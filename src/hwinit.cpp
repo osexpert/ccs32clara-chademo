@@ -53,24 +53,9 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_GPIOD);
    rcc_periph_clock_enable(RCC_GPIOE);
 
- //  rcc_periph_clock_enable(RCC_UART4);
-
-//   rcc_periph_clock_enable(RCC_TIM1); //Don't know
-//   rcc_periph_clock_enable(RCC_TIM2); //CP measurement
-//   rcc_periph_clock_enable(RCC_TIM3); //Contactor and lock driver
-//   rcc_periph_clock_enable(RCC_TIM4); //Scheduler
-
-//   rcc_periph_clock_enable(RCC_DMA1); //for SPI
-  // rcc_periph_clock_enable(RCC_DMA2); //For UART 4
-
    rcc_periph_clock_enable(RCC_ADC1);
 
-//   rcc_periph_clock_enable(RCC_CRC);
-
-   // SYSCFG handles all functions that were previously done by AFIO in earlier STM32 families, such as pin remapping and external interrupt configuration.
-   //rcc_periph_clock_enable(RCC_AFIO); //CAN
-
-   rcc_periph_clock_enable(RCC_CAN1); //CAN
+   rcc_periph_clock_enable(RCC_CAN1);
 
 //   rcc_periph_clock_enable(RCC_SPI1); //QCA comms
 }
@@ -80,16 +65,16 @@ void clock_setup(void)
 /**
 * Enable Timer refresh and break interrupts
 */
-void nvic_setup(void)
-{
-   nvic_set_priority(NVIC_TIM4_IRQ, 0xe << 4); //second lowest priority
-   nvic_enable_irq(NVIC_TIM4_IRQ); //Scheduler
-
-
-   // no idea....
-//   nvic_enable_irq(NVIC_DMA1_CHANNEL2_IRQ); //SPI RX complete
-//   nvic_set_priority(NVIC_DMA1_CHANNEL2_IRQ, 0xd << 4); //third lowest priority
-}
+//void nvic_setup(void)
+//{
+//   nvic_set_priority(NVIC_TIM4_IRQ, 0xe << 4); //second lowest priority
+//   nvic_enable_irq(NVIC_TIM4_IRQ); //Scheduler
+//
+//
+//   // no idea....
+////   nvic_enable_irq(NVIC_DMA1_CHANNEL2_IRQ); //SPI RX complete
+////   nvic_set_priority(NVIC_DMA1_CHANNEL2_IRQ, 0xd << 4); //third lowest priority
+//}
 
 //void rtc_setup()
 //{

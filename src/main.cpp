@@ -132,6 +132,7 @@ void read_pending_can_messages()
 }
 
 
+// need volatile???
 static int buttonPressedCont;
 
 void power_off(int r)
@@ -350,65 +351,6 @@ static void Ms1000Task()
     // TODO: voltages.
 }
 
-//Whichever timer(s) you use for the scheduler, you have to
-//implement their ISRs here and call into the respective scheduler
-//extern "C" void tim4_isr(void)
-//{
-//    printf("tim4_isr \r\n");
-//
-//    // Optional: clear update flag if you're using UIE
-////    if (timer_get_flag(TIM4, TIM_SR_UIF)) {
-//  //      timer_clear_flag(TIM4, TIM_SR_UIF);
-//    //}
-//
-//    scheduler->Run();
-//}
-
-
-#define TIM4_DESIRED_PERIOD_MS 10
-#define TIM4_TICK_HZ 1000000  // 1 MHz = 1 tick = 1 µs
-
-//void tim4_setup(void)
-//{
-//    rcc_periph_clock_enable(RCC_TIM4);
-//
-//    //timer_reset(TIM4);
-//    rcc_periph_reset_pulse(RST_TIM4);
-//
-//    // TODO: initial gpio values???
-//
-//    // Prescaler: 168 MHz -> 1 MHz timer clock
-//    timer_set_prescaler(TIM4, (rcc_apb1_frequency * 2 / TIM4_TICK_HZ) - 1);
-//
-//    // Auto-reload value for 10ms = 10,000 ticks @ 1 MHz
-//    timer_set_period(TIM4, 10000 - 1);
-//
-//    // Enable update interrupt (optional — if you're not using CCx match only)
-//    timer_enable_irq(TIM4, TIM_DIER_UIE);
-//
-//    // Also enable CCx channels for your scheduler to use
-//    timer_enable_irq(TIM4, TIM_DIER_CC1IE | TIM_DIER_CC2IE | TIM_DIER_CC3IE | TIM_DIER_CC4IE);
-//    timer_set_oc_mode(TIM4, TIM_OC1, TIM_OCM_FROZEN); timer_enable_oc_output(TIM4, TIM_OC1);
-//    timer_set_oc_mode(TIM4, TIM_OC2, TIM_OCM_FROZEN); timer_enable_oc_output(TIM4, TIM_OC2);
-//    timer_set_oc_mode(TIM4, TIM_OC3, TIM_OCM_FROZEN); timer_enable_oc_output(TIM4, TIM_OC3);
-//    timer_set_oc_mode(TIM4, TIM_OC4, TIM_OCM_FROZEN); timer_enable_oc_output(TIM4, TIM_OC4);
-//
-//    // Start timer
-//    timer_enable_counter(TIM4);
-//
-//    // Enable interrupt
-//    nvic_enable_irq(NVIC_TIM4_IRQ);
-//}
-
-/* Set STM32 system clock to 168 MHz. */
-//static void clock_setup(void)
-//{
-//    rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
-//
-//    /* Enable GPIOG clock. */
-//    rcc_periph_clock_enable(RCC_GPIOG);
-//}
-
 /* monotonically increasing number of milliseconds from reset
  * overflows every 49 days if you're wondering
  */
@@ -436,9 +378,6 @@ void usart1_setup(void)
 {
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_USART1);
-#if USE_USART_DMA
-    rcc_periph_clock_enable(RCC_DMA2); // DMA2 needed for USART1 TX
-#endif
 
     // PA9 = USART1_TX
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
@@ -451,62 +390,8 @@ void usart1_setup(void)
     usart_set_parity(USART1, USART_PARITY_NONE);
     usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
 
-#if USE_USART_DMA
-    // tx dma
-    usart_enable_tx_dma(USART1);
-
-    {
-        dma_stream_reset(DMA2, DMA_STREAM7);
-        dma_set_transfer_mode(DMA2, DMA_STREAM7, DMA_SxCR_DIR_MEM_TO_PERIPHERAL);
-        dma_set_peripheral_address(DMA2, DMA_STREAM7, (uint32_t)&USART_DR(USART1));
-        dma_set_peripheral_size(DMA2, DMA_STREAM7, DMA_SxCR_PSIZE_8BIT);
-        dma_set_memory_size(DMA2, DMA_STREAM7, DMA_SxCR_MSIZE_8BIT);
-        dma_enable_memory_increment_mode(DMA2, DMA_STREAM7);
-        dma_channel_select(DMA2, DMA_STREAM7, DMA_SxCR_CHSEL_4);
-
-      /*  dma_stream_reset(DMA2, hw->streamrx);
-        dma_set_transfer_mode(DMA2, hw->streamrx, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
-        dma_set_peripheral_address(DMA2, hw->streamrx, (uint32_t)&USART_DR(usart));
-        dma_set_peripheral_size(DMA2, hw->streamrx, DMA_SxCR_PSIZE_8BIT);
-        dma_set_memory_size(DMA2, hw->streamrx, DMA_SxCR_MSIZE_8BIT);
-        dma_enable_memory_increment_mode(DMA2, hw->streamrx);
-        dma_channel_select(DMA2, hw->streamrx, hw->channel);
-        dma_set_memory_address(DMA2, hw->streamrx, (uint32_t)inBuf);
-        dma_set_number_of_data(DMA2, hw->streamrx, bufSize);
-        dma_enable_stream(DMA2, hw->streamrx);*/
-    }
-#endif
-
     usart_enable(USART1);
 }
-
-//void dma2_stream7_setup(void)
-//{
-//    dma_stream_reset(DMA2, DMA_STREAM7);
-//
-//    // Set channel 4 for USART1_TX
-//    dma_channel_select(DMA2, DMA_STREAM7, DMA_SxCR_CHSEL_4);
-//
-//    dma_set_priority(DMA2, DMA_STREAM7, DMA_SxCR_PL_HIGH);
-//
-//    dma_disable_peripheral_increment_mode(DMA2, DMA_STREAM7);
-//
-//    dma_set_peripheral_address(DMA2, DMA_STREAM7, (uint32_t)&USART1_DR);
-//}
-
-
-#if USE_USART_DMA
-void usart1_dma_send(const void* data, uint16_t len, bool firstSend)
-{
-    while (!dma_get_interrupt_flag(DMA2, DMA_STREAM7, DMA_TCIF) && !firstSend);
-
-    dma_disable_stream(DMA2, DMA_STREAM7);
-    dma_set_number_of_data(DMA2, DMA_STREAM7, curIdx + 1);
-    dma_set_memory_address(DMA2, DMA_STREAM7, (uint32_t)outBuf[curBuf]);
-    dma_clear_interrupt_flags(DMA2, DMA_STREAM7, DMA_TCIF);
-    dma_enable_stream(DMA2, DMA_STREAM7);
-}
-#endif
 
 /*
  * systick_setup(void)
@@ -524,19 +409,6 @@ static void systick_setup(void)
     systick_counter_enable();
     /* this done last */
     systick_interrupt_enable();
-
-//    If the bootloader used SysTick(common in USB DFU), it might be left running or misconfigured.
-//        Always do:
-    //systick_interrupt_disable();
-    //systick_counter_disable();
-    //systick_clear();  // optional but good hygiene
-    //systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
-    //systick_set_reload(...);
-    //systick_counter_enable();
-    //systick_interrupt_enable();
-
-
-
 }
 
 
@@ -548,55 +420,6 @@ void iwdg_configure(uint16_t period_ms)
     // Start the watchdog
     iwdg_start();
 }
-
-//static void tim_setup(void)
-//{
-//    /* Enable TIM2 clock. */
-//    rcc_periph_clock_enable(RCC_TIM2);
-//
-//    /* Enable TIM2 interrupt. */
-//    nvic_enable_irq(NVIC_TIM2_IRQ);
-//
-//    /* Reset TIM2 peripheral to defaults. */
-//    rcc_periph_reset_pulse(RST_TIM2);
-//
-//    /* Timer global mode:
-//     * - No divider
-//     * - Alignment edge
-//     * - Direction up
-//     * (These are actually default values after reset above, so this call
-//     * is strictly unnecessary, but demos the api for alternative settings)
-//     */
-//    timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT,
-//        TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-//
-//    /*
-//     * Please take note that the clock source for STM32 timers
-//     * might not be the raw APB1/APB2 clocks.  In various conditions they
-//     * are doubled.  See the Reference Manual for full details!
-//     * In our case, TIM2 on APB1 is running at double frequency, so this
-//     * sets the prescaler to have the timer run at 5kHz
-//     */
-//    timer_set_prescaler(TIM2, ((rcc_apb1_frequency * 2) / 5000));
-//
-//    /* Disable preload. */
-//    timer_disable_preload(TIM2);
-//    timer_continuous_mode(TIM2);
-//
-//    /* count full range, as we'll update compare value continuously */
-//    timer_set_period(TIM2, 65535);
-//
-//    /* Set the initual output compare value for OC1. */
-//    timer_set_oc_value(TIM2, TIM_OC1, frequency_sequence[frequency_sel++]);
-//
-//    /* Counter enable. */
-//    timer_enable_counter(TIM2);
-//
-//    /* Enable Channel 1 compare interrupt to recalculate compare values */
-//    timer_enable_irq(TIM2, TIM_DIER_CC1IE);
-//}
-
-
 
 #define MAX_TASKS 4
 
@@ -710,6 +533,7 @@ extern "C" int main(void)
 
     while(1)
     {
+        // TODO: to save mem, we could do this only every 10ms instead of every 1ms as currently.
         scheduler_run();
 
         __WFI();
@@ -766,43 +590,8 @@ bool ChademoCharger::IsChargingStoppedByCharger()
     return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
 }
 
-#if USE_USART_DMA
-static const int bufSize = 128;
-static bool firstSend = true;
-static char outBuf[2][bufSize]; //double buffering
-static uint8_t curBuf;
-static int lastIdx;
-static uint32_t curIdx;
-#endif
-
 extern "C" void putchar(char c)
 {
-//    
-
-#if USE_USART_DMA
-    if (c == '\n' || curIdx == (bufSize - 1))
-    {
-        outBuf[curBuf][curIdx] = c;
-
-        usart1_dma_send(outBuf[curBuf], curIdx + 1, firstSend);
-
-        curBuf = !curBuf; //switch buffers
-        firstSend = false; //only needed once so we don't get stuck in the while loop above
-        curIdx = 0;
-    }
-    else
-    {
-        outBuf[curBuf][curIdx] = c;
-        curIdx++;
-    }
-#endif
-    //trace_send_blocking8(31, c);
-//    dma_send_usart1(&c, 1);
-
     usart_send_blocking(USART1, c);
-
-//    while (!(USART1_SR & USART_SR_TXE));  // wait until TXE (transmit buffer empty)
-  //  USART1_DR = c;
-    // TODO
 };
 
