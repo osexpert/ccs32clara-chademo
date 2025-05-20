@@ -26,67 +26,79 @@ uint16_t myethreceivebufferLen;
 
 uint16_t debugCounter_cutted_myethreceivebufferLen;
 
+
+
+uint8_t read_write_byte(uint8_t param) 
+{
+    uint8_t result = 0;
+
+    // Set Clock high
+    DigIo::spi_clock_out.Set();
+
+    for (int bit = 7; bit >= 0; --bit) {
+
+        // Clock low
+        DigIo::spi_clock_out.Clear();
+
+        // Send bit
+        if ((param >> bit) & 1)
+            DigIo::spi_mosi_out.Set();
+        else
+            DigIo::spi_mosi_out.Clear();
+
+        // Clock high
+        DigIo::spi_clock_out.Set();
+
+        // Read bit
+        bool read = DigIo::spi_miso_in.Get();
+
+        result = (result << 1) | (read == true);
+    }
+
+    // Finish Clock high
+    DigIo::spi_clock_out.Set();
+
+    return result;
+}
+
+
+
 static void mySpiTransmitReceive()
 {
-   while (SPI_SR(SPI1) & SPI_SR_BSY);
-   DigIo::spics.Clear();
-   for (uint32_t i = 0; i < mySpiDataSize; i++) {
-      mySpiRxBuffer[i] = spi_xfer(SPI1, mySpiTxBuffer[i]);
-   }
-   DigIo::spics.Set();
+    cm_disable_interrupts();
+
+    //while (SPI_SR(SPI1) & SPI_SR_BSY);
+    DigIo::spi_cs_out.Clear();
+
+    for (uint32_t i = 0; i < mySpiDataSize; i++) 
+    {
+        mySpiRxBuffer[i] = read_write_byte(mySpiTxBuffer[i]);
+    }
+
+    DigIo::spi_cs_out.Set();
+
+    cm_enable_interrupts();
 }
 
-static void dmaTransmitReceive()
+// signature reads 0 the first time, second time it reads ok, for unknown and weird reason...
+// writing one dummy byte seems to fix it....but I don't like it (ugly hack)
+void dummy_warmup_rw_one_byte(void) {
+    uint16_t sig;
+    uint8_t i;
+    i = 0;
+    mySpiTxBuffer[i++] = 0x00;
+    mySpiDataSize = i;
+    mySpiTransmitReceive();
+}
+
+void qca7000setup() 
 {
-   while (SPI_SR(SPI1) & SPI_SR_BSY);
-   dma_disable_channel(DMA1, DMA_CHANNEL2);
-   dma_disable_channel(DMA1, DMA_CHANNEL3);
-   dma_set_number_of_data(DMA1, DMA_CHANNEL2, mySpiDataSize);
-   dma_set_number_of_data(DMA1, DMA_CHANNEL3, mySpiDataSize);
-   dma_clear_interrupt_flags(DMA1, DMA_CHANNEL2, DMA_TCIF);
-   dma_clear_interrupt_flags(DMA1, DMA_CHANNEL3, DMA_TCIF);
-   dma_enable_channel(DMA1, DMA_CHANNEL2);
-   dma_enable_channel(DMA1, DMA_CHANNEL3);
-   DigIo::spics.Clear();
-   spi_enable_tx_dma(SPI1);
-   spi_enable_rx_dma(SPI1);
-   dma_enable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
-}
+   //DigIo::spi_cs_out.Set(); // 1=not selected
+   // try to fix something strange by doing a toggle...
+   //DigIo::spi_cs_out.Clear();
+   //DigIo::spi_cs_out.Set();
 
-extern "C" void dma1_channel2_isr()
-{
-   while (SPI_SR(SPI1) & SPI_SR_BSY);
-   DigIo::spics.Set();
-   spi_disable_tx_dma(SPI1);
-   spi_disable_rx_dma(SPI1);
-   dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
-}
-
-void qca7000setup() {
-   spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_16, SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
-                  SPI_CR1_CPHA_CLK_TRANSITION_1, SPI_CR1_DFF_8BIT, SPI_CR1_MSBFIRST);
-
-   spi_enable_software_slave_management(SPI1);
-   spi_set_nss_high(SPI1);
-   gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO5 | GPIO7);
-   gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO6);
-   spi_enable(SPI1);
-   DigIo::spics.Set();
-
-   dma_channel_reset(DMA1, DMA_CHANNEL3);
-   dma_set_read_from_memory(DMA1, DMA_CHANNEL3);
-   dma_set_peripheral_address(DMA1, DMA_CHANNEL3, (uint32_t)&SPI_DR(SPI1));
-   dma_set_peripheral_size(DMA1, DMA_CHANNEL3, DMA_CCR_PSIZE_8BIT);
-   dma_set_memory_size(DMA1, DMA_CHANNEL3, DMA_CCR_MSIZE_8BIT);
-   dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL3);
-   dma_set_memory_address(DMA1, DMA_CHANNEL3, (uint32_t)mySpiTxBuffer);
-
-   dma_channel_reset(DMA1, DMA_CHANNEL2);
-   dma_set_peripheral_address(DMA1, DMA_CHANNEL2, (uint32_t)&SPI_DR(SPI1));
-   dma_set_peripheral_size(DMA1, DMA_CHANNEL2, DMA_CCR_PSIZE_8BIT);
-   dma_set_memory_size(DMA1, DMA_CHANNEL2, DMA_CCR_MSIZE_8BIT);
-   dma_enable_memory_increment_mode(DMA1, DMA_CHANNEL2);
-   dma_set_memory_address(DMA1, DMA_CHANNEL2, (uint32_t)mySpiRxBuffer);
+    dummy_warmup_rw_one_byte();
 }
 
 static void spiQCA7000DemoReadSignature(void) {
@@ -100,10 +112,11 @@ static void spiQCA7000DemoReadSignature(void) {
   mySpiTxBuffer[i++]=0x00;
   mySpiDataSize = i;
   mySpiTransmitReceive();
+
   sig = mySpiRxBuffer[2];
   sig <<= 8;
   sig += mySpiRxBuffer[3];
-  printf("Hello, sig is %x\r\n", sig); /* should be AA 55  */
+  printf("QCA7000 sig is 0x%X (expected: 0xAA55)\r\n", sig); /* should be AA 55  */
 }
 
 static void spiQCA7000DemoWriteBFR_SIZE(uint16_t n) {
@@ -271,9 +284,11 @@ void spiQCA7000checkForReceivedData(void) {
     mySpiTxBuffer[i++]=0x00;
 
     mySpiDataSize = availBytes+2;
-    //mySpiTransmitReceive();
-    dmaTransmitReceive();
-    while (SPI_SR(SPI1) & SPI_SR_BSY);
+
+    mySpiTransmitReceive();
+    //dmaTransmitReceive();
+    //while (SPI_SR(SPI1) & SPI_SR_BSY);
+
     /* discard the first two bytes, they do not belong to the data */
     for (i=0; i<availBytes; i++) {
        mySpiRxBuffer[i] = mySpiRxBuffer[i+2];
@@ -317,9 +332,11 @@ void spiQCA7000SendEthFrame(void) {
   mySpiTxBuffer[10+myethtransmitbufferLen] = 0x55; /* End of frame, 2 bytes with 0x55. Aka QcaFrmCreateFooter in the linux driver */
   mySpiTxBuffer[11+myethtransmitbufferLen] = 0x55;
   mySpiDataSize = 12+myethtransmitbufferLen;
-  //mySpiTransmitReceive();
-  dmaTransmitReceive();
-  //while (SPI_SR(SPI1) & SPI_SR_BSY);
+
+  mySpiTransmitReceive();
+
+  //dmaTransmitReceive();
+  ////while (SPI_SR(SPI1) & SPI_SR_BSY);
 }
 
 /* The Ethernet transmit function. */

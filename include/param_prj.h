@@ -48,71 +48,71 @@
 //Next value Id: 2036
 /*              category     name                  unit       min     max     default id */
 #define PARAM_LIST \
-    PARAM_ENTRY(CAT_HARDWARE,UdcDivider,           "dig/V",   0,      100,    10,     1   ) \
-    PARAM_ENTRY(CAT_HARDWARE,EconomizerDuty,       "%",       0,      100,    100,    7   ) \
-    PARAM_ENTRY(CAT_HARDWARE,InletVtgSrc,          IVSRC,     0,      2,      0,      8   ) \
-    PARAM_ENTRY(CAT_HARDWARE,LockDuty,             "%",      -100,    100,    30,     14  ) \
-    PARAM_ENTRY(CAT_HARDWARE,LockRunTime,          "ms",      0,      10000,  1500,   13  ) \
-    PARAM_ENTRY(CAT_HARDWARE,LockClosedThresh,     "dig",     0,      4095,   0,      11  ) \
-    PARAM_ENTRY(CAT_HARDWARE,LockOpenThresh,       "dig",     0,      4095,   0,      12  ) \
-    PARAM_ENTRY(CAT_HARDWARE,TempSensorNomRes,     "Ohm",     1,      1000000,10000,  26  ) \
-    PARAM_ENTRY(CAT_HARDWARE,TempSensorBeta,       "",        1,      100000, 3900,   27  ) \
-    PARAM_ENTRY(CAT_HARDWARE,ppvariant,            PPVARIANT, 0,      9,      2,      28  ) \
-    PARAM_ENTRY(CAT_HARDWARE,WakeupPinFunc,        WAKEUP,    0,      4,      0,      30  ) \
-    PARAM_ENTRY(CAT_HARDWARE,AllowUnlock,          OFFON,     0,      1,      1,      32 ) \
-    PARAM_ENTRY(CAT_COMM,    NodeId,               "",        1,      63,     22,     21  ) \
-    PARAM_ENTRY(CAT_COMM,    CanSpeed,             CANSPEEDS, 0,      4,      2,      22  ) \
+/*    PARAM_ENTRY(CAT_HARDWARE,UdcDivider,           "dig/V",   0,      100,    10,     1   ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,EconomizerDuty,       "%",       0,      100,    100,    7   ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,InletVtgSrc,          IVSRC,     0,      2,      0,      8   ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,LockDuty,             "%",      -100,    100,    30,     14  ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,LockRunTime,          "ms",      0,      10000,  1500,   13  ) \  */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,LockClosedThresh,     "dig",     0,      4095,   0,      11  ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,LockOpenThresh,       "dig",     0,      4095,   0,      12  ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,TempSensorNomRes,     "Ohm",     1,      1000000,10000,  26  ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,TempSensorBeta,       "",        1,      100000, 3900,   27  ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,ppvariant,            PPVARIANT, 0,      9,      2,      28  ) \ */ \
+/*    PARAM_ENTRY(CAT_HARDWARE,WakeupPinFunc,        WAKEUP,    0,      4,      0,      30  ) \ */ \
+ /*   PARAM_ENTRY(CAT_HARDWARE,AllowUnlock,          OFFON,     0,      1,      1,      32 ) \ */ \
+/*    PARAM_ENTRY(CAT_COMM,    NodeId,               "",        1,      63,     22,     21  ) \ */ \
+ /*   PARAM_ENTRY(CAT_COMM,    CanSpeed,             CANSPEEDS, 0,      4,      2,      22  ) \ */ \
     PARAM_ENTRY(CAT_CHARGE,  MaxPower,             "kW",      0,      1000,   100,    17  ) \
     PARAM_ENTRY(CAT_CHARGE,  MaxVoltage,           "V",       0,      1000,   410,    18  ) \
     PARAM_ENTRY(CAT_CHARGE,  MaxCurrent,           "A",       0,      500,    125,    19  ) \
-    PARAM_ENTRY(CAT_CHARGE,  MaxPinTemperature,    "°C",      0,      120,    70,     31  ) \
-    PARAM_ENTRY(CAT_CHARGE,  AcChargeControl,      ACMODES,   0,      1,      0,      33  ) \
+/*    PARAM_ENTRY(CAT_CHARGE,  MaxPinTemperature,    "°C",      0,      120,    70,     31  ) \ */ \
+/*    PARAM_ENTRY(CAT_CHARGE,  AcChargeControl,      ACMODES,   0,      1,      0,      33  ) \ */ \
     TESTP_ENTRY(CAT_CHARGE,  TargetVoltage,        "V",       0,      1000,   0,      3   ) \
-    TESTP_ENTRY(CAT_CHARGE,  ChargeCurrent,        "A",       0,      500,    0,      4   ) \
+/*     TESTP_ENTRY(CAT_CHARGE,  ChargeCurrent,        "A",       0,      500,    0,      4   ) \ */ \
     TESTP_ENTRY(CAT_CHARGE,  soc,                  "%",       0,      100,    0,      5   ) \
     TESTP_ENTRY(CAT_CHARGE,  BatteryVoltage,       "V",       0,      1000,   0,      6   ) \
     TESTP_ENTRY(CAT_CHARGE,  enable,               OFFON,     0,      1,      1,      23  ) \
-    TESTP_ENTRY(CAT_CHARGE,  AcObcState,           ACOBCSTT,  0,      5,      0,      29  ) \
-    PARAM_ENTRY(CAT_TEST,    DemoVoltage,          "V",       0,      500,    0,      20  ) \
-    PARAM_ENTRY(CAT_TEST,    DemoControl,          DEMOCTRL,  0,      511,    0,      25  ) \
-    TESTP_ENTRY(CAT_TEST,    ActuatorTest,         ACTEST,    0,      7,      0,      9   ) \
+ /*   TESTP_ENTRY(CAT_CHARGE,  AcObcState,           ACOBCSTT,  0,      5,      0,      29  ) \ */ \
+/*    PARAM_ENTRY(CAT_TEST,    DemoVoltage,          "V",       0,      500,    0,      20  ) */  \
+/*    PARAM_ENTRY(CAT_TEST,    DemoControl,          DEMOCTRL,  0,      511,    0,      25  ) \ */ \
+/*    TESTP_ENTRY(CAT_TEST,    ActuatorTest,         ACTEST,    0,      7,      0,      9   ) \ */ \
     PARAM_ENTRY(CAT_TEST,    logging,              MODULES,   0,      2047,   DEFAULT_LOGGINGMASK,    15  ) \
     VALUE_ENTRY(opmode,             pevSttString,    2000 ) \
-    VALUE_ENTRY(version,            VERSTR,          2001 ) \
-    VALUE_ENTRY(lasterr,            errorListString, 2002 ) \
+/*    VALUE_ENTRY(version,            VERSTR,          2001 ) \ */ \
+/*    VALUE_ENTRY(lasterr,            errorListString, 2002 ) \ */ \
     VALUE_ENTRY(PortState,          PORTSTAT,        2030 ) \
-    VALUE_ENTRY(BasicAcCharging,    OFFON,           2031 ) \
+/*     VALUE_ENTRY(BasicAcCharging,    OFFON,           2031 ) \ */ \
     VALUE_ENTRY(EvseVoltage,        "V",             2006 ) \
     VALUE_ENTRY(EvseCurrent,        "A",             2010 ) \
-    VALUE_ENTRY(TempLimitedCurrent, "A",             2027 ) \
+/*    VALUE_ENTRY(TempLimitedCurrent, "A",             2027 ) \ */ \
     VALUE_ENTRY(EVTargetCurrent,    "A",             2029 ) \
-    VALUE_ENTRY(LimitationReason,   LIMITREASONS,    2028 ) \
-    VALUE_ENTRY(InletVoltage,       "V",             2007 ) \
+/*    VALUE_ENTRY(LimitationReason,   LIMITREASONS,    2028 ) \ */ \
+/*    VALUE_ENTRY(InletVoltage,       "V",             2007 ) \ */ \
     VALUE_ENTRY(EvseMaxCurrent,     "A",             2008 ) \
     VALUE_ENTRY(EvseMaxVoltage,     "V",             2009 ) \
-    VALUE_ENTRY(ControlPilotDuty,   "%",             2012 ) \
-    VALUE_ENTRY(temp1,              "°C",            2003 ) \
-    VALUE_ENTRY(temp2,              "°C",            2004 ) \
-    VALUE_ENTRY(temp3,              "°C",            2005 ) \
-    VALUE_ENTRY(MaxTemp,            "°C",            2024 ) \
-    VALUE_ENTRY(ContactorDuty,      "%",             2013 ) \
-    VALUE_ENTRY(AdcLockFeedback,    "dig",           2011 ) \
-    VALUE_ENTRY(AdcProximityPilot,  "dig",           2018 ) \
-    VALUE_ENTRY(ResistanceProxPilot,"ohm",           2019 ) \
-    VALUE_ENTRY(CableCurrentLimit,  "A",             2020 ) \
-    VALUE_ENTRY(EvseAcCurrentLimit, "A",             2021 ) \
-    VALUE_ENTRY(PlugPresent,        "",              2034 ) \
-    VALUE_ENTRY(AdcHwVariant,       "",              2022 ) \
-    VALUE_ENTRY(HardwareVariant,    "",              2025 ) \
-    VALUE_ENTRY(AdcIpropi,          "",              2023 ) \
+/*    VALUE_ENTRY(ControlPilotDuty,   "%",             2012 ) \ */ \
+/*    VALUE_ENTRY(temp1,              "°C",            2003 ) \ */ \
+/*    VALUE_ENTRY(temp2,              "°C",            2004 ) \ */ \
+/*    VALUE_ENTRY(temp3,              "°C",            2005 ) \ */ \
+/*    VALUE_ENTRY(MaxTemp,            "°C",            2024 ) \ */ \
+/*    VALUE_ENTRY(ContactorDuty,      "%",             2013 ) \ */ \
+/*    VALUE_ENTRY(AdcLockFeedback,    "dig",           2011 ) \ */ \
+/*    VALUE_ENTRY(AdcProximityPilot,  "dig",           2018 ) \ */ \
+/*    VALUE_ENTRY(ResistanceProxPilot,"ohm",           2019 ) \ */ \
+/*     VALUE_ENTRY(CableCurrentLimit,  "A",             2020 ) \ */ \
+/*    VALUE_ENTRY(EvseAcCurrentLimit, "A",             2021 ) \ */ \
+/*    VALUE_ENTRY(PlugPresent,        "",              2034 ) \ */ \
+/*    VALUE_ENTRY(AdcHwVariant,       "",              2022 ) \ */ \
+/*    VALUE_ENTRY(HardwareVariant,    "",              2025 ) \*/  \
+/*    VALUE_ENTRY(AdcIpropi,          "",              2023 ) \ */  \
     VALUE_ENTRY(LockState,          LOCK,            2014 ) \
     VALUE_ENTRY(StopReason,         STOPREASONS,     2017 ) \
     VALUE_ENTRY(checkpoint,         "dig",           2015 ) \
-    VALUE_ENTRY(CanWatchdog,        "dig",           2016 ) \
-    VALUE_ENTRY(CanAwake,           OFFON,           2032 ) \
-    VALUE_ENTRY(ButtonPushed,       OFFON,           2033 ) \
+/*    VALUE_ENTRY(CanWatchdog,        "dig",           2016 ) \ */ \
+/*    VALUE_ENTRY(CanAwake,           OFFON,           2032 ) \ */ \
+/*    VALUE_ENTRY(ButtonPushed,       OFFON,           2033 ) \ */ \
     VALUE_ENTRY(VehicleSideIsoMonAllowed, OFFON,     2035 ) \
-    VALUE_ENTRY(cpuload,            "%",             2094 )
+ /*   VALUE_ENTRY(cpuload,            "%",             2094 ) */
 
 
 /***** Enum String definitions *****/
@@ -188,8 +188,8 @@ enum _wakeupfuncs
 enum _inletsources
 {
    IVSRC_CHARGER,
-   IVSRC_ANAIN,
-   IVSRC_CAN
+//   IVSRC_ANAIN,
+  // IVSRC_CAN
 };
 
 enum _stopreasons

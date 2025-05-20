@@ -22,8 +22,8 @@
 /* Define memory regions. */
 MEMORY
 {
-	rom (rx)    : ORIGIN = 0x08001000, LENGTH = 508K
-	ram (rwx)   : ORIGIN = 0x20000000, LENGTH = 64K
+	rom (rx)    : ORIGIN = 0x08020000, LENGTH = 128K
+	ram (rwx)   : ORIGIN = 0x20000000, LENGTH = 128K
 }
 
 

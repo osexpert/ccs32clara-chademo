@@ -24,10 +24,10 @@
 #include "qca7000.h"
 #include "tcp.h"
 #include "udpChecksum.h"
-#include "temperatures.h"
+//#include "temperatures.h"
 #include "pushbutton.h"
-#include "hardwareVariants.h"
-#include "acOBC.h"
+//#include "hardwareVariants.h"
+//#include "acOBC.h"
 #include "my_math.h"
 #include "anain.h"
 #include "digio.h"
@@ -36,13 +36,12 @@
 #include "errormessage.h"
 #include "my_string.h"
 #include "wakecontrol.h"
+#include "libopencm3/cm3/cortex.h"
+
 
 /* temporary stubs */
 #define publishStatus(x, y)
 #define log_v(x, ...)
-
-
-
 
 
 

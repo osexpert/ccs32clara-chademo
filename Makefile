@@ -27,12 +27,14 @@ LD		      = $(PREFIX)-gcc
 OBJCOPY		= $(PREFIX)-objcopy
 OBJDUMP		= $(PREFIX)-objdump
 MKDIR_P     = mkdir -p
-CFLAGS		= -Os -Iinclude/ -Ilibopeninv/include -Ilibopencm3/include -Iexi -Iccs \
-				 -fno-common -fno-builtin -DSTM32F1 \
-				 -mcpu=cortex-m3 -mthumb -std=gnu99 -ffunction-sections -fdata-sections
-CPPFLAGS    = -Og -ggdb -Wall -Wextra -Iinclude/ -Ilibopeninv/include -Ilibopencm3/include -Iexi -Iccs \
-				-fno-common -std=c++11 -pedantic -DSTM32F1 -DUSART_BAUDRATE=921600 \
-				-ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables -mcpu=cortex-m3 -mthumb
+FPU_FLAGS = -mfloat-abi=hard -mfpu=fpv4-sp-d16
+CPU_FLAGS = -DSTM32F4 -mcpu=cortex-m4 -mthumb
+CFLAGS		= -Os -Iinclude/ -Ilibopeninv/include -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+				 -fno-common -fno-builtin \
+				 $(CPU_FLAGS) $(FPU_FLAGS) -std=gnu99 -ffunction-sections -fdata-sections
+CPPFLAGS    = -Og -ggdb -Wall -Wextra -Iinclude/ -Ilibopeninv/include -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+				-fno-common -std=c++11 -pedantic -DUSART_BAUDRATE=921600 \
+				-ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables $(CPU_FLAGS) $(FPU_FLAGS)
 # Check if the variable GITHUB_RUN_NUMBER exists. When running on the github actions running, this
 # variable is automatically available.
 # Create a compiler define with the content of the variable. Or, if it does not exist, use replacement value 0.
@@ -41,26 +43,27 @@ EXTRACOMPILERFLAGS  = $(shell \
 	 )
 
 LDSCRIPT	  = linker.ld
-LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -Wl,--gc-sections,-Map,linker.map
-OBJSL		  = main.o hwinit.o stm32scheduler.o params.o terminal.o terminal_prj.o \
+# -march=armv7e-m did the trick here?? -mcpu=cortex-m4 did nothing. or...
+LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib -Wl,--gc-sections,-Map,linker.map $(FPU_FLAGS)
+OBJSL		  = stubs.o main.o hwinit.o stm32scheduler.o params.o \
 				 my_string.o digio.o my_fp.o printf.o anain.o \
-				 param_save.o errormessage.o stm32_can.o canhardware.o canmap.o cansdo.o \
-				 picontroller.o terminalcommands.o \
+				 param_save.o errormessage.o \
 				 ipv6.o tcp.o \
-				 connMgr.o modemFinder.o pevStateMachine.o temperatures.o acOBC.o wakecontrol.o \
-				 hardwareInterface.o hardwareVariants.o pushbutton.o udpChecksum.o \
+				 connMgr.o modemFinder.o pevStateMachine.o wakecontrol.o \
+				 hardwareInterface.o pushbutton.o udpChecksum.o \
 				 homeplug.o myHelpers.o qca7000.o \
 				 appHandEXIDatatypesDecoder.o ByteStream.o EncoderChannel.o \
 				 appHandEXIDatatypesEncoder.o DecoderChannel.o EXIHeaderDecoder.o \
 				 appHandEXIDatatypes.o dinEXIDatatypesDecoder.o EXIHeaderEncoder.o \
 				 BitInputStream.o dinEXIDatatypesEncoder.o MethodsBag.o \
-				 BitOutputStream.o dinEXIDatatypes.o projectExiConnector.o
+				 BitOutputStream.o dinEXIDatatypes.o projectExiConnector.o \
+				 chademoCharger.o
 
 
 OBJS     = $(patsubst %.o,obj/%.o, $(OBJSL))
 DEPENDS := $(patsubst %.o,obj/%.d, $(OBJSL))
-vpath %.c src/ libopeninv/src exi/ ccs/
-vpath %.cpp src/ libopeninv/src exi/ ccs/
+vpath %.c src/ libopeninv/src exi/ ccs/ chademo/
+vpath %.cpp src/ libopeninv/src exi/ ccs/ chademo/
 
 OPENOCD_BASE	= /usr
 OPENOCD		= $(OPENOCD_BASE)/bin/openocd
@@ -110,7 +113,7 @@ ${OUT_DIR}:
 
 $(BINARY): $(OBJS) $(LDSCRIPT)
 	@printf "  LD      $(subst $(shell pwd)/,,$(@))\n"
-	$(Q)$(LD) $(LDFLAGS) -o $(BINARY) $(OBJS) -lopencm3_stm32f1 -lm
+	$(Q)$(LD) $(LDFLAGS) -o $(BINARY) $(OBJS) -lopencm3_stm32f4 -lm
 
 -include $(DEPENDS)
 
@@ -153,7 +156,7 @@ get-deps:
 	@printf "  GIT SUBMODULE\n"
 	$(Q)git submodule update --init
 	@printf "  MAKE libopencm3\n"
-	$(Q)${MAKE} -C libopencm3 TARGETS=stm32/f1
+	$(Q)${MAKE} -C libopencm3 TARGETS=stm32/f4
 
 Test:
 	cd test && $(MAKE)
