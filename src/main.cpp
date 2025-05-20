@@ -17,44 +17,44 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <stdint.h>
-#include <stddef.h>
+//#include <stddef.h>
 
-#include "libopencm3/cm3/cortex.h"
+//#include "libopencm3/cm3/cortex.h"
 #include <libopencm3/stm32/usart.h>
-#include <libopencm3/stm32/timer.h>
-#include <libopencm3/stm32/rtc.h>
+//#include <libopencm3/stm32/timer.h>
+//#include <libopencm3/stm32/rtc.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
 #include <libopencm3/stm32/iwdg.h>
-#include <libopencm3/stm32/desig.h>
+//#include <libopencm3/stm32/desig.h>
 #include <libopencm3/cm3/systick.h>
-#include <libopencm3/cm3/nvic.h>
-#include <libopencm3/cm3/itm.h>
-#include <libopencm3/cm3/dwt.h>
-#include <libopencm3/cm3/scs.h>
-#include <libopencm3/cm3/scb.h>
-#include <libopencm3/cm3/tpiu.h>
-#include <libopencm3/stm32/dbgmcu.h>
+//#include <libopencm3/cm3/nvic.h>
+//#include <libopencm3/cm3/itm.h>
+//#include <libopencm3/cm3/dwt.h>
+//#include <libopencm3/cm3/scs.h>
+//#include <libopencm3/cm3/scb.h>
+//#include <libopencm3/cm3/tpiu.h>
+//#include <libopencm3/stm32/dbgmcu.h>
 
 #include <libopencmsis/core_cm3.h>
 
-#include <libopencm3/stm32/rcc.h>
-#include <libopencm3/stm32/usart.h>
+//#include <libopencm3/stm32/rcc.h>
+//#include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/gpio.h>
-#include <libopencm3/stm32/dma.h>
+//#include <libopencm3/stm32/dma.h>
 
 #include "params.h"
 #include "hwdefs.h"
 #include "digio.h"
 #include "hwinit.h"
-#include "anain.h"
-#include "param_save.h"
-#include "my_math.h"
+//#include "anain.h"
+//#include "param_save.h"
+//#include "my_math.h"
 #include "errormessage.h"
 #include "printf.h"
-#include "my_string.h"
+//#include "my_string.h"
 
-#include "configuration.h"
+//#include "configuration.h"
 #include "connMgr.h"
 #include "hardwareInterface.h"
 #include "homeplug.h"
@@ -64,10 +64,11 @@
 #include "pevStateMachine.h"
 #include "qca7000.h"
 #include "tcp.h"
-#include "udpChecksum.h"
-#include "pushbutton.h"
-#include "wakecontrol.h"
+//#include "udpChecksum.h"
+//#include "pushbutton.h"
+//#include "wakecontrol.h"
 #include "chademoCharger.h"
+#include "led_blinker.h"
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
@@ -86,17 +87,22 @@ extern "C" void __cxa_pure_virtual()
 // need volatile???
 volatile static int stopButtonPressedCounter;
 
-//enum PowerOffReason
-//{
-//    StopButton
-//};
-
 static ChademoCharger* chademoCharger;
+static LedBlinker* ledBlinker;
 
-//static Stm32Scheduler* scheduler;
-
-//static bool powerOffStarted;
-
+void LedBlinker::onLedChange(bool set)
+{
+    if (set)
+    {
+        DigIo::power_led_out.Set();
+        DigIo::internal_led_out.Set();
+    }
+    else
+    {
+        DigIo::power_led_out.Clear();
+        DigIo::internal_led_out.Clear();
+    }
+}
 
 void read_pending_can_messages()
 {
@@ -130,12 +136,8 @@ void read_pending_can_messages()
         {
             chademoCharger->HandleChademoMessage(id, data);
         }
-        // Process the message (e.g., echo it back)
-        //can_transmit(CAN1, id, ext, rtr, len, data);
     }
 }
-
-
 
 
 void power_off(int r)
@@ -144,7 +146,6 @@ void power_off(int r)
 
     // If charging, we need to stop it first. Just keep holding the button and eventually it should stop
     // (unless can is just suddenly dead so the param is never updated, and same for the charger end...)
-    //
     bool lockedCcs = Param::Get(Param::LockState);
     bool lockedCha = chademoCharger->IsChargingPlugLocked();
     if (lockedCha || lockedCcs)
@@ -184,12 +185,40 @@ static void Ms100Task(void)
         printf("in task 100\r\n");
     }
 
-//    iwdg_reset();
+    ledBlinker->tick(100); // 100 ms tick
 
     read_pending_can_messages();
-
     chademoCharger->RunStateMachine();
 
+    iwdg_reset();
+
+    if (DigIo::stop_button_in_inverted.Get() == false)
+    {
+        stopButtonPressed = true; // one way street
+        stopButtonPressedCounter++;
+
+        ledBlinker->setOnOffDuration(300, 300); // short blinking
+
+        power_off(1);// PowerOffReason::StopButton);
+    }
+    else
+    {
+        stopButtonPressedCounter = 0;
+    }
+
+    if (!chargingAccomplished && Param::Get(Param::EvseCurrent) >= 5) // 5 amps
+    {
+        // dont care about chademo, if 5A is delivered it has to go somewhere:-)
+        chargingAccomplished = true; // one way street
+    }
+
+    if (!stopButtonPressed && chargingAccomplished)
+    {
+        ledBlinker->setOnOffDuration(1200, 1200); // long blinking
+    }
+
+    //    iwdg_reset();
+    // 
     //This sets a fixed point value WITHOUT calling the parm_Change() function
    // Param::SetFloat(Param::cpuload, cpuLoad / 10);
     //Param::SetInt(Param::lasterr, ErrorMessage::GetLastError());
@@ -222,39 +251,39 @@ static void Ms100Task(void)
 
 
 
-static bool onceIn500;
-
-static void Ms500Task()
-{
-    if (!onceIn500)
-    {
-        onceIn500 = true;
-        printf("in task 500\r\n");
-    }
-
-    //if (!powerOffStarted)
-    {
-        DigIo::power_led_out.Toggle();
-        DigIo::internal_led_out.Toggle();
-
-        // dog
-        // leds
-    }
-
-    iwdg_reset();
-
-    if (DigIo::stop_button_in_inverted.Get() == false)
-    {
-        stopButtonPressed = true; // one way street
-        stopButtonPressedCounter++;
-
-        power_off(1);// PowerOffReason::StopButton);
-    }
-    else
-    {
-        stopButtonPressedCounter = 0;
-    }
-}
+//static bool onceIn500;
+//
+//static void Ms500Task()
+//{
+//    if (!onceIn500)
+//    {
+//        onceIn500 = true;
+//        printf("in task 500\r\n");
+//    }
+//
+//    //if (!powerOffStarted)
+//    {
+//        DigIo::power_led_out.Toggle();
+//        DigIo::internal_led_out.Toggle();
+//
+//        // dog
+//        // leds
+//    }
+//
+//    iwdg_reset();
+//
+//    if (DigIo::stop_button_in_inverted.Get() == false)
+//    {
+//        stopButtonPressed = true; // one way street
+//        stopButtonPressedCounter++;
+//
+//        power_off(1);// PowerOffReason::StopButton);
+//    }
+//    else
+//    {
+//        stopButtonPressedCounter = 0;
+//    }
+//}
 
 static bool onceIn30;
 
@@ -511,7 +540,7 @@ extern "C" int main(void)
     //ANA_IN_CONFIGURE(ANA_IN_LIST);
 //    AnaIn::Start(); //Starts background ADC conversion via DMA
 
-    wakecontrol_init(); //Make sure board stays awake
+    //wakecontrol_init(); //Make sure board stays awake
 
     hardwareInterface_setStateB();
 
@@ -524,9 +553,12 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
+    LedBlinker lb(600, 600); // medium blibking
+    ledBlinker = &lb;
+
     scheduler_add_task(Ms30Task, 30);
     scheduler_add_task(Ms100Task, 100);
-    scheduler_add_task(Ms500Task, 500);
+//    scheduler_add_task(Ms500Task, 500);
     scheduler_add_task(Ms1000Task, 1000);
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
@@ -547,46 +579,6 @@ extern "C" int main(void)
 }
 
 
-void ChademoCharger::CanSend(int id, bool ext, bool rtr, int len, uint8_t* data)
-{
-    can_transmit(CAN1, id, ext, rtr, len, data);
-};
-
-void ChademoCharger::SetSwitchD2(bool set)
-{
-    if (set)
-        DigIo::switch_d2_out_inverted.Clear(); // 0: on
-    else
-        DigIo::switch_d2_out_inverted.Set(); // 1: off
-};
-
-bool ChademoCharger::GetSwitchK()
-{
-    return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
-};
-
-bool ChademoCharger::IsChargingStoppedByAdapter()
-{
-    return stopButtonPressed;
-};
-
-void ChademoCharger::NotifyAdapterGpioStuffAfterContactorClosed()
-{
-    // wonder what this is...
-    DigIo::chademo_unknown_out.Set();
-    // DigIo::internal_led_out.Clear(); pointless
-};
-
-void ChademoCharger::StopPowerDelivery()
-{
-    // TODO: also lower the voltage?
-    Param::Set(Param::enable, false);
-};
-
-bool ChademoCharger::IsChargingStoppedByCharger()
-{
-    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
-}
 
 extern "C" void putchar(char c)
 {

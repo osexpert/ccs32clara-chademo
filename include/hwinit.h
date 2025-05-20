@@ -28,6 +28,8 @@ extern "C"
 
 	// volatile?
 volatile static bool stopButtonPressed;
+// we delivered some (more than 5)  amps?
+volatile static bool chargingAccomplished;
 
 void can_setup(void);
 void clock_setup(void);

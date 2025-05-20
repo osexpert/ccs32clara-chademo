@@ -57,7 +57,7 @@ OBJSL		  = main.o hwinit.o params.o \
 				 appHandEXIDatatypes.o dinEXIDatatypesDecoder.o EXIHeaderEncoder.o \
 				 BitInputStream.o dinEXIDatatypesEncoder.o MethodsBag.o \
 				 BitOutputStream.o dinEXIDatatypes.o projectExiConnector.o \
-				 chademoCharger.o
+				 chademoCharger.o chademoHardware.o led_blinker.o
 
 
 OBJS     = $(patsubst %.o,obj/%.o, $(OBJSL))

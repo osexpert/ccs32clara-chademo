@@ -63,10 +63,10 @@ void wakecontrol_mainfunction(void) /* runs in 100ms cycle */
 
     //}
 }
-
-void wakecontrol_init(void) {
-    //DigIo::keep_power_on.Set(); /* Make sure board stays awake. */
-    //allowSleep=0;
-}
-
-
+//
+//void wakecontrol_init(void) {
+//    //DigIo::keep_power_on.Set(); /* Make sure board stays awake. */
+//    //allowSleep=0;
+//}
+//
+//

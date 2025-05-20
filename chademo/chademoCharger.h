@@ -202,11 +202,6 @@ struct ChargerData
 class ChademoCharger
 {
 public:
-    ChargerState _state = ChargerState::Start;
-
-    CarData _carData;
-    ChargerData _chargerData;
-
     /// <summary>
     /// Iyitially some values are wrong, such as soc, capacity etc. Spec also say they car is allowed to change cenrtain stuff until k-switch,
     /// but not after, so assuming this is the point where all params will be valid.
@@ -252,10 +247,6 @@ public:
 
     void StopPowerDelivery();
     bool GetSwitchK();
-
-    int _delayCycles;
-    int _logCounter;
-    bool _locked;
 
     bool IsChargingPlugLocked()
     {
@@ -314,4 +305,16 @@ public:
 
         return "Unknown";
     };
+
+    private:
+
+        int _delayCycles;
+        int _logCounter;
+        bool _locked;
+
+
+        ChargerState _state = ChargerState::Start;
+
+        CarData _carData;
+        ChargerData _chargerData;
 };
