@@ -83,7 +83,6 @@ static void mySpiTransmitReceive()
 // signature reads 0 the first time, second time it reads ok, for unknown and weird reason...
 // writing one dummy byte seems to fix it....but I don't like it (ugly hack)
 void dummy_warmup_rw_one_byte(void) {
-    uint16_t sig;
     uint8_t i;
     i = 0;
     mySpiTxBuffer[i++] = 0x00;
