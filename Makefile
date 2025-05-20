@@ -45,7 +45,7 @@ EXTRACOMPILERFLAGS  = $(shell \
 LDSCRIPT	  = linker.ld
 # -march=armv7e-m did the trick here?? -mcpu=cortex-m4 did nothing. or...
 LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib -Wl,--gc-sections,-Map,linker.map $(FPU_FLAGS)
-OBJSL		  = stubs.o main.o hwinit.o params.o \
+OBJSL		  = main.o hwinit.o params.o \
 				 my_string.o digio.o my_fp.o printf.o anain.o \
 				 param_save.o errormessage.o \
 				 ipv6.o tcp.o \

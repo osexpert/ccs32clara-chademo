@@ -82,6 +82,10 @@ extern "C" void __cxa_pure_virtual()
     while (1);
 }
 
+
+// need volatile???
+volatile static int stopButtonPressedCounter;
+
 //enum PowerOffReason
 //{
 //    StopButton
@@ -132,8 +136,7 @@ void read_pending_can_messages()
 }
 
 
-// need volatile???
-static int buttonPressedCont;
+
 
 void power_off(int r)
 {
@@ -149,7 +152,7 @@ void power_off(int r)
     {
         printf("power off request denied, connector is logically locked ccs:%d cha:%d... pending stop charging. just keep pressing stop button.\r\n", lockedCcs, lockedCha);
 
-        bool buttonPressed30Seconds = buttonPressedCont > 60;
+        bool buttonPressed30Seconds = stopButtonPressedCounter > 60; // 30 seconds
         if (buttonPressed30Seconds)
             printf("Stop pressed for 30sec...ignoring the lock....\r\n");
         else
@@ -242,13 +245,14 @@ static void Ms500Task()
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        power_off(1);// PowerOffReason::StopButton);
+        stopButtonPressed = true; // one way street
+        stopButtonPressedCounter++;
 
-        buttonPressedCont++;
+        power_off(1);// PowerOffReason::StopButton);
     }
     else
     {
-        buttonPressedCont = 0;
+        stopButtonPressedCounter = 0;
     }
 }
 
@@ -497,7 +501,7 @@ extern "C" int main(void)
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        // power down at startup
+        // emergency power down at startup
         power_off(3);
     }
 
@@ -563,13 +567,8 @@ bool ChademoCharger::GetSwitchK()
 
 bool ChademoCharger::IsChargingStoppedByAdapter()
 {
-    return DigIo::stop_button_in_inverted.Get() == false;
+    return stopButtonPressed;
 };
-
-//bool ChademoCharger::AdapterStopBeforeCharging()
-//{
-//    return DigIo::stop_button_in_inverted.Get() == false;
-//};
 
 void ChademoCharger::NotifyAdapterGpioStuffAfterContactorClosed()
 {
@@ -581,7 +580,6 @@ void ChademoCharger::NotifyAdapterGpioStuffAfterContactorClosed()
 void ChademoCharger::StopPowerDelivery()
 {
     // TODO: also lower the voltage?
-
     Param::Set(Param::enable, false);
 };
 
@@ -595,3 +593,7 @@ extern "C" void putchar(char c)
     usart_send_blocking(USART1, c);
 };
 
+//double __aeabi_f2d(float f) {
+//    return (double)f;
+//}
+// 

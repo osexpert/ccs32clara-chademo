@@ -195,7 +195,7 @@ void ChademoCharger::RunStateMachine()
             // Charger should drop its voltage below 25 % of circuit voltage within 1 second. I guess this is the help.
             // I a charger is not helping WD, it can not drop its voltage this quickly, in case the car will probably skip WD (after 4 sec).
             // It may be hard to know up front if ccs can drop volt this quickly.
-            //StopVoltageDelivery();
+            StopVoltageDelivery();
 
             // The log take 2 seconds from remove of CHARGER_STATUS_CHARGING to car log showing CAR_STATUS_CONTACTOR_OPEN (yes, it used this tme to do welding detection)
 

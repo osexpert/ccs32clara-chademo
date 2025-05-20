@@ -226,27 +226,17 @@ public:
     void SetState(ChargerState newState)
     {
         printf("cha: enter state %d (%s)\r\n", newState, GetStateName());
-
         _state = newState;
     };
-
-    //bool ChargerStopBeforeCharging(void) 
-    //{
-    //    // don't know how to detect.
-    //    return false;
-    //};
 
     void SetSwitchD1(bool set) 
     {
         (void)set; // unused warn
         // adapter seem to do nothing here...
     };
+
     void SetSwitchD2(bool set);
-
-    //void StopVoltageDelivery() 
-    //{
-    //};
-
+    void StopVoltageDelivery() {/* NOP */ }
     bool IsChargingStoppedByAdapter();
     
     void SetChargerSetMaxCurrent(uint16_t maxA)
@@ -260,7 +250,6 @@ public:
         _chargerData.AvailableOutputVoltage = maxV;
     };
 
-   // bool AdapterStopBeforeCharging();
     void StopPowerDelivery();
     bool GetSwitchK();
 
@@ -285,21 +274,19 @@ public:
     };
 
     void NotifyAdapterGpioStuffAfterContactorClosed();
-
-    void PerformInsulationTest() 
-    {
-        // NOP
-    };
-
+    void PerformInsulationTest() { /* NOP */ }
+    
     bool IsPreChargeDone_PowerDeliveryOk_AdapterContactorClosed_Hot()
     {
         // TODO: can we wait for precharge done?
         //kickoff: end of precharge or start of powerDelivery
         return true;
     };
+
     void NotifyCarAskingForAmps_ChargingStarted_ChargerShouldStartDeliveringAmps()
     {
     };
+
     bool IsChargingStoppedByCharger();
     
 

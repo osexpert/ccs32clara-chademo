@@ -38,3 +38,14 @@ void sanityCheck(const char*) {
     /* todo: check the canaries, config registers, maybe stack, ... */
 }
 
+extern "C" void* memcpy(void* __restrict target, const void* __restrict source, size_t length)
+{
+    uint8_t* dst = (uint8_t*)target;
+    const uint8_t* src = (const uint8_t*)source;
+
+    while (length--) {
+        *dst++ = *src++;
+    }
+
+    return dst;
+};

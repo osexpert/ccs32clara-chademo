@@ -142,7 +142,7 @@ bool hardwareInterface_stopChargeRequested()
 {
     uint8_t stopReason = STOP_REASON_NONE;
 
-    if (DigIo::stop_button_in_inverted.Get() == false)//  pushbutton_isPressed500ms()) 
+    if (stopButtonPressed)//  pushbutton_isPressed500ms()) 
     {
         stopReason = STOP_REASON_BUTTON;
         Param::SetInt(Param::StopReason, stopReason);
