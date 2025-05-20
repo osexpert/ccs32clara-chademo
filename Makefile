@@ -29,10 +29,10 @@ OBJDUMP		= $(PREFIX)-objdump
 MKDIR_P     = mkdir -p
 FPU_FLAGS = -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CPU_FLAGS = -DSTM32F4 -mcpu=cortex-m4 -mthumb
-CFLAGS		= -Os -Iinclude/ -Ilibopeninv/include -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+CFLAGS		= -Os -Iinclude/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
 				 -fno-common -fno-builtin \
 				 $(CPU_FLAGS) $(FPU_FLAGS) -std=gnu99 -ffunction-sections -fdata-sections
-CPPFLAGS    = -Og -ggdb -Wall -Wextra -Iinclude/ -Ilibopeninv/include -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+CPPFLAGS    = -Og -ggdb -Wall -Wextra -Iinclude/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
 				-fno-common -std=c++11 -pedantic -DUSART_BAUDRATE=921600 \
 				-ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables $(CPU_FLAGS) $(FPU_FLAGS)
 # Check if the variable GITHUB_RUN_NUMBER exists. When running on the github actions running, this
@@ -45,7 +45,7 @@ EXTRACOMPILERFLAGS  = $(shell \
 LDSCRIPT	  = linker.ld
 # -march=armv7e-m did the trick here?? -mcpu=cortex-m4 did nothing. or...
 LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib -Wl,--gc-sections,-Map,linker.map $(FPU_FLAGS)
-OBJSL		  = stubs.o main.o hwinit.o stm32scheduler.o params.o \
+OBJSL		  = stubs.o main.o hwinit.o params.o \
 				 my_string.o digio.o my_fp.o printf.o anain.o \
 				 param_save.o errormessage.o \
 				 ipv6.o tcp.o \
@@ -102,8 +102,6 @@ cleanDebug:clean
 images: $(BINARY)
 	@printf "  OBJCOPY $(BINARY).bin\n"
 	$(Q)$(OBJCOPY) -Obinary $(BINARY) $(BINARY).bin
-	@printf "  OBJCOPY $(BINARY).hex\n"
-	$(Q)$(OBJCOPY) -Oihex $(BINARY) $(BINARY).hex
 	$(Q)$(SIZE) $(BINARY)
 
 directories: ${OUT_DIR}
@@ -132,23 +130,11 @@ clean:
 	$(Q)rm -f $(BINARY)
 	@printf "  CLEAN   $(BINARY).bin\n"
 	$(Q)rm -f $(BINARY).bin
-	@printf "  CLEAN   $(BINARY).hex\n"
-	$(Q)rm -f $(BINARY).hex
 	@printf "  CLEAN   $(BINARY).srec\n"
 	$(Q)rm -f $(BINARY).srec
 	@printf "  CLEAN   $(BINARY).list\n"
 	$(Q)rm -f $(BINARY).list
 
-flash: images
-	@printf "  FLASH   $(BINARY).bin\n"
-	@# IMPORTANT: Don't use "resume", only "reset" will work correctly!
-	$(Q)$(OPENOCD) -s $(OPENOCD_SCRIPTS) \
-				 -f $(OPENOCD_FLASHER) \
-				 -f $(OPENOCD_BOARD) \
-				 -c "init" -c "reset halt" \
-				 -c "flash write_image erase $(BINARY).hex" \
-				 -c "reset" \
-				 -c "shutdown" $(NULL)
 
 .PHONY: directories images clean
 

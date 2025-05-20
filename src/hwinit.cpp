@@ -33,7 +33,6 @@
 #include <libopencm3/stm32/desig.h>
 #include "hwdefs.h"
 #include "hwinit.h"
-#include "stm32_loader.h"
 #include "my_string.h"
 
 /**

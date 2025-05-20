@@ -41,13 +41,8 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/gpio.h>
-//#include <libopencm3/stm32/nvic.h>
 #include <libopencm3/stm32/dma.h>
 
-//#include "stm32_can.h"
-//#include "canmap.h"
-//#include "cansdo.h"
-//#include "terminal.h"
 #include "params.h"
 #include "hwdefs.h"
 #include "digio.h"
@@ -57,8 +52,6 @@
 #include "my_math.h"
 #include "errormessage.h"
 #include "printf.h"
-#include "stm32scheduler.h"
-//#include "terminalcommands.h"
 #include "my_string.h"
 
 #include "configuration.h"
@@ -72,10 +65,7 @@
 #include "qca7000.h"
 #include "tcp.h"
 #include "udpChecksum.h"
-//#include "temperatures.h"
 #include "pushbutton.h"
-//#include "hardwareVariants.h"
-//#include "acOBC.h"
 #include "wakecontrol.h"
 #include "chademoCharger.h"
 
@@ -648,8 +638,6 @@ void scheduler_run(void)
         }
     }
 }
-
-
 
 extern "C" int main(void)
 {
