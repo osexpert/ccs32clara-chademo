@@ -83,7 +83,7 @@ int Set(PARAM_NUM ParamNum, s32fp ParamVal)
     if (ParamVal >= attribs[ParamNum].min && ParamVal <= attribs[ParamNum].max)
     {
         values[ParamNum] = ParamVal;
-        Change(ParamNum);
+        Change(ParamNum); // FIXME: its a bit weird that this is the only Set that call Change. It make no sense...
         res = 0;
     }
     return res;

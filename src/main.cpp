@@ -217,6 +217,10 @@ static void Ms100Task(void)
         ledBlinker->setOnOffDuration(1200, 1200); // long blinking
     }
 
+    // mirror these values (Change method is only called for some params...)
+    chademoCharger->SetChargerSetMaxCurrent(Param::GetInt(Param::EvseMaxCurrent));
+    chademoCharger->SetChargerSetMaxVoltage(Param::GetInt(Param::EvseMaxVoltage));
+
     //    iwdg_reset();
     // 
     //This sets a fixed point value WITHOUT calling the parm_Change() function
@@ -327,36 +331,41 @@ static void SetMacAddress()
 /** This function is called when the user changes a parameter */
 void Param::Change(Param::PARAM_NUM paramNum)
 {
+    (void)paramNum;
+    // This does not suit my neads. I guess I could change so it triggered on all params. But I did a manual mirror in 100ms instead.
+
 //    static bool enableReceived = false;
 
-    switch (paramNum)
-    {
-    case Param::EVTargetCurrent:
-        //Charge current is the single most important item that must be constantly updated
-        //by the BMS or VCU. Whenever it is updated we feed the dog
-        //When it is no longer updated the dog will bark and stop the charge session
-        //if (enableReceived)
-        //Param::SetInt(Param::CanWatchdog, 0);
-        //enableReceived = false; //this will be set back to true once enable is received again
-        break;
+    //switch (paramNum)
+    //{
+    //case Param::EVTargetCurrent:
+    //    //Charge current is the single most important item that must be constantly updated
+    //    //by the BMS or VCU. Whenever it is updated we feed the dog
+    //    //When it is no longer updated the dog will bark and stop the charge session
+    //    //if (enableReceived)
+    //    //Param::SetInt(Param::CanWatchdog, 0);
+    //    //enableReceived = false; //this will be set back to true once enable is received again
+    //    break;
 
-    // OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
-    case Param::enable:
-        //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
-        //When it is no longer updated the dog will bark and stop the charge session
-        //enableReceived = true;
-        break;
+    //// OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
+    //case Param::enable:
+    //    //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
+    //    //When it is no longer updated the dog will bark and stop the charge session
+    //    //enableReceived = true;
+    //    break;
 
-    case Param::EvseMaxCurrent:
-        chademoCharger->SetChargerSetMaxCurrent(Param::GetInt(Param::EvseMaxCurrent));
-        break;
-    case Param::EvseMaxVoltage:
-        chademoCharger->SetChargerSetMaxVoltage(Param::GetInt(Param::EvseMaxVoltage));
-        break;
-    default:
-        //Handle general parameter changes here. Add paramNum labels for handling specific parameters
-        break;
-    }
+    //case Param::EvseMaxCurrent:
+    //    // FIXME: Since set with SetFloat.....Change is not called!!!!!!!!!!!!!! What logic is this?????????????????????
+    //    
+    //    break;
+    //case Param::EvseMaxVoltage:
+    //    // FIXME: Since set with SetFloat.....Change is not called!!!!!!!!!!!!!! What logic is this?????????????????????
+    //    
+    //    break;
+    //default:
+    //    //Handle general parameter changes here. Add paramNum labels for handling specific parameters
+    //    break;
+    //}
 }
 
 static void PrintTrace()
@@ -367,6 +376,7 @@ static void PrintTrace()
     const char* label = pevSttLabels[state];
 
     //if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_counter_val() - lastSttPrint) >= 100 || lastState != state))
+    // I guess the >= 100 does not matter now that we call it every 1000ms.
     if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
     {
         lastSttPrint = rtc_get_ms();// counter_val();
