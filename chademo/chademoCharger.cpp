@@ -6,8 +6,20 @@
 
 #define LAST_ASKING_FOR_AMPS_TIMEOUT 10 // 10 x 100ms = 1sec.
 
+/// <summary>
+/// TODO: should we not send can immediately?
+/// TODO: should we stop sending can at some point?
+/// </summary>
 void ChademoCharger::RunStateMachine()
 {
+    _cyclesInState++;
+    uint16_t timeout_s = GetStateTimeoutSec();
+    if (timeout_s > 0 && (timeout_s * 10) > _cyclesInState)
+    {
+        printf("cha: timeout for state %s\r\n", GetStateName());
+
+    }
+
     if (_delayCycles > 0)
     {
         _delayCycles--;
@@ -48,32 +60,18 @@ void ChademoCharger::RunStateMachine()
     {
         printf("cha: start\r\n");
 
-        SetSwitchD1(true);
+        SetSwitchD1(true); // will trigger car sending can
 
-        SetState(ChargerState::WaitForChargerReady);
+        SetState(ChargerState::WaitForCarReadyToCharge);
     }
-    else if (_state == ChargerState::WaitForChargerReady)
+    else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
-        if (IsChargerReady())
-        {
-            SetState(ChargerState::WaitForCarSwitchK);
-        }
-    }
-    else if (_state == ChargerState::WaitForCarSwitchK)
-    {
-        if (GetSwitchK() == true)
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE) && GetSwitchK() == true)
         {
             // spec: car should not update MaxChargingTimeMins after SwitchK, so take it here
             // Take car as initial value and countdown the minutes
             _chargerData.RemainingChargeTimeMins = _carData.MaxChargingTimeMins;
 
-            SetState(ChargerState::WaitForCarReadyToCharge);
-        }
-    }
-    else if (_state == ChargerState::WaitForCarReadyToCharge)
-    {
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE))
-        {
             SetState(ChargerState::CarReadyToCharge);
         }
     }
@@ -112,7 +110,7 @@ void ChademoCharger::RunStateMachine()
             // Contactors closed
 
             // Adapter set 2 GPIO's at this point. They do not fit into the spec/flow chart in any way...so its not easy to tell what they are.
-            NotifyAdapterGpioStuffAfterContactorClosed();
+            NotifyCarContactorsClosed();
 
             // At this point, deliveredVolts should match battery + 10v?
             // No...I think it should be 0 and gradually increased.
@@ -137,7 +135,7 @@ void ChademoCharger::RunStateMachine()
             // Take car as initial value and countdown the minutes
             //_chargerData.RemainingChargeTimeMins = _carData.MaxChargingTimeMins;
 
-            NotifyCarAskingForAmps_ChargingStarted_ChargerShouldStartDeliveringAmps();
+            NotifyCarAskingForAmps();
 
             SetState(ChargerState::ChargingLoop);
         }
@@ -155,7 +153,7 @@ void ChademoCharger::RunStateMachine()
         if (GetSwitchK() == false) set_flag(&stopReason, StopReason::CAR_K_OFF);
         if (IsChargingStoppedByCharger()) set_flag(&stopReason, StopReason::CHARGER);
         if (IsChargingStoppedByAdapter()) set_flag(&stopReason, StopReason::ADAPTER_STOP_BUTTON);
-        if (_carData.SinceLastAskingAmpsCounter++ > LAST_ASKING_FOR_AMPS_TIMEOUT) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
+        if (_carData.CyclesSinceLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
 
         if (stopReason != StopReason::NONE)
         {
@@ -222,7 +220,8 @@ void ChademoCharger::RunStateMachine()
         {
             SetState(ChargerState::Stopping_UnlockPlug);
         }
-     }
+    }
+    // TODO: if can is lost, the machine will halt and we never get to unlock the plug
     else if (_state == ChargerState::Stopping_UnlockPlug)
     {
         SetSwitchD1(false);
@@ -239,6 +238,8 @@ void ChademoCharger::RunStateMachine()
         // nop
         printf("cha: the end\r\n");
     }
+
+    // TODO: we need some place to do all cleanup in case of timeout.
 
     if (_logCounter++ > 10)
     {
@@ -363,11 +364,9 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
         if (_carData.AskingAmps > ADAPTER_MAX_AMPS)
             _carData.AskingAmps = ADAPTER_MAX_AMPS;
 
+        Param::Set(Param::ChargeCurrent, _carData.AskingAmps);
         // for timeout
-        _carData.SinceLastAskingAmpsCounter = 0;
-
-        Param::Set(Param::EVTargetCurrent, _carData.AskingAmps);
-
+        _carData.CyclesSinceLastAskingAmps = 0;
 
         _carData.Faults = (CarFaults)data[4];
         _carData.Status = (CarStatus)data[5];

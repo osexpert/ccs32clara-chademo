@@ -114,8 +114,8 @@ enum ChargerState
     Start,
 //    WaitForChargerAvailableVoltAndCurrent,
     //SendCarStartSignal, // D1
-    WaitForChargerReady,
-    WaitForCarSwitchK,
+    //WaitForChargerReady,
+    //WaitForCarSwitchK,
     WaitForCarReadyToCharge,
     CarReadyToCharge, // LockPlug
     WaitForChargerHot, // D2
@@ -140,7 +140,7 @@ struct CarData
     // Valid after kSwitch
     uint16_t TargetVoltage;
 
-    uint16_t SinceLastAskingAmpsCounter;
+    uint16_t CyclesSinceLastAskingAmps;
 
     //ushort BattNominalVoltage = > (ushort)Program.get_estimated_nominal_voltage(TargetVoltage);
     uint8_t AskingAmps;
@@ -222,6 +222,7 @@ public:
     {
         printf("cha: enter state %d (%s)\r\n", newState, GetStateName());
         _state = newState;
+        _cyclesInState = 0;
     };
 
     void SetSwitchD1(bool set) 
@@ -258,13 +259,14 @@ public:
         _locked = lock;
     };
 
-    bool IsChargerReady()
-    {
-        // kickoff: Start of precharge??
-        return true;
-    };
+    //bool IsChargerReady()
+    //{
+    //    // kickoff: Start of precharge??
+    //    // or end...maybe? hardwareInterface_setPowerRelayOn??
+    //    return true;
+    //};
 
-    void NotifyAdapterGpioStuffAfterContactorClosed();
+    void NotifyCarContactorsClosed();
     void PerformInsulationTest() { /* NOP */ }
     
     bool IsPreChargeDone_PowerDeliveryOk_AdapterContactorClosed_Hot()
@@ -274,7 +276,7 @@ public:
         return true;
     };
 
-    void NotifyCarAskingForAmps_ChargingStarted_ChargerShouldStartDeliveringAmps()
+    void NotifyCarAskingForAmps()
     {
     };
 
@@ -288,8 +290,8 @@ public:
         switch (_state)
         {
         case ChargerState::Start: return "Start";
-        case ChargerState::WaitForChargerReady: return "WaitForChargerReady";
-        case ChargerState::WaitForCarSwitchK: return "WaitForCarSwitchK";
+        //case ChargerState::WaitForChargerReady: return "WaitForChargerReady";
+        //case ChargerState::WaitForCarSwitchK: return "WaitForCarSwitchK";
         case ChargerState::WaitForCarReadyToCharge: return "WaitForCarReadyToCharge";
         case ChargerState::CarReadyToCharge: return "CarReadyToCharge";
         case ChargerState::WaitForChargerHot: return "WaitForChargerHot";
@@ -306,15 +308,42 @@ public:
         return "Unknown";
     };
 
+    /// <summary>
+    /// Time allowed in a state. 0 = no limit
+    /// </summary>
+    /// <returns></returns>
+    uint16_t GetStateTimeoutSec()
+    {
+        switch (_state)
+        {
+        case ChargerState::Start: return 0;
+        //case ChargerState::WaitForChargerReady: return 0;
+        //case ChargerState::WaitForCarSwitchK: return 0;
+        case ChargerState::WaitForCarReadyToCharge: return 0;
+        case ChargerState::CarReadyToCharge: return 0; // plug locked here. so important that we unlock again, if something is stuck.
+        case ChargerState::WaitForChargerHot: return 10;
+        case ChargerState::WaitForCarContactorsClosed: return 10;
+        case ChargerState::WaitForCarAskingAmps: return 10;
+        case ChargerState::ChargingLoop: return 0;
+        case ChargerState::Stopping_WaitForLowAmpsDelivered: return 10;
+        case ChargerState::Stopping_WaitForCarContactorsOpen: return 10;
+        case ChargerState::Stopping_WaitForLowVoltsDelivered: return 10;
+        case ChargerState::Stopping_UnlockPlug: return 0;
+        case ChargerState::End: return 0;
+        }
+
+        return 0;
+    };
+
     private:
 
-        int _delayCycles;
-        int _logCounter;
-        bool _locked;
-
+        int _delayCycles = 0;
+        int _logCounter = 0;
+        bool _locked = false;
+        int _cyclesInState = 0;
 
         ChargerState _state = ChargerState::Start;
 
-        CarData _carData;
-        ChargerData _chargerData;
+        CarData _carData = {};
+        ChargerData _chargerData = {};
 };

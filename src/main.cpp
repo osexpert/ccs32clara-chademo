@@ -85,7 +85,7 @@ extern "C" void __cxa_pure_virtual()
 
 
 // need volatile???
-volatile static int stopButtonPressedCounter;
+volatile static int stopButtonPressedCounter = 0;
 
 static ChademoCharger* chademoCharger;
 static LedBlinker* ledBlinker;
@@ -94,13 +94,13 @@ void LedBlinker::onLedChange(bool set)
 {
     if (set)
     {
-        DigIo::power_led_out.Set();
-        DigIo::internal_led_out.Set();
+        DigIo::internal_led_out_inverted.Clear();
+        DigIo::external_led_out_inverted.Clear();
     }
     else
     {
-        DigIo::power_led_out.Clear();
-        DigIo::internal_led_out.Clear();
+        DigIo::internal_led_out_inverted.Set();
+        DigIo::external_led_out_inverted.Set();
     }
 }
 
@@ -139,41 +139,64 @@ void read_pending_can_messages()
     }
 }
 
-
-void power_off(int r)
+void power_off(int i)
 {
-    printf("power off request %d\r\n", r);
+    printf("Power off now %d. Bye!\r\n", i);
 
-    // If charging, we need to stop it first. Just keep holding the button and eventually it should stop
-    // (unless can is just suddenly dead so the param is never updated, and same for the charger end...)
-    bool lockedCcs = Param::Get(Param::LockState);
-    bool lockedCha = chademoCharger->IsChargingPlugLocked();
-    if (lockedCha || lockedCcs)
-        //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
-    {
-        printf("power off request denied, connector is logically locked ccs:%d cha:%d... pending stop charging. just keep pressing stop button.\r\n", lockedCcs, lockedCha);
+    DigIo::switch_d1_out.Clear();
 
-        bool buttonPressed30Seconds = stopButtonPressedCounter > 60; // 30 seconds
-        if (buttonPressed30Seconds)
-            printf("Stop pressed for 30sec...ignoring the lock....\r\n");
-        else
-            return;
-    }
-
-    printf("Power off now. Bye!\r\n");
-
-    DigIo::contactor_out.Clear();
+    // stop can?
 
     DigIo::power_on_out.Clear();
 
-    DigIo::internal_led_out.Set();
-    DigIo::power_led_out.Set();
+    DigIo::external_led_out_inverted.Set(); // led off
+    DigIo::internal_led_out_inverted.Set(); // led off
 
     while (1)
     {
         __WFI();
     }
 }
+
+void power_off_check()
+{
+    // fixme: power off after charging?
+
+    if (stopButtonPressed)
+    {
+//        printf("stopButtonPressed\r\n", r);
+
+        bool buttonPressed30Seconds = stopButtonPressedCounter > 60; // 30 seconds
+        if (buttonPressed30Seconds)
+        {
+            printf("Stop pressed for 30sec...\r\n");
+            power_off(1);
+        }
+
+        bool lockedCcs = Param::Get(Param::LockState) == LOCK_CLOSED;
+        bool lockedCha = chademoCharger->IsChargingPlugLocked();
+
+        if (lockedCha || lockedCcs)
+            //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
+        {
+            printf("power off request denied, connector is logically locked ccs:%d cha:%d... pending stop charging. just keep pressing stop button.\r\n", lockedCcs, lockedCha);
+            return;
+        }
+
+        printf("Both unlocked so power off");
+        power_off(2);
+    }
+}
+
+enum GlobalState
+{
+    Init,
+    AmpsAsked, // > 0
+    AmpsDelivered, // > 5
+    AmpsDeliveryDone // <= 5 (obs can be temp drop of amps...should use a different logic...
+};
+
+//static GlobalState _globalState = GlobalState::Init;
 
 static bool onceIn100;
 
@@ -198,15 +221,13 @@ static void Ms100Task(void)
         stopButtonPressedCounter++;
 
         ledBlinker->setOnOffDuration(300, 300); // short blinking
-
-        power_off(1);// PowerOffReason::StopButton);
     }
     else
     {
         stopButtonPressedCounter = 0;
     }
 
-    if (!chargingAccomplished && Param::Get(Param::EvseCurrent) >= 5) // 5 amps
+    if (!chargingAccomplished && Param::Get(Param::EvseCurrent) > 5) // 5 amps
     {
         // dont care about chademo, if 5A is delivered it has to go somewhere:-)
         chargingAccomplished = true; // one way street
@@ -221,8 +242,8 @@ static void Ms100Task(void)
     chademoCharger->SetChargerSetMaxCurrent(Param::GetInt(Param::EvseMaxCurrent));
     chademoCharger->SetChargerSetMaxVoltage(Param::GetInt(Param::EvseMaxVoltage));
 
-    //    iwdg_reset();
-    // 
+    power_off_check();
+
     //This sets a fixed point value WITHOUT calling the parm_Change() function
    // Param::SetFloat(Param::cpuload, cpuLoad / 10);
     //Param::SetInt(Param::lasterr, ErrorMessage::GetLastError());
@@ -252,52 +273,8 @@ static void Ms100Task(void)
     //}
 }
 
-
-
-
-//static bool onceIn500;
-//
-//static void Ms500Task()
-//{
-//    if (!onceIn500)
-//    {
-//        onceIn500 = true;
-//        printf("in task 500\r\n");
-//    }
-//
-//    //if (!powerOffStarted)
-//    {
-//        DigIo::power_led_out.Toggle();
-//        DigIo::internal_led_out.Toggle();
-//
-//        // dog
-//        // leds
-//    }
-//
-//    iwdg_reset();
-//
-//    if (DigIo::stop_button_in_inverted.Get() == false)
-//    {
-//        stopButtonPressed = true; // one way street
-//        stopButtonPressedCounter++;
-//
-//        power_off(1);// PowerOffReason::StopButton);
-//    }
-//    else
-//    {
-//        stopButtonPressedCounter = 0;
-//    }
-//}
-
-static bool onceIn30;
-
 static void Ms30Task()
 {
-    if (!onceIn30) {
-        onceIn30 = true;
-        printf("in task 30\r\n");
-    }
-
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
@@ -356,16 +333,10 @@ void Param::Change(Param::PARAM_NUM paramNum)
 
     //case Param::EvseMaxCurrent:
     //    // FIXME: Since set with SetFloat.....Change is not called!!!!!!!!!!!!!! What logic is this?????????????????????
-    //    
     //    break;
     //case Param::EvseMaxVoltage:
     //    // FIXME: Since set with SetFloat.....Change is not called!!!!!!!!!!!!!! What logic is this?????????????????????
-    //    
     //    break;
-    //default:
-    //    //Handle general parameter changes here. Add paramNum labels for handling specific parameters
-    //    break;
-    //}
 }
 
 static void PrintTrace()
@@ -393,6 +364,7 @@ static void Ms1000Task()
 
     // TODO: voltages.
 }
+
 
 /* monotonically increasing number of milliseconds from reset
  * overflows every 49 days if you're wondering
@@ -524,12 +496,12 @@ extern "C" int main(void)
     DigIo::spi_cs_out.Set();
     DigIo::spi_clock_out.Set();
     DigIo::state_c_out_inverted.Set();
+    DigIo::switch_d1_out.Clear();
     DigIo::contactor_out.Clear();
-    DigIo::chademo_unknown_out.Clear();
     DigIo::spi_mosi_out.Set();
 
-    DigIo::power_led_out.Set();
-    DigIo::internal_led_out.Set();
+    DigIo::internal_led_out_inverted.Set(); // led off
+    DigIo::external_led_out_inverted.Set(); // led off
 
     usart1_setup();
 
@@ -570,10 +542,11 @@ extern "C" int main(void)
     scheduler_add_task(Ms100Task, 100);
 //    scheduler_add_task(Ms500Task, 500);
     scheduler_add_task(Ms1000Task, 1000);
+    
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
-  //  Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-//    Param::Change(Param::PARAM_LAST); //Call callback one for general parameter propagation
+    Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
+    Param::Change(Param::PARAM_LAST); //Call callback one for general parameter propagation????
 
     printf("begin WFI loop\r\n");
 

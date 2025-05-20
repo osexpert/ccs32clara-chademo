@@ -66,7 +66,10 @@ int16_t hardwareInterface_getChargingTargetVoltage(void)
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
-    return Param::GetInt(Param::EVTargetCurrent);
+    int16_t iOriginalDemand = Param::GetInt(Param::ChargeCurrent); /* the current demand from BMS */
+    // already limited on chademo side to 200A
+    //Param::SetInt(Param::EVTargetCurrent, iOriginalDemand);
+    return iOriginalDemand;
 }
 
 uint8_t hardwareInterface_getSoc(void)
@@ -83,13 +86,18 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 void hardwareInterface_setPowerRelayOn(void)
 {
     printf("close adapter contactor\r\n");
-    DigIo::contactor_out.Set();
+    // D1 does not belong here??? or possibly...this will kick of the can...
+    // even so....i would have used a different signaling
+    DigIo::switch_d1_out.Set();
+
+
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
     printf("open adapter contactor\r\n");
-    DigIo::contactor_out.Clear();
+    // adapter does nothing here...
+    //DigIo::unknown_relay_out.Clear();
 }
 
 void hardwareInterface_setStateB(void)

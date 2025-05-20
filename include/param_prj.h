@@ -68,7 +68,7 @@
 /*    PARAM_ENTRY(CAT_CHARGE,  MaxPinTemperature,    "°C",      0,      120,    70,     31  ) \ */ \
 /*    PARAM_ENTRY(CAT_CHARGE,  AcChargeControl,      ACMODES,   0,      1,      0,      33  ) \ */ \
     TESTP_ENTRY(CAT_CHARGE,  TargetVoltage,        "V",       0,      1000,   0,      3   ) \
-/*     TESTP_ENTRY(CAT_CHARGE,  ChargeCurrent,        "A",       0,      500,    0,      4   ) \ */ \
+    TESTP_ENTRY(CAT_CHARGE,  ChargeCurrent,        "A",       0,      500,    0,      4   ) \
     TESTP_ENTRY(CAT_CHARGE,  soc,                  "%",       0,      100,    0,      5   ) \
     TESTP_ENTRY(CAT_CHARGE,  BatteryVoltage,       "V",       0,      1000,   0,      6   ) \
     TESTP_ENTRY(CAT_CHARGE,  enable,               OFFON,     0,      1,      1,      23  ) \
@@ -85,7 +85,7 @@
     VALUE_ENTRY(EvseVoltage,        "V",             2006 ) \
     VALUE_ENTRY(EvseCurrent,        "A",             2010 ) \
 /*    VALUE_ENTRY(TempLimitedCurrent, "A",             2027 ) \ */ \
-    VALUE_ENTRY(EVTargetCurrent,    "A",             2029 ) \
+/*    VALUE_ENTRY(EVTargetCurrent,    "A",             2029 ) \ */ \
 /*    VALUE_ENTRY(LimitationReason,   LIMITREASONS,    2028 ) \ */ \
 /*    VALUE_ENTRY(InletVoltage,       "V",             2007 ) \ */ \
     VALUE_ENTRY(EvseMaxCurrent,     "A",             2008 ) \

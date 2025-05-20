@@ -28,11 +28,11 @@ bool ChademoCharger::IsChargingStoppedByAdapter()
     return stopButtonPressed;
 };
 
-void ChademoCharger::NotifyAdapterGpioStuffAfterContactorClosed()
+void ChademoCharger::NotifyCarContactorsClosed()
 {
-    // wonder what this is...
-    DigIo::chademo_unknown_out.Set();
-    // DigIo::internal_led_out.Clear(); pointless
+    // close our contactor too. it is not opened until power off
+    DigIo::contactor_out.Set();
+    // DigIo::external_led_out.Clear(); led on. pointless?
 };
 
 void ChademoCharger::StopPowerDelivery()

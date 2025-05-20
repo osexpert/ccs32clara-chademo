@@ -1,3 +1,20 @@
+# ccs32clara-chademo
+
+Alternative firmware for adapter that uses My407ccs2chademo.bin.
+It may use a stm32f407 cpu.
+It has a boot loader with support for firmware update from usb fat32, very nice.
+
+It has an internal 210-1200VDC transformator to charge the batteries. Out 12.6VDC 2A.
+It has 2 batteries. One short and one long. The long one seems to drive electronics. Guessing the short one drive contactors?
+2 stop buttons, but they are the same GPIO for both.
+
+Currently in development and untested/not working.
+Difference from original firmware:
+No automatic shutdown, timeout (todo: but auto shutdown after charging would be nice)
+Stop-button shut down adapter immediately, unless adapter is charging. If charging, stop button will set a flag and charging should eventually end.
+TODO: auto off after end of charging?
+Hold down stop-button continously for 30 seconds to force shutdown (emergency mode).
+Led: medium blinks: starting, long blinks: charging, short blinks: pending shutdown
 
 # ccs32clara
 
