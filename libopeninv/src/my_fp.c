@@ -27,7 +27,8 @@ char* fp_itoa(char * buf, s32fp a)
 {
    int sign = a < 0?-1:1;
    int32_t nat = (sign * a) >> FRAC_DIGITS;
-   uint32_t frac = ((UTOA_FRACDEC * ((sign * a) & FRAC_MASK))) >> FRAC_DIGITS;
+   //uint32_t frac = ((UTOA_FRACDEC * ((sign * a) & FRAC_MASK))) >> FRAC_DIGITS; 42.42 => 42.40 trunc
+   uint32_t frac = ((UTOA_FRACDEC * ((sign * a) & FRAC_MASK)) + (1 << (FRAC_DIGITS - 1))) >> FRAC_DIGITS; // 42.42 => 42.41 round
    char *p = buf;
    if (sign < 0)
    {

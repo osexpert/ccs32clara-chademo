@@ -22,6 +22,7 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/usart.h>
+#include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/dma.h>
@@ -31,7 +32,6 @@
 #include <libopencm3/stm32/spi.h>
 #include <libopencm3/stm32/flash.h>
 #include <libopencm3/stm32/desig.h>
-#include "hwdefs.h"
 #include "hwinit.h"
 #include "my_string.h"
 
@@ -58,6 +58,24 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_CAN1);
 
 //   rcc_periph_clock_enable(RCC_SPI1); //QCA comms
+}
+
+/*
+ * systick_setup(void)
+ *
+ * This function sets up the 1khz "system tick" count. The SYSTICK counter is a
+ * standard feature of the Cortex-M series.
+ */
+void systick_setup(void)
+{
+    /* clock rate / 1000 to get 1mS interrupt rate */
+    systick_set_reload(168000 - 1); // 1ms
+    //systick_set_reload(1680000); // for 168 MHz core clock -> 10ms
+
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
+    systick_counter_enable();
+    /* this done last */
+    systick_interrupt_enable();
 }
 
 
@@ -89,29 +107,30 @@ extern volatile uint32_t system_millis;
 /**
 * returns the number of milliseconds since startup
 */
-uint32_t rtc_get_ms(void) {
+uint32_t rtc_get_ms(void) 
+{
     //return rtc_get_counter_val()*10; /* The RTC has a 10ms tick (see rtc_setup()). So we multiply by 10 to get the milliseconds. */
     return ::system_millis;
 }
 
-
-
-
 void can_setup(void) {
 
-    // Enable CAN1 clock
-
     rcc_periph_clock_enable(RCC_CAN1);
+    rcc_periph_clock_enable(RCC_GPIOD);
+
+    // Configure GPIOD pin 0 as AF9, Pull-Up, Very High Speed, Alternate function push-pull. Can RX.
+    gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO0);
+    gpio_set_af(GPIOD, GPIO_AF9, GPIO0);
+//    gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO0);
+
+    // Configure GPIOD pin 1 as AF9, No Pull, Very High Speed, Alternate function push-pull. Can TX.
+    gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO1);
+    gpio_set_af(GPIOD, GPIO_AF9, GPIO1);
+  //  gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
+
     can_reset(CAN1);
 
-    // CAN initialization with 500 kbps baud rate
-
     // Configure CAN for 500 kbps assuming APB1 clock is 42 MHz
-
-    /*int can_init(uint32_t canport, bool ttcm, bool abom, bool awum, bool nart,
-        bool rflm, bool txfp, uint32_t sjw, uint32_t ts1, uint32_t ts2,
-        uint32_t brp, bool loopback, bool silent);*/
-
     can_init(CAN1,
         false,           // TTCM (Time Triggered Communication Mode)
         true,            // ABOM (Automatic Bus-Off Management)
@@ -120,13 +139,12 @@ void can_setup(void) {
         false,           // RFLM (Receive FIFO Locked Mode)
         false,           // TXFP (Transmit FIFO Priority)
         CAN_BTR_SJW_1TQ,
-        CAN_BTR_TS1_13TQ,
+        CAN_BTR_TS1_11TQ,
         CAN_BTR_TS2_2TQ,
         6, // Baudrate prescaler (for 500 kbps)
         false, // loopback
-        false // silent?
+        false // silent
         );              
-
 
     // Accepts 0x100, 0x101, 0x102 — standard IDs, data frames
     can_filter_id_mask_32bit_init(
@@ -137,10 +155,30 @@ void can_setup(void) {
         true                    // Enable filter
     );
 
+    // Don't use irq's. Polling seems to work fine and dropped messages should not matter.
 
     // Enable interrupts for FIFO 0 message received TODO currently polling
 //    can_enable_interrupt(CAN1, CAN_IER_FMPIE0);
 
     // Enable CAN1 RX0 interrupt in the NVIC TODO currently polling
 //    nvic_enable_irq(NVIC_CAN1_RX0_IRQ);
+}
+
+void usart1_setup(void)
+{
+    rcc_periph_clock_enable(RCC_GPIOA);
+    rcc_periph_clock_enable(RCC_USART1);
+
+    // PA9 = USART1_TX
+    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
+    gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
+
+    usart_set_baudrate(USART1, 115200);
+    usart_set_databits(USART1, 8);
+    usart_set_stopbits(USART1, USART_STOPBITS_1);
+    usart_set_mode(USART1, USART_MODE_TX);
+    usart_set_parity(USART1, USART_PARITY_NONE);
+    usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
+
+    usart_enable(USART1);
 }

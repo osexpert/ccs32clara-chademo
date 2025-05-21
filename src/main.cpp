@@ -18,43 +18,19 @@
  */
 #include <stdint.h>
 //#include <stddef.h>
-
-//#include "libopencm3/cm3/cortex.h"
 #include <libopencm3/stm32/usart.h>
-//#include <libopencm3/stm32/timer.h>
-//#include <libopencm3/stm32/rtc.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
 #include <libopencm3/stm32/iwdg.h>
-//#include <libopencm3/stm32/desig.h>
 #include <libopencm3/cm3/systick.h>
-//#include <libopencm3/cm3/nvic.h>
-//#include <libopencm3/cm3/itm.h>
-//#include <libopencm3/cm3/dwt.h>
-//#include <libopencm3/cm3/scs.h>
-//#include <libopencm3/cm3/scb.h>
-//#include <libopencm3/cm3/tpiu.h>
-//#include <libopencm3/stm32/dbgmcu.h>
-
 #include <libopencmsis/core_cm3.h>
-
-//#include <libopencm3/stm32/rcc.h>
-//#include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/gpio.h>
-//#include <libopencm3/stm32/dma.h>
 
 #include "params.h"
-#include "hwdefs.h"
 #include "digio.h"
 #include "hwinit.h"
-//#include "anain.h"
-//#include "param_save.h"
-//#include "my_math.h"
 #include "errormessage.h"
 #include "printf.h"
-//#include "my_string.h"
-
-//#include "configuration.h"
 #include "connMgr.h"
 #include "hardwareInterface.h"
 #include "homeplug.h"
@@ -64,11 +40,10 @@
 #include "pevStateMachine.h"
 #include "qca7000.h"
 #include "tcp.h"
-//#include "udpChecksum.h"
-//#include "pushbutton.h"
-//#include "wakecontrol.h"
 #include "chademoCharger.h"
 #include "led_blinker.h"
+#include "my_fp.h"
+#include "scheduler.h"
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
@@ -104,51 +79,19 @@ void LedBlinker::onLedChange(bool set)
     }
 }
 
-void read_pending_can_messages()
+
+void power_off(const char* reason)
 {
-    uint32_t id;
-    bool is_extended;
-    bool is_rtr;
-    uint8_t filter_match_index;
-    uint8_t dlc;
-    uint8_t data[8];
-    uint16_t ts;
+    printf("Power off: %s. Bye!\r\n", reason);
 
-    // Check if a message is received in FIFO 0
-    while (can_fifo_pending(CAN1, 0) > 0) 
-    {
-        // Read the message from FIFO 0
-        // Call the receive function
-        uint32_t result = can_receive(
-            0,           // CAN port (e.g., 0 for CAN1)
-            0,           // FIFO (usually 0 or 1)
-            true,        // release = true → frees the mailbox after reading
-            &id,
-            &is_extended,
-            &is_rtr,
-            &filter_match_index,
-            &dlc,
-            data,
-            &ts
-        );
-
-        if (result)
-        {
-            chademoCharger->HandleChademoMessage(id, data);
-        }
-    }
-}
-
-void power_off(int i)
-{
-    printf("Power off now %d. Bye!\r\n", i);
-
+    // weird...i dont think this has any effect
     DigIo::switch_d1_out.Clear();
 
     // stop can?
 
     DigIo::power_on_out.Clear();
 
+    // and wont these be turned off now anyways? when power goes...
     DigIo::external_led_out_inverted.Set(); // led off
     DigIo::internal_led_out_inverted.Set(); // led off
 
@@ -160,67 +103,74 @@ void power_off(int i)
 
 void power_off_check()
 {
+    static bool stopButtonPressedMsgTrigger;
+
     // fixme: power off after charging?
 
-    if (stopButtonPressed)
+    if (stopButtonPressedTrigger)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
     {
-//        printf("stopButtonPressed\r\n", r);
+        if (!stopButtonPressedMsgTrigger)
+        {
+            printf("Stop button pressed. Stop pending...\r\n");
+            stopButtonPressedMsgTrigger = true;
+        }
 
         bool buttonPressed30Seconds = stopButtonPressedCounter > 60; // 30 seconds
         if (buttonPressed30Seconds)
         {
-            printf("Stop pressed for 30sec...\r\n");
-            power_off(1);
+            power_off("Stop pressed for 30sec");
         }
 
        // bool lockedCcs = Param::Get(Param::LockState) == LOCK_CLOSED;
        // bool lockedCha = chademoCharger->IsChargingPlugLocked();
 
         // I Think it only need to check ccs here, i trust it more. If ccs is not delivering amps, it should not matter what chademo says.
-        if (Param::Get(Param::LockState) == LOCK_CLOSED)//lockedCha || lockedCcs)
+        if (Param::GetInt(Param::LockState) == LOCK_CLOSED)//lockedCha || lockedCcs)
             //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
         {
-            printf("power off request denied, connector is logically locked... pending stop charging. press for 30sec for emergency shutdown.\r\n");
+            //printf("Power off request denied, connector is (logically) locked. pending stop charging. press for 30sec for emergency shutdown.\r\n");
             return;
         }
 
-        printf("Unlocked so power off");
-        power_off(2);
+        power_off("Stop pressed & plug unlocked");
     }
 }
 
-enum GlobalState
+//enum GlobalState
+//{
+//    Init,
+//    AmpsAsked, // > 0
+//    AmpsDelivered, // > 5
+//    AmpsDeliveryDone // <= 5 (obs can be temp drop of amps...should use a different logic...
+//};
+
+enum AdapterState
 {
     Init,
-    AmpsAsked, // > 0
-    AmpsDelivered, // > 5
-    AmpsDeliveryDone // <= 5 (obs can be temp drop of amps...should use a different logic...
+    CcsPlugLocked,
+    //CcsDeliveringAmps,
+    CcsPlugUnlocked
 };
 
 //static GlobalState _globalState = GlobalState::Init;
 
-static bool onceIn100;
-
-static volatile bool _ccsStart = false;
+static volatile bool _ccsKickoff = false;
+// FIXME: find a good wad to manage auto power off. By some custom wdog etc.
+// OR maybe...if chargingAccomplished + currently stopped\unlocked (imply 0 amps delivered))?
+static volatile uint16_t _autoPowerOffCycles100ms = 0; // 100ms. Wait max 5min = 10 * 60 * 5 = 3000
 
 static void Ms100Task(void)
 {
-    if (!onceIn100)
-    {
-        onceIn100 = true;
-        printf("in task 100\r\n");
-    }
-
     ledBlinker->tick(100); // 100 ms tick
 
-    read_pending_can_messages();
+    chademoCharger->ReadPendingCanMessages();
     chademoCharger->RunStateMachine();
 
     iwdg_reset();
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        stopButtonPressed = true; // one way street
+        stopButtonPressedTrigger = true; // one way street
         stopButtonPressedCounter++;
 
         ledBlinker->setOnOffDuration(300, 300); // short blinking
@@ -230,13 +180,16 @@ static void Ms100Task(void)
         stopButtonPressedCounter = 0;
     }
 
-    if (!chargingAccomplished && Param::Get(Param::EvseCurrent) > 5) // 5 amps
+    // TODO: maybe simply use Locked state? When locked, we assume chargingAccomplished. Then when unlocked, we power off.
+    // Becuse of we locked and unlocked, it does not matter if we delivered amps or not (for most cases)
+    if (!chargerDeliveredAmpsTrigger && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
     {
-        // dont care about chademo, if 5A is delivered it has to go somewhere:-)
-        chargingAccomplished = true; // one way street
+        // dont care about chademo, if amps delivered it has to go somewhere:-)
+        chargerDeliveredAmpsTrigger = true; // triggered
     }
 
-    if (!stopButtonPressed && chargingAccomplished)
+    // todo: use plug locked trigger instead?
+    if (!stopButtonPressedTrigger && chargerDeliveredAmpsTrigger)
     {
         ledBlinker->setOnOffDuration(1200, 1200); // long blinking
     }
@@ -245,22 +198,21 @@ static void Ms100Task(void)
     chademoCharger->SetChargerSetMaxCurrent(Param::GetInt(Param::EvseMaxCurrent));
     chademoCharger->SetChargerSetMaxVoltage(Param::GetInt(Param::EvseMaxVoltage));
 
-    if (!_ccsStart)
+    if (!_ccsKickoff)
     {
         // chademo will set these and then ccs can start
-        _ccsStart = Param::Get(Param::BatteryVoltage) > 0
-            && Param::Get(Param::MaxVoltage) > 0
-            && Param::Get(Param::TargetVoltage) > 0;
+        // TODO: wait until soc has correct value.....need to check some value?
+        _ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
+            && Param::GetInt(Param::MaxVoltage) > 0
+            && Param::GetInt(Param::TargetVoltage) > 0;
 
-        if (_ccsStart)
-            printf("ccs kickoff, voltages satisfied!");
+        if (_ccsKickoff)
+            printf("ccs kickoff, voltages satisfied!\r\n");
+//        else
+  //          _cyclesWaitingForCcsStart++; auto power off attempt...
     }
 
     power_off_check();
-
-    //This sets a fixed point value WITHOUT calling the parm_Change() function
-   // Param::SetFloat(Param::cpuload, cpuLoad / 10);
-    //Param::SetInt(Param::lasterr, ErrorMessage::GetLastError());
 
     //Watchdog
     //int wd = Param::GetInt(Param::CanWatchdog);
@@ -276,21 +228,14 @@ static void Ms100Task(void)
 
     //CAN bus a sleep !!!to decide
     //Param::SetInt(Param::CanAwake, (rtc_get_counter_val() - can->GetLastRxTimestamp()) < 200);
-
     //Param::SetInt(Param::CanAwake, (rtc_get_ms() - can->GetLastRxTimestamp()) < 200);
-
     //wakecontrol_mainfunction();
-
-    //if (DigIo::stop_button_in_inverted.Get() == false)
-    //{
-    //    power_off(1);// PowerOffReason::StopButton);
-    //}
 }
 
 
 static void Ms30Task()
 {
-    if (!_ccsStart)
+    if (!_ccsKickoff)
         return;
 
     spiQCA7000checkForReceivedData();
@@ -301,10 +246,6 @@ static void Ms30Task()
     tcp_Mainfunction();
     pevStateMachine_Mainfunction();
 
-    //    pushbutton_handlePushbutton();
-    //    Param::SetInt(Param::ButtonPushed, pushbutton_isPressed500ms());
-
-        //ErrorMessage::SetTime(rtc_get_counter_val());
     ErrorMessage::SetTime(rtc_get_ms());
 }
 
@@ -324,63 +265,54 @@ static void SetMacAddress()
 }
 
 /** This function is called when the user changes a parameter */
-void Param::Change(Param::PARAM_NUM paramNum)
-{
-    (void)paramNum;
-    // This does not suit my neads. I guess I could change so it triggered on all params. But I did a manual mirror in 100ms instead.
+//void Param::Change(Param::PARAM_NUM paramNum)
+//{
+////    static bool enableReceived = false;
+//    //switch (paramNum)
+//    //{
+//    //case Param::EVTargetCurrent:
+//    //    //Charge current is the single most important item that must be constantly updated
+//    //    //by the BMS or VCU. Whenever it is updated we feed the dog
+//    //    //When it is no longer updated the dog will bark and stop the charge session
+//    //    //if (enableReceived)
+//    //    //Param::SetInt(Param::CanWatchdog, 0);
+//    //    //enableReceived = false; //this will be set back to true once enable is received again
+//    //    break;
+//    //// OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
+//    //case Param::enable:
+//    //    //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
+//    //    //When it is no longer updated the dog will bark and stop the charge session
+//    //    //enableReceived = true;
+//    //    break;
+//}
 
-//    static bool enableReceived = false;
-
-    //switch (paramNum)
-    //{
-    //case Param::EVTargetCurrent:
-    //    //Charge current is the single most important item that must be constantly updated
-    //    //by the BMS or VCU. Whenever it is updated we feed the dog
-    //    //When it is no longer updated the dog will bark and stop the charge session
-    //    //if (enableReceived)
-    //    //Param::SetInt(Param::CanWatchdog, 0);
-    //    //enableReceived = false; //this will be set back to true once enable is received again
-    //    break;
-
-    //// OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
-    //case Param::enable:
-    //    //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
-    //    //When it is no longer updated the dog will bark and stop the charge session
-    //    //enableReceived = true;
-    //    break;
-
-    //case Param::EvseMaxCurrent:
-    //    // FIXME: Since set with SetFloat.....Change is not called!!!!!!!!!!!!!! What logic is this?????????????????????
-    //    break;
-    //case Param::EvseMaxVoltage:
-    //    // FIXME: Since set with SetFloat.....Change is not called!!!!!!!!!!!!!! What logic is this?????????????????????
-    //    break;
-}
-
-static void PrintTrace()
+static void PrintCcsTrace()
 {
     int state = Param::GetInt(Param::opmode);
     const char* label = pevSttLabels[state];
 
 //    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
-    {
-  //      lastSttPrint = rtc_get_ms();// counter_val();
-        printf("In state %s. TcpRetries %u. out:%uA,%uV max:%uA,%uV car:%uA,t:%uV,b:%uV\r\n", label,
-            tcp_getTotalNumberOfRetries(),
-            Param::Get(Param::EvseCurrent),
-            Param::Get(Param::EvseVoltage),
-            Param::Get(Param::EvseMaxCurrent),
-            Param::Get(Param::EvseMaxVoltage),
-            Param::Get(Param::ChargeCurrent),
-            Param::Get(Param::TargetVoltage),
-            Param::Get(Param::BatteryVoltage)
-            );
-    }
+        //      lastSttPrint = rtc_get_ms();// counter_val();
+    printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n", 
+        label,
+        tcp_getTotalNumberOfRetries(),
+        Param::GetInt(Param::EvseVoltage),
+        Param::GetInt(Param::EvseCurrent),
+        Param::GetInt(Param::EvseMaxVoltage),
+        Param::GetInt(Param::EvseMaxCurrent),
+        // car
+        Param::GetInt(Param::ChargeCurrent),
+        Param::GetInt(Param::TargetVoltage),
+        Param::GetInt(Param::BatteryVoltage),
+        Param::GetInt(Param::MaxVoltage),
+        Param::GetInt(Param::MaxCurrent)
+    );
 }
 
 static void Ms1000Task()
 {
-    PrintTrace();
+    if (_ccsKickoff)
+        PrintCcsTrace();
 
     // TODO: print voltages.
 }
@@ -397,54 +329,12 @@ extern "C" void sys_tick_handler(void)
     system_millis += 1;
 }
 
-uint32_t get_system_millis()
-{
-    return system_millis;
-}
-
 /* sleep for delay milliseconds */
 //static void msleep(uint32_t delay)
 //{
 //    uint32_t wake = system_millis + delay;
 //    while (wake > system_millis);
 //}
-
-void usart1_setup(void)
-{
-    rcc_periph_clock_enable(RCC_GPIOA);
-    rcc_periph_clock_enable(RCC_USART1);
-
-    // PA9 = USART1_TX
-    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
-    gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
-
-    usart_set_baudrate(USART1, 115200);
-    usart_set_databits(USART1, 8);
-    usart_set_stopbits(USART1, USART_STOPBITS_1);
-    usart_set_mode(USART1, USART_MODE_TX);
-    usart_set_parity(USART1, USART_PARITY_NONE);
-    usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
-
-    usart_enable(USART1);
-}
-
-/*
- * systick_setup(void)
- *
- * This function sets up the 1khz "system tick" count. The SYSTICK counter is a
- * standard feature of the Cortex-M series.
- */
-static void systick_setup(void)
-{
-    /* clock rate / 1000 to get 1mS interrupt rate */
-    systick_set_reload(168000 - 1); // 1ms
-    //systick_set_reload(1680000); // for 168 MHz core clock -> 10ms
-
-    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
-    systick_counter_enable();
-    /* this done last */
-    systick_interrupt_enable();
-}
 
 
 void iwdg_configure(uint16_t period_ms)
@@ -454,47 +344,6 @@ void iwdg_configure(uint16_t period_ms)
 
     // Start the watchdog
     iwdg_start();
-}
-
-#define MAX_TASKS 4
-
-typedef void (*task_func_t)(void);
-
-typedef struct {
-    task_func_t task;
-    uint32_t period_ms;
-    uint32_t next_run;
-    uint8_t enabled;
-} scheduler_task_t;
-
-static scheduler_task_t tasks[MAX_TASKS];
-static uint8_t task_count = 0;
-//extern volatile uint32_t system_millis;  // from your systick driver
-
-// Add a task to the scheduler
-int scheduler_add_task(task_func_t func, uint32_t period_ms)
-{
-    if (task_count >= MAX_TASKS) {
-        return -1; // no space
-    }
-    tasks[task_count].task = func;
-    tasks[task_count].period_ms = period_ms;
-    tasks[task_count].next_run = system_millis + period_ms;
-    tasks[task_count].enabled = 1;
-    task_count++;
-    return 0;
-}
-
-// Run scheduler loop (call this in main)
-void scheduler_run(void)
-{
-    uint32_t now = system_millis;
-    for (uint8_t i = 0; i < task_count; i++) {
-        if (tasks[i].enabled && ((int32_t)(now - tasks[i].next_run) >= 0)) {
-            tasks[i].task();
-            tasks[i].next_run += tasks[i].period_ms;
-        }
-    }
 }
 
 extern "C" int main(void)
@@ -513,12 +362,16 @@ extern "C" int main(void)
     DIG_IO_CONFIGURE(DIG_IO_LIST);
 
     DigIo::power_on_out.Set();
+
     DigIo::spi_cs_out.Set();
     DigIo::spi_clock_out.Set();
+    DigIo::spi_mosi_out.Set();
+
     DigIo::state_c_out_inverted.Set();
+
     DigIo::switch_d1_out.Clear();
     DigIo::contactor_out.Clear();
-    DigIo::spi_mosi_out.Set();
+    // d2?
 
     DigIo::internal_led_out_inverted.Set(); // led off
     DigIo::external_led_out_inverted.Set(); // led off
@@ -527,17 +380,17 @@ extern "C" int main(void)
 
     printf("ccs32clara-chademo v0.1\r\n");
 
-    printf("rcc_ahb_frequency:%d, rcc_apb1_frequency:%d, rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
+    printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        // emergency power down at startup
-        power_off(3);
+        power_off("Stop button pressed during startup");
     }
 
     systick_setup();
 
+    can_setup();
 
     //ANA_IN_CONFIGURE(ANA_IN_LIST);
 //    AnaIn::Start(); //Starts background ADC conversion via DMA
@@ -555,7 +408,7 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
-    LedBlinker lb(600, 600); // medium blibking
+    LedBlinker lb(600, 600); // medium blinking
     ledBlinker = &lb;
 
     scheduler_add_task(Ms30Task, 30);
@@ -563,16 +416,15 @@ extern "C" int main(void)
 //    scheduler_add_task(Ms500Task, 500);
     scheduler_add_task(Ms1000Task, 1000);
     
-
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-    Param::Change(Param::PARAM_LAST); //Call callback one for general parameter propagation????
+    // TODO: set Param::MaxCurrent to 200?? does it matter? can it hurt? could choose from battery size...
 
     printf("begin WFI loop\r\n");
 
     while(1)
     {
-        // TODO: to save mem, we could do this only every 10ms instead of every 1ms as currently.
+        // TODO: to save cpu, we could do this only every 10ms instead of every 1ms as currently.
         scheduler_run();
 
         __WFI();
@@ -588,7 +440,9 @@ extern "C" void putchar(char c)
     usart_send_blocking(USART1, c);
 };
 
-//double __aeabi_f2d(float f) {
+//extern "C" double __aeabi_f2d(float f) {
 //    return (double)f;
 //}
-// 
+//extern "C" float __aeabi_d2f(double f) {
+//    return (float)f;
+//}

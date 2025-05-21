@@ -192,30 +192,16 @@ struct ChargerData
 
     // initial value from car, charger count it down
     uint8_t RemainingChargeTimeMins;
-
-
     uint16_t ThresholdVoltage;
-
 };
 
 
 class ChademoCharger
 {
 public:
-    /// <summary>
-    /// Iyitially some values are wrong, such as soc, capacity etc. Spec also say they car is allowed to change cenrtain stuff until k-switch,
-    /// but not after, so assuming this is the point where all params will be valid.
-    /// </summary>
-    /// <returns></returns>
-    /*bool CarDataCanBeUsedSafely()
-    {
-        return _state > ChargerState::CarReadyToCharge;
-    }*/
 
     void SendCanMessages();
-
     void RunStateMachine(void);
-
 	void HandleChademoMessage(uint32_t id, uint8_t* data);
 
     void SetState(ChargerState newState)
@@ -276,6 +262,8 @@ public:
     bool IsChargingStoppedByCharger();
     
     void CanSend(int id, bool ext, bool rem, int len, uint8_t* data);
+
+    void ReadPendingCanMessages();
 
     const char* GetStateName()
     {

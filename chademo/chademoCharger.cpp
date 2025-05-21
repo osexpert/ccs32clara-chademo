@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "chademoCharger.h"
 #include "params.h"
+#include "my_fp.h"
 
 #define LAST_ASKING_FOR_AMPS_TIMEOUT 10 // 10 x 100ms = 1sec.
 
@@ -52,7 +53,7 @@ void ChademoCharger::RunStateMachine()
 
         // set to the minimum of AvailableOutputVoltage and MaxChargeVoltage, until charging start.
         // special case for MaxChargeVoltage == 0 if no message recieved from car yet
-        if (_carData.MaxChargeVoltage == 0 || _chargerData.AvailableOutputVoltage < _carData.MaxChargeVoltage)
+        if (/*_carData.MaxChargeVoltage == 0 ||*/ _chargerData.AvailableOutputVoltage < _carData.MaxChargeVoltage)
             _chargerData.ThresholdVoltage = _chargerData.AvailableOutputVoltage;
         else
             _chargerData.ThresholdVoltage = _carData.MaxChargeVoltage;
@@ -163,7 +164,7 @@ void ChademoCharger::RunStateMachine()
             printf("cha: Stopping: 0x%x\r\n", stopReason);
 
             // Checking for State >= ChargerState.Stopping_WaitForLowAmpsDelivered is probably better if we need to know we are in this state, instead of mutating the car data?
-            //_carData.AskingAmps = 0;
+            _carData.AskingAmps = 0;
 
             // TODO: reason the charger stopped?
             set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_STOPPED);
@@ -246,13 +247,8 @@ void ChademoCharger::RunStateMachine()
 
     if (_logCounter++ > 10)
     {
-        //float f = _carData.BatteryCapacityKwh + 0.5f; // round up
-        //if (f > 255.0f)
-        //    f = 255.0f;
-        //uint8_t cap = static_cast<uint8_t>(f);
-
         // every second
-        printf("cha: state:%d, charger: avail:%dV,%dA out:%dV,%dA rem_t:%dm weld:%d thres=%dV st=0x%x  car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d% st:0x%x target:%dV \r\n",
+        printf("cha: state:%d, charger: avail:%dV/%dA out:%dV/%dA rem_t:%dm weld:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d%% st:0x%x target:%dV\r\n",
             _state,
             _chargerData.AvailableOutputVoltage,
             _chargerData.AvailableOutputCurrent,
@@ -299,10 +295,7 @@ void ChademoCharger::SendCanMessages()
     // BUT WHY IS THE CHARGER SENDING THIS TO THE CAR?????
     data[4] = _chargerData.ThresholdVoltage & 0xFF;
     data[5] = (_chargerData.ThresholdVoltage >> 8) & 0xFF;
-
     CanSend(0x108, ext, rtr, length, data);
-
-
 
     data[0] = _chargerData.ChademoRawVersion;// ChademoRawVersion 1:0.9 2:1.0 etc.
 
@@ -322,17 +315,14 @@ void ChademoCharger::SendCanMessages()
 
 void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
 {
-    // fixme: we may need to use the params before k-switch...
-    //bool paramsValid = CarDataCanBeUsedSafely();
-
     if (id == 0x100)
     {
         _carData.MinimumChargeCurrent = data[0];
         _carData.MaxChargeVoltage = (uint16_t)(data[4] | data[5] << 8);
-        // Allways 100%?
+        // Allways 100%? no...240 is seen
         _carData.ChargingRateReferenceConstant = data[6]; // Charged rate reference constant, 100% fixed
 
-        Param::Set(Param::MaxVoltage, _carData.MaxChargeVoltage);
+        Param::SetInt(Param::MaxVoltage, _carData.MaxChargeVoltage);
     }
     else if (id == 0x101)
     {
@@ -348,7 +338,7 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
         // Added in Chademo 1.0.1 so the (old) leaf does not exmit this? Seems to always be 0?
         _carData.EstimatedChargingTimeMins = data[3];// = 60; //how long we think the charge will actually take
 
-        // 0 first, then 55, then correct :-)
+        // 0 first, then 55, then correct :-) Correct after car ready?
         _carData.BatteryCapacityKwh = (float)(data[5] | data[6] << 8) * 0.11f;
     }
     else if (id == 0x102)
@@ -359,15 +349,15 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
         _carData.TargetVoltage = (uint16_t)(data[1] | data[2] << 8);
 
         // Leaf 410 typical
-        Param::Set(Param::TargetVoltage, _carData.TargetVoltage);
-        Param::Set(Param::BatteryVoltage, _carData.TargetVoltage); // not really correct but...
+        Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
+        Param::SetInt(Param::BatteryVoltage, _carData.TargetVoltage); // not really correct but...
  
         _carData.AskingAmps = data[3];
         // limit to adapter max
         if (_carData.AskingAmps > ADAPTER_MAX_AMPS)
             _carData.AskingAmps = ADAPTER_MAX_AMPS;
 
-        Param::Set(Param::ChargeCurrent, _carData.AskingAmps);
+        Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
         // for timeout
         _carData.CyclesSinceLastAskingAmps = 0;
 
@@ -378,6 +368,17 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
         // Start as 3, then 1, then to the real value:-)
         _carData.SocPercent = data[6];
 
-        Param::Set(Param::soc, _carData.SocPercent);
+        // changes from very low to higher :-) i guess this is ok...
+        // TODO: set only after X has happened (k-switch)
+        // strange values seen sometimes...
+        //if (_carData.SocPercent <= 100 && _state >= CarReadyToCharge)
+        //{
+        //    /*Charged rate(for display) =
+        //        Charged rate(#102.6) / Charged rate
+        //        reference constant(#100.6) × 100*/
+
+        //    Param::SetInt(Param::soc, _carData.SocPercent);
+        //    // TODO: estimate battery volts?
+        //}
     }
 }

@@ -92,11 +92,6 @@ void dummy_warmup_rw_one_byte(void) {
 
 void qca7000setup() 
 {
-   //DigIo::spi_cs_out.Set(); // 1=not selected
-   // try to fix something strange by doing a toggle...
-   //DigIo::spi_cs_out.Clear();
-   //DigIo::spi_cs_out.Set();
-
     dummy_warmup_rw_one_byte();
 }
 
@@ -115,7 +110,7 @@ static void spiQCA7000DemoReadSignature(void) {
   sig = mySpiRxBuffer[2];
   sig <<= 8;
   sig += mySpiRxBuffer[3];
-  printf("QCA7000 sig is 0x%X (expected: 0xAA55)\r\n", sig); /* should be AA 55  */
+  printf("QCA7000 sig is 0x%X\r\n", sig); /* should be AA 55  */
 }
 
 static void spiQCA7000DemoWriteBFR_SIZE(uint16_t n) {

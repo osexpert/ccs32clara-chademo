@@ -53,5 +53,13 @@ void DigIo::Configure(uint32_t port, uint16_t pin, PinMode::PinMode pinMode)
         break;
     }
 
+    // todo: high or lowe speed??
+
     gpio_mode_setup(port, mode, pull, pin);
+
+   // if (mode == GPIO_MODE_OUTPUT)
+    {
+    //    gpio_set_output_options(port, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, pin);
+    }
+
 }

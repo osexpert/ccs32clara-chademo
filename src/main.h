@@ -28,19 +28,19 @@ extern "C" {
 
 
 /* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
+//void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define OUT_STATE_C_CONTROL_Pin GPIO_PIN_4
-#define OUT_STATE_C_CONTROL_GPIO_Port GPIOB
-#define OUT_CONTACTOR_CONTROL1_Pin GPIO_PIN_5
-#define OUT_CONTACTOR_CONTROL1_GPIO_Port GPIOB
-#define OUT_CONTACTOR_CONTROL2_Pin GPIO_PIN_6
-#define OUT_CONTACTOR_CONTROL2_GPIO_Port GPIOB
+//#define OUT_STATE_C_CONTROL_Pin GPIO_PIN_4
+//#define OUT_STATE_C_CONTROL_GPIO_Port GPIOB
+//#define OUT_CONTACTOR_CONTROL1_Pin GPIO_PIN_5
+//#define OUT_CONTACTOR_CONTROL1_GPIO_Port GPIOB
+//#define OUT_CONTACTOR_CONTROL2_Pin GPIO_PIN_6
+//#define OUT_CONTACTOR_CONTROL2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

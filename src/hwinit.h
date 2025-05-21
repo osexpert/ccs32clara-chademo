@@ -27,17 +27,20 @@ extern "C"
 #endif
 
 	// volatile?
-volatile static bool stopButtonPressed;
-// we delivered some (more than 5)  amps?
-volatile static bool chargingAccomplished;
+volatile static bool stopButtonPressedTrigger;
 
-volatile static bool prechargeCompleted;
+volatile static bool chargerDeliveredAmpsTrigger;
+
+volatile static bool prechargeCompletedTrigger;
 
 void can_setup(void);
 void clock_setup(void);
 //void nvic_setup(void);
 //void rtc_setup(void);
 uint32_t rtc_get_ms(void);
+void usart1_setup(void);
+void systick_setup(void);
+
 //void tim_setup(int variant);
 //void write_bootloader_pininit();
 

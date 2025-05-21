@@ -23,8 +23,8 @@
 namespace Param
 {
 
-#define PARAM_ENTRY(category, name, unit, min, max, def, id) { category, #name, unit, FP_FROMFLT(min), FP_FROMFLT(max), FP_FROMFLT(def), id, TYPE_PARAM },
-#define TESTP_ENTRY(category, name, unit, min, max, def, id) { category, #name, unit, FP_FROMFLT(min), FP_FROMFLT(max), FP_FROMFLT(def), id, TYPE_TESTPARAM },
+#define PARAM_ENTRY(category, name, unit, min, max, def, id) { category, #name, unit, (min), (max), (def), id, TYPE_PARAM },
+#define TESTP_ENTRY(category, name, unit, min, max, def, id) { category, #name, unit, (min), (max), (def), id, TYPE_TESTPARAM },
 #define VALUE_ENTRY(name, unit, id) { 0, #name, unit, 0, 0, 0, id, TYPE_SPOTVALUE },
 static const Attributes attribs[] =
 {
@@ -34,10 +34,10 @@ static const Attributes attribs[] =
 #undef TESTP_ENTRY
 #undef VALUE_ENTRY
 
-#define PARAM_ENTRY(category, name, unit, min, max, def, id) FP_FROMFLT(def),
-#define TESTP_ENTRY(category, name, unit, min, max, def, id) FP_FROMFLT(def),
+#define PARAM_ENTRY(category, name, unit, min, max, def, id) (def),
+#define TESTP_ENTRY(category, name, unit, min, max, def, id) (def),
 #define VALUE_ENTRY(name, unit, id) 0,
-static s32fp values[] =
+static float values[] =
 {
     PARAM_LIST
 };
@@ -76,29 +76,29 @@ enum _dupes
 * @param[in] ParamVal New value of parameter
 * @return 0 if set ok, -1 if ParamVal outside of allowed range
 */
-int Set(PARAM_NUM ParamNum, s32fp ParamVal)
-{
-    char res = -1;
-
-    if (ParamVal >= attribs[ParamNum].min && ParamVal <= attribs[ParamNum].max)
-    {
-        values[ParamNum] = ParamVal;
-        Change(ParamNum); // FIXME: its a bit weird that this is the only Set that call Change. It make no sense...
-        res = 0;
-    }
-    return res;
-}
+//int SetFixedPoint_RangeCheck_ChangeNotify(PARAM_NUM ParamNum, s32fp ParamVal)
+//{
+//    char res = -1;
+//
+//    if (ParamVal >= attribs[ParamNum].min && ParamVal <= attribs[ParamNum].max)
+//    {
+//        values[ParamNum] = ParamVal;
+//        Change(ParamNum); // FIXME: its a bit weird that this is the only Set that call Change. It make no sense...
+//        res = 0;
+//    }
+//    return res;
+//}
 
 /**
 * Get a parameters fixed point value
-*
+* Renamed from Get -> GetFixedPoint (seems like it can't be used, return wrong data)
 * @param[in] ParamNum Parameter index
 * @return Parameters value
 */
-s32fp Get(PARAM_NUM ParamNum)
-{
-    return values[ParamNum];
-}
+//s32fp GetFixedPoint(PARAM_NUM ParamNum)
+//{
+//    return values[ParamNum];
+//}
 
 /**
 * Get a parameters integer value
@@ -108,7 +108,7 @@ s32fp Get(PARAM_NUM ParamNum)
 */
 int GetInt(PARAM_NUM ParamNum)
 {
-    return FP_TOINT(values[ParamNum]);
+    return values[ParamNum];
 }
 
 /**
@@ -119,7 +119,7 @@ int GetInt(PARAM_NUM ParamNum)
 */
 float GetFloat(PARAM_NUM ParamNum)
 {
-    return FP_TOFLOAT(values[ParamNum]);
+    return values[ParamNum];
 }
 
 /**
@@ -130,7 +130,7 @@ float GetFloat(PARAM_NUM ParamNum)
 */
 bool GetBool(PARAM_NUM ParamNum)
 {
-    return FP_TOINT(values[ParamNum]) == 1;
+    return values[ParamNum] == 1;
 }
 
 /**
@@ -141,7 +141,7 @@ bool GetBool(PARAM_NUM ParamNum)
 */
 void SetInt(PARAM_NUM ParamNum, int ParamVal)
 {
-   values[ParamNum] = FP_FROMINT(ParamVal);
+    values[ParamNum] = ParamVal;// FP_FROMINT(ParamVal);
 }
 
 /**
@@ -150,10 +150,10 @@ void SetInt(PARAM_NUM ParamNum, int ParamVal)
 * @param[in] ParamNum Parameter index
 * @param[in] ParamVal New value of parameter
 */
-void SetFixed(PARAM_NUM ParamNum, s32fp ParamVal)
-{
-   values[ParamNum] = ParamVal;
-}
+//void SetFixedPoint(PARAM_NUM ParamNum, s32fp ParamVal)
+//{
+//   values[ParamNum] = ParamVal;
+//}
 
 /**
 * Set a parameters floating point value without range check and callback
@@ -163,7 +163,8 @@ void SetFixed(PARAM_NUM ParamNum, s32fp ParamVal)
 */
 void SetFloat(PARAM_NUM ParamNum, float ParamVal)
 {
-   values[ParamNum] = FP_FROMFLT(ParamVal);
+   //values[ParamNum] = FP_FROMFLT(ParamVal);
+    values[ParamNum] = ParamVal;
 }
 
 /**
@@ -221,15 +222,20 @@ const Attributes *GetAttrib(PARAM_NUM ParamNum)
     return &attribs[ParamNum];
 }
 
-/** Load default values for all parameters */
+/** Load default values for all parameters
+Clarification: all params automatically get their def. vals. BUT in case you want to refresh the default and overwrite potentional changes...
+*/
 void LoadDefaults()
 {
    const Attributes *curAtr = attribs;
 
    for (int idx = 0; idx < PARAM_LAST; idx++, curAtr++)
    {
-      if (curAtr->id > 0)
-         SetFixed((PARAM_NUM)idx, curAtr->def);
+       if (curAtr->id > 0)
+       {
+           SetFloat((PARAM_NUM)idx, curAtr->def);
+           //SetFixedPoint((PARAM_NUM)idx, curAtr->def);
+       }
    }
 }
 

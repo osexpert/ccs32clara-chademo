@@ -133,7 +133,7 @@ static int printfp(IPutChar* put, int i, int width, int pad)
 {
 	char print_buf[PRINT_BUF_LEN];
 
-   fp_itoa(print_buf, i);
+	fp_itoa(print_buf, i);
 
 	return prints (put, print_buf, width, pad);
 }
@@ -167,7 +167,7 @@ static int print(IPutChar* put, const char *format, va_list args )
 				pc += prints (put, s?s:"(null)", width, pad);
 				continue;
 			}
-			if( *format == 'd' ) { // *format == 'd' || *format == 'i' 
+			if( *format == 'd' || *format == 'i' || *format == 'u') {
 				pc += printi (put, va_arg( args, int ), 10, 1, width, pad, 'a');
 				continue;
 			}
@@ -179,10 +179,10 @@ static int print(IPutChar* put, const char *format, va_list args )
 				pc += printi (put, va_arg( args, int ), 16, 0, width, pad, 'A');
 				continue;
 			}
-			if( *format == 'u' ) {
-				pc += printi (put, va_arg( args, int ), 10, 0, width, pad, 'a');
-				continue;
-			}
+			//if( *format == 'u' ) {
+			//	pc += printi (put, va_arg( args, int ), 10, 0, width, pad, 'a');
+			//	continue;
+			//}
 			if ( *format == 'f' ) {
 				pc += printfp (put, va_arg( args, int ), width, pad);
 				continue;

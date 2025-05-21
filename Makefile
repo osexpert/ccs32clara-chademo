@@ -29,10 +29,10 @@ OBJDUMP		= $(PREFIX)-objdump
 MKDIR_P     = mkdir -p
 FPU_FLAGS = -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CPU_FLAGS = -DSTM32F4 -mcpu=cortex-m4 -mthumb
-CFLAGS		= -Os -Iinclude/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+CFLAGS		= -Os -Isrc/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
 				 -fno-common -fno-builtin \
 				 $(CPU_FLAGS) $(FPU_FLAGS) -std=gnu99 -ffunction-sections -fdata-sections
-CPPFLAGS    = -Og -ggdb -Wall -Wextra -Iinclude/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
 				-fno-common -std=c++11 -pedantic -DUSART_BAUDRATE=921600 \
 				-ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables $(CPU_FLAGS) $(FPU_FLAGS)
 # Check if the variable GITHUB_RUN_NUMBER exists. When running on the github actions running, this
@@ -47,7 +47,7 @@ LDSCRIPT	  = linker.ld
 LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib -Wl,--gc-sections,-Map,linker.map $(FPU_FLAGS)
 OBJSL		  = main.o hwinit.o params.o \
 				 my_string.o digio.o my_fp.o printf.o anain.o \
-				 param_save.o errormessage.o \
+				 errormessage.o \
 				 ipv6.o tcp.o \
 				 connMgr.o modemFinder.o pevStateMachine.o wakecontrol.o \
 				 hardwareInterface.o pushbutton.o udpChecksum.o \
@@ -57,7 +57,7 @@ OBJSL		  = main.o hwinit.o params.o \
 				 appHandEXIDatatypes.o dinEXIDatatypesDecoder.o EXIHeaderEncoder.o \
 				 BitInputStream.o dinEXIDatatypesEncoder.o MethodsBag.o \
 				 BitOutputStream.o dinEXIDatatypes.o projectExiConnector.o \
-				 chademoCharger.o chademoHardware.o led_blinker.o
+				 chademoCharger.o chademoHardware.o led_blinker.o scheduler.o
 
 
 OBJS     = $(patsubst %.o,obj/%.o, $(OBJSL))

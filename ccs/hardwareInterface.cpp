@@ -26,7 +26,7 @@ void hardwareInterface_simulateCharging(void)
 int16_t hardwareInterface_getInletVoltage(void)
 {
     // we have no inlet voltage sensor. 
-    return Param::Get(Param::EvseVoltage);
+    return Param::GetInt(Param::EvseVoltage);
 }
 
 int16_t hardwareInterface_getAccuVoltage(void)
@@ -57,8 +57,8 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 
 void hardwareInterface_setPowerRelayOn(void)
 {
-    printf("prechargeCompleted\r\n");
-    prechargeCompleted = true;
+    printf("hardwareInterface_setPowerRelayOn\r\n");
+    prechargeCompletedTrigger = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
@@ -67,6 +67,8 @@ void hardwareInterface_setPowerRelayOn(void)
 
 void hardwareInterface_setPowerRelayOff(void)
 {
+    printf("hardwareInterface_setPowerRelayOff\r\n");
+
  //   printf("open adapter contactor\r\n");
     // adapter does nothing here...
     //DigIo::unknown_relay_out.Clear();
@@ -86,17 +88,17 @@ void hardwareInterface_setStateC(void)
 
 void hardwareInterface_triggerConnectorLocking(void)
 {
-    Param::Set(Param::LockState, LOCK_CLOSED);
+    Param::SetInt(Param::LockState, LOCK_CLOSED);
 }
 
 void hardwareInterface_triggerConnectorUnlocking(void)
 {
-    Param::Set(Param::LockState, LOCK_OPEN);
+    Param::SetInt(Param::LockState, LOCK_OPEN);
 }
 
 uint8_t hardwareInterface_isConnectorLocked(void)
 {
-    return Param::Get(Param::LockState) == LOCK_CLOSED;
+    return Param::GetInt(Param::LockState) == LOCK_CLOSED;
 }
 
 uint8_t hardwareInterface_getPowerRelayConfirmation(void)
@@ -109,7 +111,7 @@ bool hardwareInterface_stopChargeRequested()
 {
     uint8_t stopReason = STOP_REASON_NONE;
 
-    if (stopButtonPressed)//  pushbutton_isPressed500ms()) 
+    if (stopButtonPressedTrigger)//  pushbutton_isPressed500ms()) 
     {
         stopReason = STOP_REASON_BUTTON;
         Param::SetInt(Param::StopReason, stopReason);

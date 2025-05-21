@@ -16,6 +16,12 @@ TODO: auto off after end of charging?
 Hold down stop-button continously for 30 seconds to force shutdown (emergency mode).
 Led: medium blinks: starting, long blinks: charging, short blinks: pending shutdown
 
+Operation:
+Plug adapter into car. Ccs logic will not start until chademo communication is established and we have maxVoltage and targetVoltage from the car.
+Chademo can will stall until ccs know how much volts and amps to deliver. This should in theory make chademo can progress.
+Then chademo can will wait until end of ccs PreCharge, and from this point, ccs and chademo state machines should be in sync.
+TODO: adapter auto off after charging (or after 5 minutes without any charging started)
+
 # ccs32clara
 
 ![image](doc/clara_logo_colored.jpg) Hi, I'm Clara. I'm a piece of software, which was born in the OpenInverter forum community, https://openinverter.org/forum/viewtopic.php?t=3727, and I'm loving to grow due to the great people there.
