@@ -31,6 +31,8 @@ volatile static bool stopButtonPressed;
 // we delivered some (more than 5)  amps?
 volatile static bool chargingAccomplished;
 
+volatile static bool prechargeCompleted;
+
 void can_setup(void);
 void clock_setup(void);
 //void nvic_setup(void);

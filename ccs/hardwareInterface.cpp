@@ -2,43 +2,18 @@
 
 #include "ccs32_globals.h"
 
-//#define CP_DUTY_VALID_TIMER_MAX 3 /* after 3 cycles with 30ms, we consider the CP connection lost, if
-                               //      we do not see PWM interrupts anymore */
-//#define CONTACTOR_CYCLES_FOR_FULL_PWM (33/5) /* 33 cycles per second. ~200ms should be more than enough, see https://github.com/uhi22/ccs32clara/issues/22  */
-//#define CONTACTOR_CYCLES_SEQUENTIAL (33/3) /* ~300ms delay from one contactor to the other, to avoid high peak current consumption. https://github.com/uhi22/ccs32clara/issues/22  */
-
-//static float cpDuty_Percent;
-//static uint8_t cpDutyValidTimer;
-//static uint8_t ContactorRequest;
-//static int8_t ContactorOnTimer1, ContactorOnTimer2;
-//static uint16_t dutyContactor1, dutyContactor2;
-
-//static uint8_t LedBlinkDivider;
-
-//static uint16_t lockTimer;
-//static bool actuatorTestRunning = false;
-
-//#define ACTUTEST_STATUS_IDLE 0
-//#define ACTUTEST_STATUS_LOCKING_TRIGGERED 1
-//#define ACTUTEST_STATUS_UNLOCKING_TRIGGERED 2
-
 void hardwareInterface_showOnDisplay(char*, char*, char*)
 {
-
 }
-
 
 void hardwareInterface_initDisplay(void)
 {
-
 }
 
 int hardwareInterface_sanityCheck()
 {
    return 0; /* 0 is OK */
 }
-
-//uint16_t hwIf_simulatedSoc_0p01;
 
 void hardwareInterface_simulatePreCharge(void)
 {
@@ -66,10 +41,7 @@ int16_t hardwareInterface_getChargingTargetVoltage(void)
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
-    int16_t iOriginalDemand = Param::GetInt(Param::ChargeCurrent); /* the current demand from BMS */
-    // already limited on chademo side to 200A
-    //Param::SetInt(Param::EVTargetCurrent, iOriginalDemand);
-    return iOriginalDemand;
+    return Param::GetInt(Param::ChargeCurrent);
 }
 
 uint8_t hardwareInterface_getSoc(void)
@@ -85,19 +57,21 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 
 void hardwareInterface_setPowerRelayOn(void)
 {
-    printf("close adapter contactor\r\n");
+    printf("prechargeCompleted\r\n");
+    prechargeCompleted = true;
+
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
-    DigIo::switch_d1_out.Set();
-
-
+//    DigIo::switch_d1_out.Set();
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
-    printf("open adapter contactor\r\n");
+ //   printf("open adapter contactor\r\n");
     // adapter does nothing here...
     //DigIo::unknown_relay_out.Clear();
+
+    // TODO: what to do here???
 }
 
 void hardwareInterface_setStateB(void)
@@ -122,22 +96,7 @@ void hardwareInterface_triggerConnectorUnlocking(void)
 
 uint8_t hardwareInterface_isConnectorLocked(void)
 {
-    // no locking here anymore.
-    // we use this to make the state machine not progress until we have battery/target voltage
-
-    bool canCont = 
-        Param::Get(Param::LockState) == LOCK_CLOSED
-        // FIXME: can we get this reliably from chademo before this point?`???????????????????????????????????????????????????????????????????????????
-        && Param::Get(Param::BatteryVoltage) > 0
-        && Param::Get(Param::MaxVoltage) > 0
-        && Param::Get(Param::TargetVoltage) > 0;
-
-    ; /* no matter whether we have a real lock or just a simulated one, always give the state. */
-
-    if (canCont)
-        printf("LOCK_CLOSED, BatteryVoltage > 0 && MaxVoltage > 0 && TargetVoltage > 0 satisfied\r\n");
-
-    return canCont;
+    return Param::Get(Param::LockState) == LOCK_CLOSED;
 }
 
 uint8_t hardwareInterface_getPowerRelayConfirmation(void)

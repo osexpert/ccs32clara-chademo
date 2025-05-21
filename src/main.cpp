@@ -173,17 +173,18 @@ void power_off_check()
             power_off(1);
         }
 
-        bool lockedCcs = Param::Get(Param::LockState) == LOCK_CLOSED;
-        bool lockedCha = chademoCharger->IsChargingPlugLocked();
+       // bool lockedCcs = Param::Get(Param::LockState) == LOCK_CLOSED;
+       // bool lockedCha = chademoCharger->IsChargingPlugLocked();
 
-        if (lockedCha || lockedCcs)
+        // I Think it only need to check ccs here, i trust it more. If ccs is not delivering amps, it should not matter what chademo says.
+        if (Param::Get(Param::LockState) == LOCK_CLOSED)//lockedCha || lockedCcs)
             //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
         {
-            printf("power off request denied, connector is logically locked ccs:%d cha:%d... pending stop charging. just keep pressing stop button.\r\n", lockedCcs, lockedCha);
+            printf("power off request denied, connector is logically locked... pending stop charging. press for 30sec for emergency shutdown.\r\n");
             return;
         }
 
-        printf("Both unlocked so power off");
+        printf("Unlocked so power off");
         power_off(2);
     }
 }
@@ -199,6 +200,8 @@ enum GlobalState
 //static GlobalState _globalState = GlobalState::Init;
 
 static bool onceIn100;
+
+static volatile bool _ccsStart = false;
 
 static void Ms100Task(void)
 {
@@ -242,6 +245,17 @@ static void Ms100Task(void)
     chademoCharger->SetChargerSetMaxCurrent(Param::GetInt(Param::EvseMaxCurrent));
     chademoCharger->SetChargerSetMaxVoltage(Param::GetInt(Param::EvseMaxVoltage));
 
+    if (!_ccsStart)
+    {
+        // chademo will set these and then ccs can start
+        _ccsStart = Param::Get(Param::BatteryVoltage) > 0
+            && Param::Get(Param::MaxVoltage) > 0
+            && Param::Get(Param::TargetVoltage) > 0;
+
+        if (_ccsStart)
+            printf("ccs kickoff, voltages satisfied!");
+    }
+
     power_off_check();
 
     //This sets a fixed point value WITHOUT calling the parm_Change() function
@@ -273,8 +287,12 @@ static void Ms100Task(void)
     //}
 }
 
+
 static void Ms30Task()
 {
+    if (!_ccsStart)
+        return;
+
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
@@ -283,10 +301,10 @@ static void Ms30Task()
     tcp_Mainfunction();
     pevStateMachine_Mainfunction();
 
-//    pushbutton_handlePushbutton();
-//    Param::SetInt(Param::ButtonPushed, pushbutton_isPressed500ms());
+    //    pushbutton_handlePushbutton();
+    //    Param::SetInt(Param::ButtonPushed, pushbutton_isPressed500ms());
 
-    //ErrorMessage::SetTime(rtc_get_counter_val());
+        //ErrorMessage::SetTime(rtc_get_counter_val());
     ErrorMessage::SetTime(rtc_get_ms());
 }
 
@@ -341,28 +359,30 @@ void Param::Change(Param::PARAM_NUM paramNum)
 
 static void PrintTrace()
 {
-    static int lastState = 0;
-    static uint32_t lastSttPrint = 0;
     int state = Param::GetInt(Param::opmode);
     const char* label = pevSttLabels[state];
 
-    //if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_counter_val() - lastSttPrint) >= 100 || lastState != state))
-    // I guess the >= 100 does not matter now that we call it every 1000ms.
-    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
+//    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
     {
-        lastSttPrint = rtc_get_ms();// counter_val();
-        printf("[%u] In state %s. TcpRetries %u\r\n", rtc_get_ms(), label, tcp_getTotalNumberOfRetries());
-        lastState = state;
+  //      lastSttPrint = rtc_get_ms();// counter_val();
+        printf("In state %s. TcpRetries %u. out:%uA,%uV max:%uA,%uV car:%uA,t:%uV,b:%uV\r\n", label,
+            tcp_getTotalNumberOfRetries(),
+            Param::Get(Param::EvseCurrent),
+            Param::Get(Param::EvseVoltage),
+            Param::Get(Param::EvseMaxCurrent),
+            Param::Get(Param::EvseMaxVoltage),
+            Param::Get(Param::ChargeCurrent),
+            Param::Get(Param::TargetVoltage),
+            Param::Get(Param::BatteryVoltage)
+            );
     }
 }
 
 static void Ms1000Task()
 {
-    // ccs stuff?
-    // print more stuff about voltages etc..
     PrintTrace();
 
-    // TODO: voltages.
+    // TODO: print voltages.
 }
 
 

@@ -18,6 +18,19 @@ void ChademoCharger::SetSwitchD2(bool set)
         DigIo::switch_d2_out_inverted.Set(); // 1: off
 };
 
+void ChademoCharger::SetSwitchD1(bool set)
+{
+    if (set)
+        DigIo::switch_d1_out.Set();
+    else
+        DigIo::switch_d1_out.Clear();
+};
+
+bool ChademoCharger::IsChargerLive()
+{
+    return prechargeCompleted;
+};
+
 bool ChademoCharger::GetSwitchK()
 {
     return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
@@ -37,7 +50,16 @@ void ChademoCharger::NotifyCarContactorsClosed()
 
 void ChademoCharger::StopPowerDelivery()
 {
-    // TODO: also lower the voltage?
+    Param::Set(Param::ChargeCurrent, 0);
+    // TODO: should we disable at the end of the machine instead?
+    Param::Set(Param::enable, false);
+};
+
+void ChademoCharger::StopVoltageDelivery()
+{
+    Param::Set(Param::TargetVoltage, 0);
+    Param::Set(Param::BatteryVoltage, 0);
+    // TODO: should we disable at the end of the machine instead?
     Param::Set(Param::enable, false);
 };
 

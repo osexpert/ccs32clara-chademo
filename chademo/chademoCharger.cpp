@@ -13,12 +13,15 @@
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
-    uint16_t timeout_s = GetStateTimeoutSec();
+    /*int16_t timeout_s = GetStateTimeoutSec();
     if (timeout_s > 0 && (timeout_s * 10) > _cyclesInState)
     {
-        printf("cha: timeout for state %s\r\n", GetStateName());
+        printf("cha: timeout in state %s. What todo....\r\n", GetStateName());
 
-    }
+
+
+        _state == ChargerState::Start;
+    }*/
 
     if (_delayCycles > 0)
     {
@@ -89,15 +92,15 @@ void ChademoCharger::RunStateMachine()
         // End of insulation test: measured volt <= 20v. BUT logs tell a different story...volt is kept after insultayion test, only lowerd to eg. 380 (from eg. 480)
         PerformInsulationTest();
 
-        SetState(ChargerState::WaitForChargerHot);
+        SetState(ChargerState::WaitForChargerLive);
     }
-    else if (_state == ChargerState::WaitForChargerHot)
+    else if (_state == ChargerState::WaitForChargerLive)
     {
-        if (IsPreChargeDone_PowerDeliveryOk_AdapterContactorClosed_Hot())
+        if (IsChargerLive())
         {
             // This means the charger has its voltage at nominal voltage we gave it and is ready to charge
 
-            // this will give the car the 12v it needs to acticate contactors
+            // this will trigger car to acticate contactors
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
@@ -142,7 +145,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
-        printf("cha: charging\r\n");
+        //printf("cha: charging\r\n");
 
         // Spec: k-signal and CAR_NOT_READY_TO_CHARGE both exist to make sure at least one of them reach the charger in case of cable error.
 
@@ -203,12 +206,12 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
         // The car will open the contactor by itself, when amps drop <= 5 and welding detection done (based on what we told it in M108 CarWeldingDetection)
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE))
+        // TODO: if can-bus broke down, we will never get past this...so only wait max 4 sec. (40 * 100ms)
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) || _cyclesInState > 40)
         {
             SetSwitchD2(false);
 
-            // Since adapter D1 does nothing, its no need to wait...
-            //_delayCycles = 5; // spec says, after setting D2:false wait 0.5sec before setting D1:false
+            _delayCycles = 5; // spec says, after setting D2:false wait 0.5sec before setting D1:false
 
             SetState(ChargerState::Stopping_WaitForLowVoltsDelivered);
         }
@@ -216,6 +219,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForLowVoltsDelivered)
     {
         // charger output voltage should drop <= 10 before plug can be unlocked.
+        // TODO: is it possible the volt is never dropped? need timeout here too perhaps?
         if (_chargerData.OutputVoltage <= 10)
         {
             SetState(ChargerState::Stopping_UnlockPlug);
@@ -236,20 +240,19 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::End)
     {
         // nop
-        printf("cha: the end\r\n");
     }
 
     // TODO: we need some place to do all cleanup in case of timeout.
 
     if (_logCounter++ > 10)
     {
-        float f = _carData.BatteryCapacityKwh + 0.5f; // round up
-        if (f > 255.0f)
-            f = 255.0f;
-        uint8_t cap = static_cast<uint8_t>(f);
+        //float f = _carData.BatteryCapacityKwh + 0.5f; // round up
+        //if (f > 255.0f)
+        //    f = 255.0f;
+        //uint8_t cap = static_cast<uint8_t>(f);
 
         // every second
-        printf("cha: state:%d, charger: avail:%dV,%dA out:%dV,%dA rem_t:%dm weld:%d thres=%dV st=0x%x  car: ask:%dA cap=%dkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d% st:0x%x target:%dV \r\n",
+        printf("cha: state:%d, charger: avail:%dV,%dA out:%dV,%dA rem_t:%dm weld:%d thres=%dV st=0x%x  car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d% st:0x%x target:%dV \r\n",
             _state,
             _chargerData.AvailableOutputVoltage,
             _chargerData.AvailableOutputCurrent,
@@ -261,7 +264,7 @@ void ChademoCharger::RunStateMachine()
             _chargerData.Status,
 
             _carData.AskingAmps,
-            cap,
+            FP_FROMFLT(_carData.BatteryCapacityKwh),
             _carData.ChademoRawVersion,
             _carData.ChargingRateReferenceConstant,
             _carData.EstimatedChargingTimeMins,
