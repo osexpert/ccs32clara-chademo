@@ -17,15 +17,48 @@ void ChademoCharger::CanSend(int id, bool ext, bool rtr, int len, uint8_t* data)
     int res = can_transmit(CAN1, id, ext, rtr, len, data);
     if (res == -1)
     {
-        printf("can_transmit mailbox full, try one more time...\r\n");
-        res = can_transmit(CAN1, id, ext, rtr, len, data);
-        if (res == -1)
-        {
-            printf("full on second try as well:-)\r\n");
-            // We send so often, a few dropped messages should not be a dealbreaker
-        }
+        _canTxDrop++;
     }
+    else
+    {
+//        _lastCanSendTime = 
+    }
+
+    // try 2 times
+    //for (int i = 0; i < 2; i++)
+    //{
+    //    int res = can_transmit(CAN1, id, ext, rtr, len, data);
+
+    //    //@returns int 0, 1 or 2 on success and depending on which outgoing mailbox got
+    //    //    selected. - 1 if no mailbox was available and no transmission got queued.
+
+    //    if (res == -1)
+    //    {
+    //        printf("mailbox full, retry %d\r\n", i);
+    //        // We send so often, a few dropped messages should not be a dealbreaker
+    //    }
+    //    else // queued
+    //    {
+    //        _lastCanSendTime = rtc_get_ms();
+    //        return;
+    //    }
+
+    //}
+
+    //int res = can_transmit(CAN1, id, ext, rtr, len, data);
+    //if (res == -1)
+    //{
+    //    printf("can_transmit mailbox full, try one more time...\r\n");
+    //    res = can_transmit(CAN1, id, ext, rtr, len, data);
+    //    if (res == -1)
+    //    {
+    //        printf("full on second try as well:-)\r\n");
+    //        // We send so often, a few dropped messages should not be a dealbreaker
+    //    }
+    //}
 };
+
+
 
 void ChademoCharger::ReadPendingCanMessages()
 {
@@ -55,9 +88,10 @@ void ChademoCharger::ReadPendingCanMessages()
             &ts
         );
 
-        // result = messages left in queue?
+        // result = nt 0-3 depending on how many messages where pending before
         if (result)
         {
+//            _lastCanRecieveTime = rtc_get_ms();
             HandleChademoMessage(id, data);
         }
     }
@@ -81,7 +115,7 @@ void ChademoCharger::SetSwitchD1(bool set)
 
 bool ChademoCharger::IsChargerLive()
 {
-    return prechargeCompletedTrigger;
+    return ccsPowerRelayOnTrigger;
 };
 
 bool ChademoCharger::GetSwitchK()
@@ -91,32 +125,15 @@ bool ChademoCharger::GetSwitchK()
 
 bool ChademoCharger::IsChargingStoppedByAdapter()
 {
-    return stopButtonPressedTrigger;
+    return stopButtonTrigger;
 };
 
 void ChademoCharger::NotifyCarContactorsClosed()
 {
+    printf("cha: Adapter contactor closed\r\n");
+
     // close our contactor too. it is not opened until power off
     DigIo::contactor_out.Set();
     // DigIo::external_led_out.Clear(); led on. pointless?
 };
 
-void ChademoCharger::StopPowerDelivery()
-{
-    Param::SetInt(Param::ChargeCurrent, 0);
-    // TODO: should we disable at the end of the machine instead?
-    Param::SetInt(Param::enable, false);
-};
-
-void ChademoCharger::StopVoltageDelivery()
-{
-    Param::SetInt(Param::TargetVoltage, 0);
-//    Param::Set(Param::BatteryVoltage, 0);
-    // TODO: should we disable at the end of the machine instead?
-    Param::SetInt(Param::enable, false);
-};
-
-bool ChademoCharger::IsChargingStoppedByCharger()
-{
-    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
-}

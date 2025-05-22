@@ -58,7 +58,7 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
-    prechargeCompletedTrigger = true;
+    ccsPowerRelayOnTrigger = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
@@ -111,7 +111,7 @@ bool hardwareInterface_stopChargeRequested()
 {
     uint8_t stopReason = STOP_REASON_NONE;
 
-    if (stopButtonPressedTrigger)//  pushbutton_isPressed500ms()) 
+    if (stopButtonTrigger)//  pushbutton_isPressed500ms()) 
     {
         stopReason = STOP_REASON_BUTTON;
         Param::SetInt(Param::StopReason, stopReason);

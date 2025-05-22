@@ -5,7 +5,41 @@
 #include "params.h"
 #include "my_fp.h"
 
-#define LAST_ASKING_FOR_AMPS_TIMEOUT 10 // 10 x 100ms = 1sec.
+#define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES 10 // 10 x 100ms = 1sec.
+#define CYCLES_PER_SEC 10 // 100ms ticks
+
+
+void ChademoCharger::Run()
+{
+    SetChargerData();
+
+    ReadPendingCanMessages();
+
+    //uint16_t timeout_s = _stateTimeoutsSec[_state];
+//if (timeout_s > 0 && (timeout_s * 10) > _cyclesInState)
+//{
+//    printf("cha: timeout in state %d/%s. What todo....\r\n", _state, GetStateName());
+//}
+
+    RunStateMachine();
+
+    Log();
+
+    // this was not being called at all before...but lets try the new logic:-)
+    // only send when d1 is set
+    if (_state >= WaitForCarReadyToCharge && _state < End)
+        SendCanMessages();
+}
+
+bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
+{
+    if (_cyclesInState > (max_sec * CYCLES_PER_SEC))
+    {
+        printf("cha: Timeout in %d/%s (max:%dsec)\r\n", _state, GetStateName(), max_sec);
+        return true;
+    }
+    return false;
+}
 
 /// <summary>
 /// TODO: should we not send can immediately?
@@ -14,15 +48,6 @@
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
-    /*int16_t timeout_s = GetStateTimeoutSec();
-    if (timeout_s > 0 && (timeout_s * 10) > _cyclesInState)
-    {
-        printf("cha: timeout in state %s. What todo....\r\n", GetStateName());
-
-
-
-        _state == ChargerState::Start;
-    }*/
 
     if (_delayCycles > 0)
     {
@@ -59,18 +84,46 @@ void ChademoCharger::RunStateMachine()
             _chargerData.ThresholdVoltage = _carData.MaxChargeVoltage;
     }
 
-
+    // Car seem to immediately go into stopped before starting, i am guessing if available volts and amps are 0 from the start. So do it in two steps...
     if (_state == ChargerState::Start)
     {
         printf("cha: start\r\n");
 
         SetSwitchD1(true); // will trigger car sending can
 
-        SetState(ChargerState::WaitForCarReadyToCharge);
+        SetState(ChargerState::WaitForCarMaxAndTargetVolts);
+    }
+    else if (_state == ChargerState::WaitForCarMaxAndTargetVolts)
+    {
+        if (_carData.MaxChargeVoltage > 0 && _carData.TargetVoltage > 0)
+        {
+            // we got volts! done with can for now. turn off to make car happy, reset its states, not timeout, stop before starting etc.
+            // TODO: was not sending CAN earier........................it may also be the prioblem........................anyways....this seems like a better solution...
+            SetSwitchD1(false);
+
+            SetState(ChargerState::WaitForChargerAvailableVoltsAndAmps);
+        }
+    }
+    else if (_state == ChargerState::WaitForChargerAvailableVoltsAndAmps)
+    {
+        if (_chargerData.AvailableOutputVoltage > 0 && _chargerData.AvailableOutputCurrent > 0)
+        {
+            // we have gotten so far we got availables back from ccs. We can then enable can again (or is it too soon??? it may be. seems like i take 16 sec. until we reach CurrentDemandReq,
+            // it may be too much, but from Using-OCPP-with-CHAdeMO.pdf it seems like T-time 22+6 seconds, so should be ok...)
+            SetSwitchD1(true); // will trigger car sending can
+
+            SetState(ChargerState::WaitForCarReadyToCharge);
+        }
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE) && GetSwitchK() == true)
+        bool canEna = has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE);
+        bool switchEna = GetSwitchK() == true;
+
+        if ((canEna || switchEna) && (canEna != switchEna))
+            printf("cha: only one of can %d and SwitchK %d enabled", canEna, switchEna);
+
+        if (canEna && switchEna)
         {
             // spec: car should not update MaxChargingTimeMins after SwitchK, so take it here
             // Take car as initial value and countdown the minutes
@@ -157,7 +210,7 @@ void ChademoCharger::RunStateMachine()
         if (GetSwitchK() == false) set_flag(&stopReason, StopReason::CAR_K_OFF);
         if (IsChargingStoppedByCharger()) set_flag(&stopReason, StopReason::CHARGER);
         if (IsChargingStoppedByAdapter()) set_flag(&stopReason, StopReason::ADAPTER_STOP_BUTTON);
-        if (_carData.CyclesSinceLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
+        if (_carData.CyclesSinceLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
 
         if (stopReason != StopReason::NONE)
         {
@@ -208,7 +261,9 @@ void ChademoCharger::RunStateMachine()
     {
         // The car will open the contactor by itself, when amps drop <= 5 and welding detection done (based on what we told it in M108 CarWeldingDetection)
         // TODO: if can-bus broke down, we will never get past this...so only wait max 4 sec. (40 * 100ms)
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) || _cyclesInState > 40)
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) 
+            //|| IsTimeoutSec(4) // if can get stuck, make sure we can progress stopping TODO: ADD timeout only if needed??
+            )
         {
             SetSwitchD2(false);
 
@@ -220,7 +275,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForLowVoltsDelivered)
     {
         // charger output voltage should drop <= 10 before plug can be unlocked.
-        // TODO: is it possible the volt is never dropped? need timeout here too perhaps?
+        // TODO: is it possible the volt is never dropped? need timeout here too perhaps????
         if (_chargerData.OutputVoltage <= 10)
         {
             SetState(ChargerState::Stopping_UnlockPlug);
@@ -229,12 +284,17 @@ void ChademoCharger::RunStateMachine()
     // TODO: if can is lost, the machine will halt and we never get to unlock the plug
     else if (_state == ChargerState::Stopping_UnlockPlug)
     {
-        SetSwitchD1(false);
-
         // safe to unlock plug
         LockChargingPlug(false);
         // remove plug locked flag
         clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
+
+        SetState(ChargerState::Stopping_StopCan);
+    }
+    else if (_state == ChargerState::Stopping_StopCan)
+    {
+        // this stops can
+        SetSwitchD1(false);
 
         SetState(ChargerState::End);
     }
@@ -245,11 +305,35 @@ void ChademoCharger::RunStateMachine()
 
     // TODO: we need some place to do all cleanup in case of timeout.
 
-    if (_logCounter++ > 10)
+}
+
+void ChademoCharger::SetState(ChargerState newState)
+{
+    printf("cha: enter state %d/%s\r\n", newState, GetStateName());
+    _state = newState;
+    _cyclesInState = 0;
+
+    // force log on state change
+    Log(true);
+};
+
+void ChademoCharger::Log(bool force)
+{
+    if (force || _logCycleCounter++ > 10)
     {
-        // every second
-        printf("cha: state:%d, charger: avail:%dV/%dA out:%dV/%dA rem_t:%dm weld:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d%% st:0x%x target:%dV\r\n",
+        //if (_carData.ChargingRateReferenceConstant != 100)
+        {
+          //  printf("Alt. soc %d%%\r\n", (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f));
+        }
+
+        int alt_soc = (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f);
+
+        // every second or when forced
+        printf("cha: state:%d/%s cycles:%d can_tx_drop:%d charger: avail:%dV/%dA out:%dV/%dA rem_t:%dm weld:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d%% st:0x%x target:%dV alt_soc:%d%%\r\n",
             _state,
+            GetStateName(),
+            _cyclesInState,
+            _canTxDrop,
             _chargerData.AvailableOutputVoltage,
             _chargerData.AvailableOutputCurrent,
             _chargerData.OutputVoltage,
@@ -265,18 +349,37 @@ void ChademoCharger::RunStateMachine()
             _carData.ChargingRateReferenceConstant,
             _carData.EstimatedChargingTimeMins,
             _carData.Faults,
-            _carData.MaxChargeVoltage, 
+            _carData.MaxChargeVoltage,
             _carData.MaxChargingTimeMins,
             _carData.MinimumChargeCurrent,
             _carData.SocPercent,
             _carData.Status,
-            _carData.TargetVoltage
-            );
+            _carData.TargetVoltage,
+            alt_soc
+        );
 
-        _logCounter = 0;
+        _logCycleCounter = 0;
     }
 }
 
+
+void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
+{
+    _chargerData.AvailableOutputVoltage = maxV;
+    // convert from 16 to 8 bit int...default is to trunc...
+    _chargerData.AvailableOutputCurrent = maxA > 0xFF ? 0xFF : maxA;
+    if (_chargerData.AvailableOutputCurrent > ADAPTER_MAX_AMPS)
+        _chargerData.AvailableOutputCurrent = ADAPTER_MAX_AMPS;
+
+    _chargerData.OutputVoltage = outV;
+    // convert from 16 to 8 bit int...default is to trunc... (impossible that this can be over 0xff!!!)
+    _chargerData.OutputCurrent = outA > 0xFF ? 0xFF : outA;
+};
+
+//void ChademoCharger::SetChargerSetMaxVoltage(uint16_t maxV)
+//{
+//
+//};
 
 void ChademoCharger::SendCanMessages()
 {
@@ -350,7 +453,7 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
 
         // Leaf 410 typical
         Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
-        Param::SetInt(Param::BatteryVoltage, _carData.TargetVoltage); // not really correct but...
+        Param::SetInt(Param::BatteryVoltage, _carData.TargetVoltage - 10); // not really correct but...
  
         _carData.AskingAmps = data[3];
         // limit to adapter max
@@ -371,14 +474,60 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
         // changes from very low to higher :-) i guess this is ok...
         // TODO: set only after X has happened (k-switch)
         // strange values seen sometimes...
-        //if (_carData.SocPercent <= 100 && _state >= CarReadyToCharge)
-        //{
-        //    /*Charged rate(for display) =
-        //        Charged rate(#102.6) / Charged rate
-        //        reference constant(#100.6) × 100*/
+        //if (_state >= CarReadyToCharge) //_carData.SocPercent <= 100 &&
+        {
+            /*Charged rate(for display) =
+                Charged rate(#102.6) / Charged rate
+                reference constant(#100.6) × 100*/
+            
+            //if (_carData.ChargingRateReferenceConstant != 100)
+            //{
+            //    printf("Alt. soc %d%%\r\n", (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f));
+            //}
 
-        //    Param::SetInt(Param::soc, _carData.SocPercent);
-        //    // TODO: estimate battery volts?
-        //}
+            Param::SetInt(Param::soc, _carData.SocPercent);
+            // TODO: estimate battery volts?
+        }
     }
+}
+
+
+const char* ChademoCharger::GetStateName()
+{
+    return _stateNames[_state];
+};
+
+void ChademoCharger::SetChargerData()
+{
+    // mirror these values (Change method is only called for some params...)
+    SetChargerData(
+        Param::GetInt(Param::EvseMaxVoltage),
+        Param::GetInt(Param::EvseMaxCurrent),
+        Param::GetInt(Param::EvseVoltage),
+        Param::GetInt(Param::EvseCurrent)
+    );
+}
+
+void ChademoCharger::StopPowerDelivery()
+{
+    printf("cha: StopPowerDelivery\r\n");
+
+    Param::SetInt(Param::ChargeCurrent, 0);
+    // TODO: should we disable at the end of the machine instead?
+    Param::SetInt(Param::enable, false);
+};
+
+void ChademoCharger::StopVoltageDelivery()
+{
+    printf("cha: StopVoltageDelivery\r\n");
+
+    Param::SetInt(Param::TargetVoltage, 0);
+    //    Param::Set(Param::BatteryVoltage, 0);
+        // TODO: should we disable at the end of the machine instead?
+    Param::SetInt(Param::enable, false);
+};
+
+bool ChademoCharger::IsChargingStoppedByCharger()
+{
+    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
 }

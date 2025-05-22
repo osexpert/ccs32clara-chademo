@@ -50,7 +50,7 @@
 //#define __disable_irq() __asm__ volatile ("cpsid i")
 //#define __enable_irq()  __asm__ volatile ("cpsie i")
 
-#define PRINT_JSON 0
+//#define PRINT_JSON 0
 
 /* to solve linker warning, see https://openinverter.org/forum/viewtopic.php?p=64546#p64546 */
 extern "C" void __cxa_pure_virtual()
@@ -58,9 +58,8 @@ extern "C" void __cxa_pure_virtual()
     while (1);
 }
 
-
 // need volatile???
-volatile static int stopButtonPressedCounter = 0;
+volatile static int stopButtonCounter = 0;
 
 static ChademoCharger* chademoCharger;
 static LedBlinker* ledBlinker;
@@ -107,7 +106,7 @@ void power_off_check()
 
     // fixme: power off after charging?
 
-    if (stopButtonPressedTrigger)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
+    if (stopButtonTrigger)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
     {
         if (!stopButtonPressedMsgTrigger)
         {
@@ -115,7 +114,7 @@ void power_off_check()
             stopButtonPressedMsgTrigger = true;
         }
 
-        bool buttonPressed30Seconds = stopButtonPressedCounter > 60; // 30 seconds
+        bool buttonPressed30Seconds = stopButtonCounter > 60; // 30 seconds
         if (buttonPressed30Seconds)
         {
             power_off("Stop pressed for 30sec");
@@ -136,68 +135,46 @@ void power_off_check()
     }
 }
 
-//enum GlobalState
-//{
-//    Init,
-//    AmpsAsked, // > 0
-//    AmpsDelivered, // > 5
-//    AmpsDeliveryDone // <= 5 (obs can be temp drop of amps...should use a different logic...
-//};
-
-enum AdapterState
-{
-    Init,
-    CcsPlugLocked,
-    //CcsDeliveringAmps,
-    CcsPlugUnlocked
-};
-
-//static GlobalState _globalState = GlobalState::Init;
-
 static volatile bool _ccsKickoff = false;
 // FIXME: find a good wad to manage auto power off. By some custom wdog etc.
 // OR maybe...if chargingAccomplished + currently stopped\unlocked (imply 0 amps delivered))?
-static volatile uint16_t _autoPowerOffCycles100ms = 0; // 100ms. Wait max 5min = 10 * 60 * 5 = 3000
+//static volatile uint16_t _autoPowerOffCycles100ms = 0; // 100ms. Wait max 5min = 10 * 60 * 5 = 3000
 
 static void Ms100Task(void)
 {
     ledBlinker->tick(100); // 100 ms tick
 
-    chademoCharger->ReadPendingCanMessages();
-    chademoCharger->RunStateMachine();
+    chademoCharger->Run();
 
     iwdg_reset();
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        stopButtonPressedTrigger = true; // one way street
-        stopButtonPressedCounter++;
+        stopButtonTrigger = true; // one way street
+        stopButtonCounter++;
 
         ledBlinker->setOnOffDuration(300, 300); // short blinking
     }
     else
     {
-        stopButtonPressedCounter = 0;
+        stopButtonCounter = 0;
     }
 
     // TODO: maybe simply use Locked state? When locked, we assume chargingAccomplished. Then when unlocked, we power off.
     // Becuse of we locked and unlocked, it does not matter if we delivered amps or not (for most cases)
-    if (!chargerDeliveredAmpsTrigger && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
+    if (!ccsDeliveredAmpsTrigger && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
     {
         // dont care about chademo, if amps delivered it has to go somewhere:-)
-        chargerDeliveredAmpsTrigger = true; // triggered
+        ccsDeliveredAmpsTrigger = true; // triggered
     }
 
     // todo: use plug locked trigger instead?
-    if (!stopButtonPressedTrigger && chargerDeliveredAmpsTrigger)
+    if (!stopButtonTrigger && ccsDeliveredAmpsTrigger)
     {
         ledBlinker->setOnOffDuration(1200, 1200); // long blinking
     }
 
-    // mirror these values (Change method is only called for some params...)
-    chademoCharger->SetChargerSetMaxCurrent(Param::GetInt(Param::EvseMaxCurrent));
-    chademoCharger->SetChargerSetMaxVoltage(Param::GetInt(Param::EvseMaxVoltage));
-
+    
     if (!_ccsKickoff)
     {
         // chademo will set these and then ccs can start
@@ -264,28 +241,6 @@ static void SetMacAddress()
     setOurMac(mac);
 }
 
-/** This function is called when the user changes a parameter */
-//void Param::Change(Param::PARAM_NUM paramNum)
-//{
-////    static bool enableReceived = false;
-//    //switch (paramNum)
-//    //{
-//    //case Param::EVTargetCurrent:
-//    //    //Charge current is the single most important item that must be constantly updated
-//    //    //by the BMS or VCU. Whenever it is updated we feed the dog
-//    //    //When it is no longer updated the dog will bark and stop the charge session
-//    //    //if (enableReceived)
-//    //    //Param::SetInt(Param::CanWatchdog, 0);
-//    //    //enableReceived = false; //this will be set back to true once enable is received again
-//    //    break;
-//    //// OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
-//    //case Param::enable:
-//    //    //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
-//    //    //When it is no longer updated the dog will bark and stop the charge session
-//    //    //enableReceived = true;
-//    //    break;
-//}
-
 static void PrintCcsTrace()
 {
     int state = Param::GetInt(Param::opmode);
@@ -293,6 +248,7 @@ static void PrintCcsTrace()
 
 //    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
         //      lastSttPrint = rtc_get_ms();// counter_val();
+    // TODO: log events flags
     printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n", 
         label,
         tcp_getTotalNumberOfRetries(),
@@ -445,4 +401,27 @@ extern "C" void putchar(char c)
 //}
 //extern "C" float __aeabi_d2f(double f) {
 //    return (float)f;
+//}
+
+
+/** This function is called when the user changes a parameter */
+//void Param::Change(Param::PARAM_NUM paramNum)
+//{
+////    static bool enableReceived = false;
+//    //switch (paramNum)
+//    //{
+//    //case Param::EVTargetCurrent:
+//    //    //Charge current is the single most important item that must be constantly updated
+//    //    //by the BMS or VCU. Whenever it is updated we feed the dog
+//    //    //When it is no longer updated the dog will bark and stop the charge session
+//    //    //if (enableReceived)
+//    //    //Param::SetInt(Param::CanWatchdog, 0);
+//    //    //enableReceived = false; //this will be set back to true once enable is received again
+//    //    break;
+//    //// OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
+//    //case Param::enable:
+//    //    //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
+//    //    //When it is no longer updated the dog will bark and stop the charge session
+//    //    //enableReceived = true;
+//    //    break;
 //}
