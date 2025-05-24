@@ -110,7 +110,7 @@ extern volatile uint32_t system_millis;
 uint32_t rtc_get_ms(void) 
 {
     //return rtc_get_counter_val()*10; /* The RTC has a 10ms tick (see rtc_setup()). So we multiply by 10 to get the milliseconds. */
-    return ::system_millis;
+    return system_millis;
 }
 
 void can_setup(void) {

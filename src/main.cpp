@@ -46,6 +46,7 @@
 #include "led_blinker.h"
 #include "my_fp.h"
 #include "scheduler.h"
+#include "main.h"
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
@@ -54,14 +55,23 @@
 
 //#define PRINT_JSON 0
 
+global_data _global;
+
+/* monotonically increasing number of milliseconds from reset
+ * overflows every 49 days if you're wondering
+ */
+volatile uint32_t system_millis;
+// volatile?
+
+
+#define AUTO_POWER_OFF_LIMIT_SEC (60 * 5)
+
+
 /* to solve linker warning, see https://openinverter.org/forum/viewtopic.php?p=64546#p64546 */
 extern "C" void __cxa_pure_virtual()
 {
     while (1);
 }
-
-// need volatile???
-int stopButtonCounter = 0;
 
 ChademoCharger* chademoCharger;
 LedBlinker* ledBlinker;
@@ -104,31 +114,31 @@ void power_off_no_return(const char* reason)
 
 void power_off_check()
 {
-    static bool stopButtonPressedMsgTrigger;
+    bool buttonPressed30Seconds = _global.stopButtonCounter > 60; // 30 seconds
+    if (buttonPressed30Seconds)
+    {
+        power_off_no_return("Stop pressed for 30sec");
+    }
 
     // fixme: power off after charging?
 
-    if (stopButtonTrigger)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
+    bool inactivity = _global.auto_power_off_timer_count_up_sec > AUTO_POWER_OFF_LIMIT_SEC;
+
+    bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+    bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
+//    bool autoOffImmediatelyAfterCharging = _global.ccsDeliveredAmpsEvent && not_anymore;
+
+    if ((_global.stopButtonEvent || inactivity || _global.ccsDeliveredAmpsEvent) && powerOffOkCcs && powerOffOkCha)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
     {
-        if (!stopButtonPressedMsgTrigger)
-        {
-            printf("Stop button pressed. Stop pending...\r\n");
-            stopButtonPressedMsgTrigger = true;
-        }
+        if (_global.stopButtonEvent)
+            printf("power off: stopButtonEvent (and plugs unlocked)\r\n");
+        if (inactivity)
+            printf("power off: inactivity (and plugs unlocked)\r\n");
+        if (_global.ccsDeliveredAmpsEvent)
+            printf("power off: amps delivered (but now plugs are unlocked)\r\n");
 
-        bool buttonPressed30Seconds = stopButtonCounter > 60; // 30 seconds
-        if (buttonPressed30Seconds)
-        {
-            power_off_no_return("Stop pressed for 30sec");
-        }
-
-        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
-        bool powerOffOkCha = chademoCharger->IsPowerOffOk();
-
-        if (powerOffOkCcs && powerOffOkCha)
-        {
-            power_off_no_return("Stop pressed & plugs unlocked");
-        }
+        power_off_no_return("Plugs unlocked");
 
         // I Think it only need to check ccs here, i trust it more. If ccs is not delivering amps, it should not matter what chademo says.
         //if (lockedCha || lockedCcs)
@@ -141,7 +151,7 @@ void power_off_check()
     }
 }
 
-static volatile bool _ccsKickoff = false;
+
 // FIXME: find a good wad to manage auto power off. By some custom wdog etc.
 // OR maybe...if chargingAccomplished + currently stopped\unlocked (imply 0 amps delivered))?
 //static volatile uint16_t _autoPowerOffCycles100ms = 0; // 100ms. Wait max 5min = 10 * 60 * 5 = 3000
@@ -156,40 +166,45 @@ static void Ms100Task(void)
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        stopButtonTrigger = true; // one way street
-        stopButtonCounter++;
+        if (!_global.stopButtonEvent)
+        {
+            _global.stopButtonEvent = true; // one way street
+            printf("Stop button pressed. Stop pending...\r\n");
+        }
+
+        _global.stopButtonCounter++;
 
         ledBlinker->setOnOffDuration(300, 300); // short blinking
     }
     else
     {
-        stopButtonCounter = 0;
+        _global.stopButtonCounter = 0;
     }
 
     // TODO: maybe simply use Locked state? When locked, we assume chargingAccomplished. Then when unlocked, we power off.
     // Becuse of we locked and unlocked, it does not matter if we delivered amps or not (for most cases)
-    if (!ccsDeliveredAmpsTrigger && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
+    if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
     {
         // dont care about chademo, if amps delivered it has to go somewhere:-)
-        ccsDeliveredAmpsTrigger = true; // triggered
+        _global.ccsDeliveredAmpsEvent = true; // triggered
     }
 
     // todo: use plug locked trigger instead?
-    if (!stopButtonTrigger && ccsDeliveredAmpsTrigger)
+    if (!_global.stopButtonEvent && _global.ccsDeliveredAmpsEvent)
     {
         ledBlinker->setOnOffDuration(1200, 1200); // long blinking
     }
 
-    
-    if (!_ccsKickoff)
+   
+    if (!_global.ccsKickoff)
     {
         // chademo will set these and then ccs can start
         // TODO: wait until soc has correct value.....need to check some value?
-        _ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
+        _global.ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
             && Param::GetInt(Param::MaxVoltage) > 0
             && Param::GetInt(Param::TargetVoltage) > 0;
 
-        if (_ccsKickoff)
+        if (_global.ccsKickoff)
             printf("ccs kickoff, voltages satisfied!\r\n");
 //        else
   //          _cyclesWaitingForCcsStart++; auto power off attempt...
@@ -218,7 +233,7 @@ static void Ms100Task(void)
 
 static void Ms30Task()
 {
-    if (!_ccsKickoff)
+    if (!_global.ccsKickoff)
         return;
 
     spiQCA7000checkForReceivedData();
@@ -325,8 +340,6 @@ void adc_battery_init(void)
     adc_power_on(ADC1);
 }
 
-
-
 static void adc_read_all(void) {
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
@@ -342,27 +355,32 @@ float adc_to_voltage(uint16_t adc, float gain) {
 
 static void Ms1000Task()
 {
-    if (_ccsKickoff)
+    _global.auto_power_off_timer_count_up_sec++;
+
+    if (_global.ccsKickoff)
         PrintCcsTrace();
 
-    adc_read_all();
+    // only every 10sec
+    static uint32_t nextPrint = 0;
+    if (system_millis >= nextPrint)
+    {
+        adc_read_all();
 
-    float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
+        float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
 
-    printf("ADC %fV (nom:5) %fV (nom:12) vdd:%fV (nom:3.3)\r\n", 
-        FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
-        FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
-        FP_FROMFLT(vdd_voltage)
+        printf("Sysinfo: %fV (nom:5) %fV (nom:12) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
+            FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
+            FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
+            FP_FROMFLT(vdd_voltage),
+            scheduler_get_cpu_usage(),
+            _global.auto_power_off_timer_count_up_sec,
+            _global.ccsDeliveredAmpsEvent
         );
 
+		nextPrint = system_millis + 5000; // 5 sec.
+    }
     // Min values seen and working: 3.78V 11.56V 3.4V
 }
-
-
-/* monotonically increasing number of milliseconds from reset
- * overflows every 49 days if you're wondering
- */
-volatile uint32_t system_millis;
 
 /* Called when systick fires */
 extern "C" void sys_tick_handler(void)
@@ -426,7 +444,7 @@ extern "C" int main(void)
 
     usart1_setup();
 
-    printf("ccs32clara-chademo v0.1\r\n");
+    printf("ccs32clara-chademo v0.3\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -466,8 +484,14 @@ extern "C" int main(void)
 
     while(1)
     {
-        // TODO: to save cpu, we could do this only every 10ms instead of every 1ms as currently.
-        scheduler_run();
+        // irqs may run faster than 1ms, now that we have can irqs
+        static uint32_t nextRun = 0;
+        if (system_millis >= nextRun)
+        {
+            // TODO: to save cpu, we could do this only every 10ms instead of every 1ms as currently.
+            scheduler_run();
+            nextRun = system_millis + 1;
+        }
 
         __WFI();
     }

@@ -2,6 +2,11 @@
 
 #include "ccs32_globals.h"
 
+extern global_data _global;
+//extern bool stopButtonEvent;
+//extern int auto_power_off_timer_count_up_sec;
+//extern bool ccsPowerRelayOnTrigger;
+
 void hardwareInterface_showOnDisplay(char*, char*, char*)
 {
 }
@@ -41,6 +46,12 @@ int16_t hardwareInterface_getChargingTargetVoltage(void)
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
+    if (Param::GetInt(Param::EvseCurrent) > 0)
+    {
+        // still delivering amps, reset countUp timer
+        _global.auto_power_off_timer_count_up_sec = 0;
+    }
+
     return Param::GetInt(Param::ChargeCurrent);
 }
 
@@ -58,7 +69,7 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
-    ccsPowerRelayOnTrigger = true;
+    _global.ccsPowerRelayOnTrigger_prechargeDone = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
@@ -111,7 +122,7 @@ bool hardwareInterface_stopChargeRequested()
 {
     uint8_t stopReason = STOP_REASON_NONE;
 
-    if (stopButtonTrigger)//  pushbutton_isPressed500ms()) 
+    if (_global.stopButtonEvent)//  pushbutton_isPressed500ms()) 
     {
         stopReason = STOP_REASON_BUTTON;
         Param::SetInt(Param::StopReason, stopReason);

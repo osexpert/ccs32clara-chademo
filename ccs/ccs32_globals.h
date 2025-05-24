@@ -37,7 +37,7 @@
 #include "my_string.h"
 #include "wakecontrol.h"
 #include "libopencm3/cm3/cortex.h"
-
+#include "main.h"
 
 /* temporary stubs */
 #define publishStatus(x, y)

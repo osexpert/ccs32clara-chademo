@@ -27,6 +27,24 @@ extern "C" {
 #endif
 
 
+    struct global_data
+    {
+        int stopButtonCounter = 0;
+
+        bool ccsKickoff = false;
+
+        bool stopButtonEvent = false;
+
+        // ccs delivered 1 amps or more
+        bool ccsDeliveredAmpsEvent = false;
+
+        bool ccsPowerRelayOnTrigger_prechargeDone = false;
+
+        uint32_t auto_power_off_timer_count_up_sec = 0;
+    };
+
+
+
 /* Exported functions prototypes ---------------------------------------------*/
 //void Error_Handler(void);
 

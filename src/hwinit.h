@@ -26,13 +26,6 @@ extern "C"
 {
 #endif
 
-	// volatile?
-volatile static bool stopButtonTrigger;
-
-volatile static bool ccsDeliveredAmpsTrigger;
-
-volatile static bool ccsPowerRelayOnTrigger;
-
 void can_setup(void);
 void clock_setup(void);
 //void nvic_setup(void);

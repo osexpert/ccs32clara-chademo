@@ -4,6 +4,9 @@
 #include "params.h"
 #include "digio.h"
 #include "hwinit.h"
+#include "main.h"
+
+extern global_data _global;
 
 void ChademoCharger::SetSwitchD2(bool set)
 {
@@ -24,7 +27,7 @@ void ChademoCharger::SetSwitchD1(bool set)
 bool ChademoCharger::IsChargerLive()
 {
     // TODO: OR....could check that voltage delivered > 1 ? (precharge started)
-    return ccsPowerRelayOnTrigger;
+    return _global.ccsPowerRelayOnTrigger_prechargeDone;
 };
 
 bool ChademoCharger::GetSwitchK()
@@ -34,7 +37,7 @@ bool ChademoCharger::GetSwitchK()
 
 bool ChademoCharger::IsChargingStoppedByAdapter()
 {
-    return stopButtonTrigger;
+    return _global.stopButtonEvent;
 };
 
 void ChademoCharger::NotifyCarContactorsClosed()
