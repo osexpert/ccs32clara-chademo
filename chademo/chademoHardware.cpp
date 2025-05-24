@@ -5,46 +5,53 @@
 #include "digio.h"
 #include "hwinit.h"
 
+void ChademoCharger::SetSwitchD2(bool set)
+{
+    if (set)
+        DigIo::switch_d2_out_inverted.Clear(); // 0: on
+    else
+        DigIo::switch_d2_out_inverted.Set(); // 1: off
+};
 
+void ChademoCharger::SetSwitchD1(bool set)
+{
+    if (set)
+        DigIo::switch_d1_out.Set();
+    else
+        DigIo::switch_d1_out.Clear();
+};
 
-//
-//#include <stdint.h>
-//#include "hwdefs.h"
-//#include "my_math.h"
-//#include "printf.h"
-//#include <libopencm3/stm32/can.h>
-//#include <libopencm3/stm32/gpio.h>
-//#include <libopencm3/stm32/rcc.h>
-//#include <libopencm3/stm32/rtc.h>
-//#include <libopencm3/cm3/common.h>
-//#include <libopencm3/cm3/nvic.h>
-//#include "stm32_can.h"
-//
-//#define MAX_INTERFACES        2
-//#define IDS_PER_BANK          4
-//#define EXT_IDS_PER_BANK      2
-//
-//#ifndef CAN_PERIPH_SPEED
-//#define CAN_PERIPH_SPEED 36
-//#endif // CAN_PERIPH_SPEED
-//
+bool ChademoCharger::IsChargerLive()
+{
+    // TODO: OR....could check that voltage delivered > 1 ? (precharge started)
+    return ccsPowerRelayOnTrigger;
+};
+
+bool ChademoCharger::GetSwitchK()
+{
+    return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
+};
+
+bool ChademoCharger::IsChargingStoppedByAdapter()
+{
+    return stopButtonTrigger;
+};
+
+void ChademoCharger::NotifyCarContactorsClosed()
+{
+    printf("cha: Adapter contactor closed\r\n");
+
+    // close our contactor too. it is not opened until power off
+    DigIo::contactor_out.Set();
+    // DigIo::external_led_out.Clear(); led on. pointless?
+};
+
 
 
 #ifndef SENDBUFFER_LEN
 #define SENDBUFFER_LEN 20
 #endif // SENDBUFFER_LEN
 
-//class Stm32Can : public CanHardware
-//{
-//public:
-//    Stm32Can(uint32_t baseAddr, enum baudrates baudrate, bool remap = false);
-//    void SetBaudrate(enum baudrates baudrate);
-//    void Send(uint32_t canId, uint32_t data[2], uint8_t len);
-//    void HandleTx();
-//    void HandleMessage(int fifo);
-//    static Stm32Can* GetInterface(int index);
-//
-//private:
 struct SENDBUFFER
 {
     uint32_t id;
@@ -84,6 +91,12 @@ void Stm32CanSend(uint32_t canId, uint32_t data[2], uint8_t len)
         can_enable_irq(CAN1, CAN_IER_TMEIE);
     }
 }
+
+void ChademoCharger::CanSend(int id, int len, uint8_t* data)
+{
+    Stm32CanSend(id, (uint32_t*)data, len);
+};
+
 
 extern ChademoCharger* chademoCharger;
 
@@ -133,55 +146,4 @@ extern "C" void can1_tx_isr()
     Stm32CanHandleTx();
 }
 
-
-
-
-
-void ChademoCharger::CanSend(int id, int len, uint8_t* data)
-{
-    Stm32CanSend(id, (uint32_t*)data, len);
-};
-
-
-
-
-void ChademoCharger::SetSwitchD2(bool set)
-{
-    if (set)
-        DigIo::switch_d2_out_inverted.Clear(); // 0: on
-    else
-        DigIo::switch_d2_out_inverted.Set(); // 1: off
-};
-
-void ChademoCharger::SetSwitchD1(bool set)
-{
-    if (set)
-        DigIo::switch_d1_out.Set();
-    else
-        DigIo::switch_d1_out.Clear();
-};
-
-bool ChademoCharger::IsChargerLive()
-{
-    return ccsPowerRelayOnTrigger;
-};
-
-bool ChademoCharger::GetSwitchK()
-{
-    return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
-};
-
-bool ChademoCharger::IsChargingStoppedByAdapter()
-{
-    return stopButtonTrigger;
-};
-
-void ChademoCharger::NotifyCarContactorsClosed()
-{
-    printf("cha: Adapter contactor closed\r\n");
-
-    // close our contactor too. it is not opened until power off
-    DigIo::contactor_out.Set();
-    // DigIo::external_led_out.Clear(); led on. pointless?
-};
 

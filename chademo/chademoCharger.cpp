@@ -159,7 +159,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (IsChargerLive())
         {
-            // This means the charger has its voltage at nominal voltage we gave it and is ready to charge
+            // This means the charger has its voltage at "battery" voltage we gave it and is ready to charge
 
             // this will trigger car to acticate contactors
             SetSwitchD2(true);
@@ -206,8 +206,6 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
-        //printf("cha: charging\r\n");
-
         // Spec: k-signal and CAR_NOT_READY_TO_CHARGE both exist to make sure at least one of them reach the charger in case of cable error.
 
         StopReason stopReason = StopReason::NONE;
@@ -308,8 +306,6 @@ void ChademoCharger::RunStateMachine()
     {
         // NOTE: must have time to tell the car via can that plug is unlocked....so auto off when LockChargingPlug(false) is a bit too soon.
         _powerOffOk = true;
-
-        // nop
     }
 
     // TODO: we need some place to do all cleanup in case of timeout.

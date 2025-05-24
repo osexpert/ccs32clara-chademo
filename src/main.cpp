@@ -294,22 +294,6 @@ static void PrintCcsTrace()
 //    //magic 0: 0x2023123f 0x2023123f magic 1 : 0x32335313 0x32335313 magic 2 : 0x36333a37 0x36333a37
 //}
 
-//bool checkRuntimeIntegrity()
-//{
-//    __disable_irq();
-//
-//    bool match = true;
-//    for (int i = 0; i < WORD_COUNT; ++i) {
-//        if (runtimeBuffer[i] != referenceBuffer[i]) {
-//            match = false;
-//            break;
-//        }
-//    }
-//
-//    __enable_irq();
-//
-//    return match;
-//}
 
 extern uint8_t scheduler_get_cpu_usage(void);
 
@@ -322,50 +306,23 @@ void adc_battery_init(void)
 {
     gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
 
-
     //adc_enable_vrefint();
     //ADC_CCR(ADC1) |= ADC_CCR_VREFEN;
+    // Enable VREFINT for calibration by setting bit 22 in ADC_CCR
     ADC_CCR |= (1 << 22);
 
     // Enable required clocks
     rcc_periph_clock_enable(RCC_ADC1);
-    //rcc_periph_clock_enable(RCC_PWR); // Needed for VBAT sensing
-
-    // Configure PA8 for analog mode (ADC1 channel 8) with pull-up per disassembly
-    //gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_PULLUP, GPIO8);
 
     adc_power_off(ADC1);
-
     // ADC clock: PCLK2/8 = 168/2/8 = 10.5 MHz
     adc_set_clk_prescale(ADC_CCR_ADCPRE_BY8);
-    // Enable VBAT channel (confirmed by ADC_CCR bit 23)
-    //adc_enable_vbat_sensor();
-    // Delay ~10 ms for VBAT stability (168 MHz clock, ~1.68M cycles)
-  //  for (int i = 0; i < 1680000; i++) __asm__("nop");
-    // Enable VREFINT for calibration by setting bit 22 in ADC_CCR
-//    ADC_CCR |= (1 << 22);
-    // Delay ~10 ms for VREFINT stability
-    //for (int i = 0; i < 1680000; i++) __asm__("nop");
     // Set ADC to 12-bit resolution, right-aligned
     adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
-    // Enable scan mode for multi-channel sampling
-    //adc_enable_scan_mode(ADC1);
-    // Single conversion mode
     adc_set_single_conversion_mode(ADC1);
     // Set sample time for all channels (84 cycles, conservative choice)
     adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_84CYC);
-
-    //ADC_IN10	PC0	
-    //ADC_IN11	PC1
-   /* uint8_t channels[ADC_CHANNEL_COUNT] = { 10, 11 };
-    adc_set_regular_sequence(ADC1, ADC_CHANNEL_COUNT, channels);*/
-
-    // Power on ADC
     adc_power_on(ADC1);
-    // Wait for ADC to stabilize (~10 us)
-    //for (int i = 0; i < 1680; i++) __asm__("nop");
-    // Perform ADC calibration
-    //adc_calibrate(ADC1);
 }
 
 
@@ -383,66 +340,11 @@ float adc_to_voltage(uint16_t adc, float gain) {
     return adc * (3.3f / 4095.0f) * gain;
 }
 
-//static void print_results(void) {
-//
-//    adc_read_all();
-//
-//    //printf("a1: %d\r\n", adc_results[0]);
-//    //printf("a2: %d\r\n", adc_results[1]);
-//
-//    printf("a1 f: %f\r\n", FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)));
-//    printf("a2 f: %f\r\n", FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)));
-//
-//    //char buffer[64];
-//    // Assume VREF+ = 3.3V for initial conversion (use VREFINT for calibration)
-//    //float vref = 3.3f;
-//    //// VREFINT calibration value (~1.21V, per datasheet)
-//    //float vrefint_cal = 1.21f;
-//    //// Read VREFINT (channel 17, index 1) to calibrate VREF+
-//    //float vrefint_measured = (adc_results[1] * vref) / 4095.0f;
-//    //vref = (vrefint_cal * 4095.0f) / adc_results[1];
-//
-//    // Print header
-//    
-// 
-//
-//    //// PA8 (channel 8, index 0)
-//    //float voltage = (adc_results[0] * vref) / 4095.0f;
-//    //printf( "Channel  8 (PA8): %f V\r\n", FP_FROMFLT( voltage));
-// 
-//
-//    //// VREFINT (channel 17, index 1)
-//    //printf( "VREFINT (Ch17): %f V\r\n", FP_FROMFLT(vrefint_measured));
-// 
-//
-//    //// VBAT (channel 18, index 2, scaled by 4 due to internal divider)
-//    //float vbat = (adc_results[2] * vref * 4.0f) / 4095.0f;
-//    //printf("VBAT (Ch18): %f V\r\n", FP_FROMFLT(vbat));
-// 
-//}
-
 static void Ms1000Task()
 {
     if (_ccsKickoff)
         PrintCcsTrace();
 
-
-    //const uint32_t* flash = reinterpret_cast<const uint32_t*>(FLASH_REFERENCE_ADDR);
-    //for (int i = 0; i < WORD_COUNT; ++i)
-    //{
-    //    uint32_t val = flash[i];
-    //    val ^= MAGIC_MASK;
-    //    val |= MAGIC_MASK;
-    //    //referenceBuffer[i] = val;
-    //    printf("magic %d: 0x%x 0x%x", i, flash[i], val);
-    //}
-    //printf("\r\n");
-
-    //float battery_voltage = adc_raw_to_vbat(read_battery_adc_raw());
-    //printf("cpu %d%% vbatt:%f\r\n", scheduler_get_cpu_usage(), FP_FROMFLT(battery_voltage));
-
-    //print_results();
-    // TODO: print voltages.
     adc_read_all();
 
     float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
@@ -452,6 +354,8 @@ static void Ms1000Task()
         FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
         FP_FROMFLT(vdd_voltage)
         );
+
+    // Min values seen and working: 3.78V 11.56V 3.4V
 }
 
 
@@ -503,16 +407,20 @@ extern "C" int main(void)
 
     DigIo::power_on_out.Set();
 
+    // spi
     DigIo::spi_cs_out.Set();
     DigIo::spi_clock_out.Set();
     DigIo::spi_mosi_out.Set();
 
+    // ccs
     DigIo::state_c_out_inverted.Set();
 
+    // chademo
     DigIo::switch_d1_out.Clear();
     DigIo::contactor_out.Clear();
     // d2?
 
+    // leds
     DigIo::internal_led_out_inverted.Set(); // led off
     DigIo::external_led_out_inverted.Set(); // led off
 
@@ -529,22 +437,14 @@ extern "C" int main(void)
     }
 
     systick_setup();
-
     can_setup();
-
     adc_battery_init();
-
-    //ANA_IN_CONFIGURE(ANA_IN_LIST);
-//    AnaIn::Start(); //Starts background ADC conversion via DMA
 
     //wakecontrol_init(); //Make sure board stays awake
 
     hardwareInterface_setStateB();
-
     SetMacAddress();
-
     qca7000setup();
-
     demoQCA7000();
 
     ChademoCharger cc;
