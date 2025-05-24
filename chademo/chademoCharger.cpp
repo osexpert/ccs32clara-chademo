@@ -13,12 +13,16 @@ void ChademoCharger::Run()
 {
     SetChargerData();
 
-    ReadPendingCanMessages();
+   // ReadPendingCanMessages();
 
     //uint16_t timeout_s = _stateTimeoutsSec[_state];
 //if (timeout_s > 0 && (timeout_s * 10) > _cyclesInState)
 //{
 //    printf("cha: timeout in state %d/%s. What todo....\r\n", _state, GetStateName());
+// 
+//     TODO: timeout may be needed to make sure we make it to the plug unlocked state, because this is important for safety and auto off.
+//     TODO: so if we get stuck on some state, we can not rely on plug locked/unlocker for chademo
+//     TODO: also unlocked is a nice check that chademo is rundown completely
 //}
 
     RunStateMachine();
@@ -82,6 +86,9 @@ void ChademoCharger::RunStateMachine()
             _chargerData.ThresholdVoltage = _chargerData.AvailableOutputVoltage;
         else
             _chargerData.ThresholdVoltage = _carData.MaxChargeVoltage;
+
+        // Take car as initial value and countdown the minutes
+        _chargerData.RemainingChargeTimeMins = _carData.MaxChargingTimeMins;
     }
 
     // Car seem to immediately go into stopped before starting, i am guessing if available volts and amps are 0 from the start. So do it in two steps...
@@ -102,6 +109,10 @@ void ChademoCharger::RunStateMachine()
             SetSwitchD1(false);
 
             SetState(ChargerState::WaitForChargerAvailableVoltsAndAmps);
+
+            // clear misc stuff, ready for next restart (or not)
+           // _carData.Faults = CAR_FAULT_NONE;
+         //   _carData.Status = CAR_STATUS_NONE;
         }
     }
     else if (_state == ChargerState::WaitForChargerAvailableVoltsAndAmps)
@@ -125,10 +136,6 @@ void ChademoCharger::RunStateMachine()
 
         if (canEna && switchEna)
         {
-            // spec: car should not update MaxChargingTimeMins after SwitchK, so take it here
-            // Take car as initial value and countdown the minutes
-            _chargerData.RemainingChargeTimeMins = _carData.MaxChargingTimeMins;
-
             SetState(ChargerState::CarReadyToCharge);
         }
     }
@@ -222,9 +229,6 @@ void ChademoCharger::RunStateMachine()
             // TODO: reason the charger stopped?
             set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_STOPPED);
 
-            // reset countdown?
-            _chargerData.RemainingChargeTimeMins = 0;
-
             // make sure ccs stop delivering amps and turn down volts (if stop initiated by adapter or car)
             StopPowerDelivery();
 
@@ -237,6 +241,8 @@ void ChademoCharger::RunStateMachine()
         // TODO: IS this only something the car need to do? According to spec...yes. But the log show that CHARGER_STATUS_CHARGING flag is only driven by OutputCurrent...
         if (_chargerData.OutputCurrent <= 5)
         {
+            _chargerData.RemainingChargeTimeMins = 0;
+
             // this just mirror the OutputCurrent during stop
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_CHARGING);
 
@@ -267,9 +273,8 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD2(false);
 
-            _delayCycles = 5; // spec says, after setting D2:false wait 0.5sec before setting D1:false
-
-            SetState(ChargerState::Stopping_WaitForLowVoltsDelivered);
+            // spec says, after setting D2:false wait 0.5sec before setting D1:false (so 5 cycles)
+            SetState(ChargerState::Stopping_WaitForLowVoltsDelivered, 5);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForLowVoltsDelivered)
@@ -286,6 +291,7 @@ void ChademoCharger::RunStateMachine()
     {
         // safe to unlock plug
         LockChargingPlug(false);
+
         // remove plug locked flag
         clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
 
@@ -300,6 +306,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::End)
     {
+        // NOTE: must have time to tell the car via can that plug is unlocked....so auto off when LockChargingPlug(false) is a bit too soon.
+        _powerOffOk = true;
+
         // nop
     }
 
@@ -307,11 +316,12 @@ void ChademoCharger::RunStateMachine()
 
 }
 
-void ChademoCharger::SetState(ChargerState newState)
+void ChademoCharger::SetState(ChargerState newState, int delay_cycles)
 {
     printf("cha: enter state %d/%s\r\n", newState, GetStateName());
     _state = newState;
     _cyclesInState = 0;
+    _delayCycles = delay_cycles;
 
     // force log on state change
     Log(true);
@@ -329,15 +339,14 @@ void ChademoCharger::Log(bool force)
         int alt_soc = (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f);
 
         // every second or when forced
-        printf("cha: state:%d/%s cycles:%d can_tx_drop:%d charger: avail:%dV/%dA out:%dV/%dA rem_t:%dm weld:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d%% st:0x%x target:%dV alt_soc:%d%%\r\n",
+        printf("cha: state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA rem_t:%dm weld:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d%% st:0x%x target:%dV alt_soc:%d%%\r\n",
             _state,
             GetStateName(),
             _cyclesInState,
-            _canTxDrop,
-            _chargerData.AvailableOutputVoltage,
-            _chargerData.AvailableOutputCurrent,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
+            _chargerData.AvailableOutputVoltage,
+            _chargerData.AvailableOutputCurrent,
             _chargerData.RemainingChargeTimeMins,
             _chargerData.SupportWeldingDetection,
             _chargerData.ThresholdVoltage,
@@ -383,8 +392,6 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
 void ChademoCharger::SendCanMessages()
 {
-    bool ext = false;                  // Standard frame (not extended)
-    bool rtr = false;                  // Data frame (not remote request)
     uint8_t length = 8;                // Data length (0–8)
     uint8_t data[8];
 
@@ -398,7 +405,11 @@ void ChademoCharger::SendCanMessages()
     // BUT WHY IS THE CHARGER SENDING THIS TO THE CAR?????
     data[4] = _chargerData.ThresholdVoltage & 0xFF;
     data[5] = (_chargerData.ThresholdVoltage >> 8) & 0xFF;
-    CanSend(0x108, ext, rtr, length, data);
+
+    data[6] = 0;
+    data[7] = 0;
+
+    CanSend(0x108, length, data);
 
     data[0] = _chargerData.ChademoRawVersion;// ChademoRawVersion 1:0.9 2:1.0 etc.
 
@@ -407,17 +418,30 @@ void ChademoCharger::SendCanMessages()
 
     data[3] = _chargerData.OutputCurrent;
 
+    data[4] = 0;
+
     //DischargeCompatitible = data[4] == 1;
     data[5] = _chargerData.Status;
 
-    data[6] = 0xFF; //RemainingChargeTime10Sec
-    data[7] = _chargerData.RemainingChargeTimeMins;
+    if (_chargerData.RemainingChargeTimeMins > 0)
+    {
+        data[6] = 0xFF; //RemainingChargeTime10Sec
+        data[7] = _chargerData.RemainingChargeTimeMins;
+    }
+    else
+    {
+        data[6] = 0;
+        data[7] = 0;
+    }
 
-    CanSend(0x109, ext, rtr, length, data);
+    CanSend(0x109, length, data);
 }
 
-void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data)
+void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t len)
 {
+    if (len != 8)
+        return;
+
     if (id == 0x100)
     {
         _carData.MinimumChargeCurrent = data[0];

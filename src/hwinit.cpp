@@ -128,6 +128,16 @@ void can_setup(void) {
     gpio_set_af(GPIOD, GPIO_AF9, GPIO1);
   //  gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
 
+
+             //CAN1 RX and TX IRQs
+    nvic_enable_irq(NVIC_CAN1_RX0_IRQ); //CAN RX
+    nvic_set_priority(NVIC_CAN1_RX0_IRQ, 0xf << 4); //lowest priority
+    nvic_enable_irq(NVIC_CAN1_RX1_IRQ); //CAN RX
+    nvic_set_priority(NVIC_CAN1_RX1_IRQ, 0xf << 4); //lowest priority
+    nvic_enable_irq(NVIC_CAN1_TX_IRQ); //CAN TX
+    nvic_set_priority(NVIC_CAN1_TX_IRQ, 0xf << 4); //lowest priority
+
+
     can_reset(CAN1);
 
     // Configure CAN for 500 kbps assuming APB1 clock is 42 MHz
@@ -154,6 +164,9 @@ void can_setup(void) {
         0,                      // Assign to FIFO 0
         true                    // Enable filter
     );
+
+    can_enable_irq(CAN1, CAN_IER_FMPIE0);
+    can_enable_irq(CAN1, CAN_IER_FMPIE1);
 
     // Don't use irq's. Polling seems to work fine and dropped messages should not matter.
 

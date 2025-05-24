@@ -29,7 +29,7 @@
 //#include "hardwareVariants.h"
 //#include "acOBC.h"
 #include "my_math.h"
-#include "anain.h"
+//#include "anain.h"
 #include "digio.h"
 #include "params.h"
 #include "hwinit.h"

@@ -21,6 +21,8 @@
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
+//#include <libopencm3/stm32/memorymap.h>
+#include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/iwdg.h>
 #include <libopencm3/cm3/systick.h>
 #include <libopencmsis/core_cm3.h>
@@ -59,10 +61,10 @@ extern "C" void __cxa_pure_virtual()
 }
 
 // need volatile???
-volatile static int stopButtonCounter = 0;
+int stopButtonCounter = 0;
 
-static ChademoCharger* chademoCharger;
-static LedBlinker* ledBlinker;
+ChademoCharger* chademoCharger;
+LedBlinker* ledBlinker;
 
 void LedBlinker::onLedChange(bool set)
 {
@@ -79,7 +81,7 @@ void LedBlinker::onLedChange(bool set)
 }
 
 
-void power_off(const char* reason)
+void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
@@ -117,21 +119,25 @@ void power_off_check()
         bool buttonPressed30Seconds = stopButtonCounter > 60; // 30 seconds
         if (buttonPressed30Seconds)
         {
-            power_off("Stop pressed for 30sec");
+            power_off_no_return("Stop pressed for 30sec");
         }
 
-       // bool lockedCcs = Param::Get(Param::LockState) == LOCK_CLOSED;
-       // bool lockedCha = chademoCharger->IsChargingPlugLocked();
+        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
+        if (powerOffOkCcs && powerOffOkCha)
+        {
+            power_off_no_return("Stop pressed & plugs unlocked");
+        }
 
         // I Think it only need to check ccs here, i trust it more. If ccs is not delivering amps, it should not matter what chademo says.
-        if (Param::GetInt(Param::LockState) == LOCK_CLOSED)//lockedCha || lockedCcs)
-            //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
-        {
-            //printf("Power off request denied, connector is (logically) locked. pending stop charging. press for 30sec for emergency shutdown.\r\n");
-            return;
-        }
+        //if (lockedCha || lockedCcs)
+        //    //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
+        //{
+        //    //printf("Power off request denied, connector is (logically) locked. pending stop charging. press for 30sec for emergency shutdown.\r\n");
+        //    return;
+        //}
 
-        power_off("Stop pressed & plug unlocked");
     }
 }
 
@@ -265,12 +271,187 @@ static void PrintCcsTrace()
     );
 }
 
+// Weird stuff...
+//#define FLASH_REFERENCE_ADDR 0x0800C000
+//#define MAGIC_MASK 0x20231212
+//#define WORD_COUNT 3
+//
+//alignas(4) volatile uint32_t runtimeBuffer[WORD_COUNT] = { 0 };
+//alignas(4) volatile uint32_t referenceBuffer[WORD_COUNT] = { 0 };
+//
+//// Called once to initialize referenceBuffer
+//void initializeReferenceBuffer()
+//{
+//    const uint32_t* flash = reinterpret_cast<const uint32_t*>(FLASH_REFERENCE_ADDR);
+//    for (int i = 0; i < WORD_COUNT; ++i)
+//    {
+//        uint32_t val = flash[i];
+//        val ^= MAGIC_MASK;
+//        val |= MAGIC_MASK;
+//        referenceBuffer[i] = val;
+//    }
+//    // magic mask has no effect?
+//    //magic 0: 0x2023123f 0x2023123f magic 1 : 0x32335313 0x32335313 magic 2 : 0x36333a37 0x36333a37
+//}
+
+//bool checkRuntimeIntegrity()
+//{
+//    __disable_irq();
+//
+//    bool match = true;
+//    for (int i = 0; i < WORD_COUNT; ++i) {
+//        if (runtimeBuffer[i] != referenceBuffer[i]) {
+//            match = false;
+//            break;
+//        }
+//    }
+//
+//    __enable_irq();
+//
+//    return match;
+//}
+
+extern uint8_t scheduler_get_cpu_usage(void);
+
+// Buffer to store ADC results (PA8, VREFINT, VBAT)
+#define ADC_CHANNEL_COUNT 3
+uint16_t adc_results[ADC_CHANNEL_COUNT];
+static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+
+void adc_battery_init(void)
+{
+    gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
+
+
+    //adc_enable_vrefint();
+    //ADC_CCR(ADC1) |= ADC_CCR_VREFEN;
+    ADC_CCR |= (1 << 22);
+
+    // Enable required clocks
+    rcc_periph_clock_enable(RCC_ADC1);
+    //rcc_periph_clock_enable(RCC_PWR); // Needed for VBAT sensing
+
+    // Configure PA8 for analog mode (ADC1 channel 8) with pull-up per disassembly
+    //gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_PULLUP, GPIO8);
+
+    adc_power_off(ADC1);
+
+    // ADC clock: PCLK2/8 = 168/2/8 = 10.5 MHz
+    adc_set_clk_prescale(ADC_CCR_ADCPRE_BY8);
+    // Enable VBAT channel (confirmed by ADC_CCR bit 23)
+    //adc_enable_vbat_sensor();
+    // Delay ~10 ms for VBAT stability (168 MHz clock, ~1.68M cycles)
+  //  for (int i = 0; i < 1680000; i++) __asm__("nop");
+    // Enable VREFINT for calibration by setting bit 22 in ADC_CCR
+//    ADC_CCR |= (1 << 22);
+    // Delay ~10 ms for VREFINT stability
+    //for (int i = 0; i < 1680000; i++) __asm__("nop");
+    // Set ADC to 12-bit resolution, right-aligned
+    adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
+    // Enable scan mode for multi-channel sampling
+    //adc_enable_scan_mode(ADC1);
+    // Single conversion mode
+    adc_set_single_conversion_mode(ADC1);
+    // Set sample time for all channels (84 cycles, conservative choice)
+    adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_84CYC);
+
+    //ADC_IN10	PC0	
+    //ADC_IN11	PC1
+   /* uint8_t channels[ADC_CHANNEL_COUNT] = { 10, 11 };
+    adc_set_regular_sequence(ADC1, ADC_CHANNEL_COUNT, channels);*/
+
+    // Power on ADC
+    adc_power_on(ADC1);
+    // Wait for ADC to stabilize (~10 us)
+    //for (int i = 0; i < 1680; i++) __asm__("nop");
+    // Perform ADC calibration
+    //adc_calibrate(ADC1);
+}
+
+
+
+static void adc_read_all(void) {
+    for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
+        adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
+        adc_start_conversion_regular(ADC1);
+        while (!adc_eoc(ADC1));
+        adc_results[i] = adc_read_regular(ADC1);
+    }
+}
+
+float adc_to_voltage(uint16_t adc, float gain) {
+    return adc * (3.3f / 4095.0f) * gain;
+}
+
+//static void print_results(void) {
+//
+//    adc_read_all();
+//
+//    //printf("a1: %d\r\n", adc_results[0]);
+//    //printf("a2: %d\r\n", adc_results[1]);
+//
+//    printf("a1 f: %f\r\n", FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)));
+//    printf("a2 f: %f\r\n", FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)));
+//
+//    //char buffer[64];
+//    // Assume VREF+ = 3.3V for initial conversion (use VREFINT for calibration)
+//    //float vref = 3.3f;
+//    //// VREFINT calibration value (~1.21V, per datasheet)
+//    //float vrefint_cal = 1.21f;
+//    //// Read VREFINT (channel 17, index 1) to calibrate VREF+
+//    //float vrefint_measured = (adc_results[1] * vref) / 4095.0f;
+//    //vref = (vrefint_cal * 4095.0f) / adc_results[1];
+//
+//    // Print header
+//    
+// 
+//
+//    //// PA8 (channel 8, index 0)
+//    //float voltage = (adc_results[0] * vref) / 4095.0f;
+//    //printf( "Channel  8 (PA8): %f V\r\n", FP_FROMFLT( voltage));
+// 
+//
+//    //// VREFINT (channel 17, index 1)
+//    //printf( "VREFINT (Ch17): %f V\r\n", FP_FROMFLT(vrefint_measured));
+// 
+//
+//    //// VBAT (channel 18, index 2, scaled by 4 due to internal divider)
+//    //float vbat = (adc_results[2] * vref * 4.0f) / 4095.0f;
+//    //printf("VBAT (Ch18): %f V\r\n", FP_FROMFLT(vbat));
+// 
+//}
+
 static void Ms1000Task()
 {
     if (_ccsKickoff)
         PrintCcsTrace();
 
+
+    //const uint32_t* flash = reinterpret_cast<const uint32_t*>(FLASH_REFERENCE_ADDR);
+    //for (int i = 0; i < WORD_COUNT; ++i)
+    //{
+    //    uint32_t val = flash[i];
+    //    val ^= MAGIC_MASK;
+    //    val |= MAGIC_MASK;
+    //    //referenceBuffer[i] = val;
+    //    printf("magic %d: 0x%x 0x%x", i, flash[i], val);
+    //}
+    //printf("\r\n");
+
+    //float battery_voltage = adc_raw_to_vbat(read_battery_adc_raw());
+    //printf("cpu %d%% vbatt:%f\r\n", scheduler_get_cpu_usage(), FP_FROMFLT(battery_voltage));
+
+    //print_results();
     // TODO: print voltages.
+    adc_read_all();
+
+    float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
+
+    printf("ADC %fV (nom:5) %fV (nom:12) vdd:%fV (nom:3.3)\r\n", 
+        FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
+        FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
+        FP_FROMFLT(vdd_voltage)
+        );
 }
 
 
@@ -301,6 +482,9 @@ void iwdg_configure(uint16_t period_ms)
     // Start the watchdog
     iwdg_start();
 }
+
+
+
 
 extern "C" int main(void)
 {
@@ -341,12 +525,14 @@ extern "C" int main(void)
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        power_off("Stop button pressed during startup");
+        power_off_no_return("Stop button pressed during startup");
     }
 
     systick_setup();
 
     can_setup();
+
+    adc_battery_init();
 
     //ANA_IN_CONFIGURE(ANA_IN_LIST);
 //    AnaIn::Start(); //Starts background ADC conversion via DMA

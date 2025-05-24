@@ -45,6 +45,8 @@ has_flag(E value, E flag) {
 
 enum CarFaults
 {
+    //CAR_FAULT_NONE = 0,
+
     CAR_FAULT_OVER_VOLT = 1,
     CAR_FAULT_UNDER_VOLT = 2,
     CAR_FAULT_DEV_AMPS = 4,
@@ -55,12 +57,16 @@ enum CarFaults
 
 enum CarStatus
 {
+    //CAR_STATUS_NONE = 0,
+
     CAR_STATUS_READY_TO_CHARGE = 1,// charging enabled/allowed
     CAR_STATUS_NOT_IN_PARK = 2, // shifter not in safe state (0: park 1: other)
-    CAR_STATUS_ERROR = 4, // car did something dumb (fault caused by the car or the charger and detected by the car)
+    CAR_STATUS_CHARGER_ERROR = 4, // can be CAN timeout, or other timeout (too short/long in state)
 
     /// <summary>
-    /// Set the flag to 0 when the vehicle relay is closed, and set as 1 after the termination of welding detection.
+    /// Car initially send 0 here, kind of wrong...then it changes to 1 (OPEN).
+    /// Set the flag to 0 when the vehicle relay is closed (start)
+    /// and set as 1 after the termination of welding detection (end)
     /// </summary>
     CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 8, // main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
    
@@ -87,7 +93,9 @@ enum ChargerStatus
     CHARGER_STATUS_ERROR = 2, // something went wrong (fault caused by (or inside) the charger)
     CHARGER_STATUS_PLUG_LOCKED = 4, // connector is currently locked (electromagnetic lock, plug locked into the car)
     CHARGER_STATUS_INCOMPAT = 8,// parameters between vehicle and charger not compatible (battery incompatible?)
-    CHARGER_STATUS_CAR_ERROR = 16, // problem with the car, such as improper connection (or something wrong with the battery?)
+
+    CHARGER_STATUS_CAR_ERROR = 16, // can be CAN timeout, or other timeout (too short/long in state). problem with the car, such as improper connection (or something wrong with the battery?)
+
     CHARGER_STATUS_STOPPED = 32, //charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
 };
 
@@ -234,9 +242,9 @@ public:
     void SendCanMessages();
     void RunStateMachine(void);
     void Run();
-	void HandleChademoMessage(uint32_t id, uint8_t* data);
+	void HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t len);
 
-    void SetState(ChargerState newState);
+    void SetState(ChargerState newState, int delay_cycled = 0);
 
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
@@ -249,15 +257,21 @@ public:
     void StopPowerDelivery();
     bool GetSwitchK();
 
-    /*bool IsChargingPlugLocked()
+    bool IsPowerOffOk()
+    {
+        return _powerOffOk;
+    }
+  /*  bool IsChargingPlugLocked()
     {
         return _locked;
     };*/
 
     void LockChargingPlug(bool lock)
     {
-        (void)lock;
-        //_locked = lock;
+//        _locked = lock;
+
+        if (lock)
+            _powerOffOk = false;
     };
 
     //bool IsChargerReady()
@@ -279,9 +293,9 @@ public:
 
     bool IsChargingStoppedByCharger();
     
-    void CanSend(int id, bool ext, bool rem, int len, uint8_t* data);
+    void CanSend(int id, int len, uint8_t* data);
 
-    void ReadPendingCanMessages();
+    //void ReadPendingCanMessages();
     void Log(bool force = false);
 
     const char* GetStateName();
@@ -289,10 +303,11 @@ public:
 
     private:
 
-        int _canTxDrop = 0;
+        //int _canTxDrop = 0;
         int _delayCycles = 0;
         int _logCycleCounter = 0;
-        //bool _locked = false;
+//        bool _locked = false;
+        bool _powerOffOk = true;
         int _cyclesInState = 0;
         
   //      int _lastCanRecieveTime = 0;

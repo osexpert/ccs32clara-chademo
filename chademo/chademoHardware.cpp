@@ -5,97 +5,145 @@
 #include "digio.h"
 #include "hwinit.h"
 
-void ChademoCharger::CanSend(int id, bool ext, bool rtr, int len, uint8_t* data)
+
+
+//
+//#include <stdint.h>
+//#include "hwdefs.h"
+//#include "my_math.h"
+//#include "printf.h"
+//#include <libopencm3/stm32/can.h>
+//#include <libopencm3/stm32/gpio.h>
+//#include <libopencm3/stm32/rcc.h>
+//#include <libopencm3/stm32/rtc.h>
+//#include <libopencm3/cm3/common.h>
+//#include <libopencm3/cm3/nvic.h>
+//#include "stm32_can.h"
+//
+//#define MAX_INTERFACES        2
+//#define IDS_PER_BANK          4
+//#define EXT_IDS_PER_BANK      2
+//
+//#ifndef CAN_PERIPH_SPEED
+//#define CAN_PERIPH_SPEED 36
+//#endif // CAN_PERIPH_SPEED
+//
+
+
+#ifndef SENDBUFFER_LEN
+#define SENDBUFFER_LEN 20
+#endif // SENDBUFFER_LEN
+
+//class Stm32Can : public CanHardware
+//{
+//public:
+//    Stm32Can(uint32_t baseAddr, enum baudrates baudrate, bool remap = false);
+//    void SetBaudrate(enum baudrates baudrate);
+//    void Send(uint32_t canId, uint32_t data[2], uint8_t len);
+//    void HandleTx();
+//    void HandleMessage(int fifo);
+//    static Stm32Can* GetInterface(int index);
+//
+//private:
+struct SENDBUFFER
 {
-    //if (can_available_mailbox() > 0) {
-    //    send_can_message();
-    //}
-    //else {
-    //    // mailbox busy — queue message in software buffer and try later
-    //}
+    uint32_t id;
+    uint32_t len;
+    uint32_t data[2];
+};
 
-    int res = can_transmit(CAN1, id, ext, rtr, len, data);
-    if (res == -1)
+SENDBUFFER sendBuffer[SENDBUFFER_LEN];
+int sendCnt;
+
+
+
+/** \brief Send a user defined CAN message
+ *
+ * \param canId uint32_t
+ * \param data[2] uint32_t
+ * \param len message length
+ * \return void
+ *
+ */
+void Stm32CanSend(uint32_t canId, uint32_t data[2], uint8_t len)
+{
+    can_disable_irq(CAN1, CAN_IER_TMEIE);
+
+    if (can_transmit(CAN1, canId, canId > 0x7FF, false, len, (uint8_t*)data) < 0 && sendCnt < SENDBUFFER_LEN)
     {
-        _canTxDrop++;
+        // enqueue in send buffer if all TX mailboxes are full
+        sendBuffer[sendCnt].id = canId;
+        sendBuffer[sendCnt].len = len;
+        sendBuffer[sendCnt].data[0] = data[0];
+        sendBuffer[sendCnt].data[1] = data[1];
+        sendCnt++;
     }
-    else
+
+    if (sendCnt > 0)
     {
-//        _lastCanSendTime = 
+        can_enable_irq(CAN1, CAN_IER_TMEIE);
     }
+}
 
-    // try 2 times
-    //for (int i = 0; i < 2; i++)
-    //{
-    //    int res = can_transmit(CAN1, id, ext, rtr, len, data);
+extern ChademoCharger* chademoCharger;
 
-    //    //@returns int 0, 1 or 2 on success and depending on which outgoing mailbox got
-    //    //    selected. - 1 if no mailbox was available and no transmission got queued.
+void Stm32CanHandleMessage(int fifo)
+{
+    uint32_t id;
+    bool ext, rtr;
+    uint8_t length, fmi;
+    uint32_t data[2];
 
-    //    if (res == -1)
-    //    {
-    //        printf("mailbox full, retry %d\r\n", i);
-    //        // We send so often, a few dropped messages should not be a dealbreaker
-    //    }
-    //    else // queued
-    //    {
-    //        _lastCanSendTime = rtc_get_ms();
-    //        return;
-    //    }
+    while (can_receive(CAN1, fifo, true, &id, &ext, &rtr, &fmi, &length, (uint8_t*)data, 0) > 0)
+    {
+        chademoCharger->HandleChademoMessage(id, (uint8_t*)data, length);
+        //lastRxTimestamp = time_value;
+    }
+}
 
-    //}
+void Stm32CanHandleTx()
+{
+    SENDBUFFER* b = sendBuffer; //alias
 
-    //int res = can_transmit(CAN1, id, ext, rtr, len, data);
-    //if (res == -1)
-    //{
-    //    printf("can_transmit mailbox full, try one more time...\r\n");
-    //    res = can_transmit(CAN1, id, ext, rtr, len, data);
-    //    if (res == -1)
-    //    {
-    //        printf("full on second try as well:-)\r\n");
-    //        // We send so often, a few dropped messages should not be a dealbreaker
-    //    }
-    //}
+    while (sendCnt > 0 && can_transmit(CAN1, b[sendCnt - 1].id, b[sendCnt - 1].id > 0x7FF, false, b[sendCnt - 1].len, (uint8_t*)b[sendCnt - 1].data) >= 0)
+        sendCnt--;
+
+    if (sendCnt == 0)
+    {
+        can_disable_irq(CAN1, CAN_IER_TMEIE);
+    }
+}
+
+
+
+
+/* Interrupt service routines */
+extern "C" void can1_rx0_isr(void)
+{
+    Stm32CanHandleMessage(0);
+}
+
+extern "C" void can1_rx1_isr()
+{
+    Stm32CanHandleMessage(1);
+}
+
+extern "C" void can1_tx_isr()
+{
+    Stm32CanHandleTx();
+}
+
+
+
+
+
+void ChademoCharger::CanSend(int id, int len, uint8_t* data)
+{
+    Stm32CanSend(id, (uint32_t*)data, len);
 };
 
 
 
-void ChademoCharger::ReadPendingCanMessages()
-{
-    uint32_t id;
-    bool is_extended;
-    bool is_rtr;
-    uint8_t filter_match_index;
-    uint8_t dlc;
-    uint8_t data[8];
-    uint16_t ts;
-
-    // Check if a message is received in FIFO 0
-    while (can_fifo_pending(CAN1, 0) > 0)
-    {
-        // Read the message from FIFO 0
-        // Call the receive function
-        uint32_t result = can_receive(
-            CAN1,           // CAN port (e.g., 0 for CAN1)
-            0,           // FIFO (usually 0 or 1)
-            true,        // release = true → frees the mailbox after reading
-            &id,
-            &is_extended,
-            &is_rtr,
-            &filter_match_index,
-            &dlc,
-            data,
-            &ts
-        );
-
-        // result = nt 0-3 depending on how many messages where pending before
-        if (result)
-        {
-//            _lastCanRecieveTime = rtc_get_ms();
-            HandleChademoMessage(id, data);
-        }
-    }
-}
 
 void ChademoCharger::SetSwitchD2(bool set)
 {
