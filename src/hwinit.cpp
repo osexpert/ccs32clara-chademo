@@ -121,19 +121,27 @@ void can_setup(void) {
     // Configure GPIOD pin 0 as AF9, Pull-Up, Very High Speed, Alternate function push-pull. Can RX.
     gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO0);
     gpio_set_af(GPIOD, GPIO_AF9, GPIO0);
-//    gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO0);
+    //gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO0);
 
     // Configure GPIOD pin 1 as AF9, No Pull, Very High Speed, Alternate function push-pull. Can TX.
     gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO1);
     gpio_set_af(GPIOD, GPIO_AF9, GPIO1);
-  //  gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
+    gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
+
+
+
+    /*gpio_set_af(GPIOD, GPIO_AF9, GPIO0 | GPIO1);
+    gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO0 | GPIO1);*/
+
 
 
              //CAN1 RX and TX IRQs
     nvic_enable_irq(NVIC_CAN1_RX0_IRQ); //CAN RX
     nvic_set_priority(NVIC_CAN1_RX0_IRQ, 0xf << 4); //lowest priority
+
     nvic_enable_irq(NVIC_CAN1_RX1_IRQ); //CAN RX
     nvic_set_priority(NVIC_CAN1_RX1_IRQ, 0xf << 4); //lowest priority
+
     nvic_enable_irq(NVIC_CAN1_TX_IRQ); //CAN TX
     nvic_set_priority(NVIC_CAN1_TX_IRQ, 0xf << 4); //lowest priority
 
@@ -166,7 +174,7 @@ void can_setup(void) {
     );
 
     can_enable_irq(CAN1, CAN_IER_FMPIE0);
-    can_enable_irq(CAN1, CAN_IER_FMPIE1);
+//    can_enable_irq(CAN1, CAN_IER_FMPIE1); we only have filter for fifo0
 
     // Don't use irq's. Polling seems to work fine and dropped messages should not matter.
 

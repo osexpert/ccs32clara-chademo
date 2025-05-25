@@ -42,7 +42,9 @@ has_flag(E value, E flag) {
     return (static_cast<U>(value) & static_cast<U>(flag)) != 0;
 }
 
-
+/// <summary>
+/// errors during charging, related to the battery.
+/// </summary>
 enum CarFaults
 {
     //CAR_FAULT_NONE = 0,
@@ -59,27 +61,43 @@ enum CarStatus
 {
     //CAR_STATUS_NONE = 0,
 
-    CAR_STATUS_READY_TO_CHARGE = 1,// charging enabled/allowed
-    CAR_STATUS_NOT_IN_PARK = 2, // shifter not in safe state (0: park 1: other)
-    CAR_STATUS_CHARGER_ERROR = 4, // can be CAN timeout, or other timeout (too short/long in state)
+    /// <summary>
+    /// 102.5.0 Vehicle charging enabled
+    /// </summary>
+    CAR_STATUS_READY_TO_CHARGE = 0x1,
 
     /// <summary>
+    /// 102.5.1 Vehicle shift position
+    /// </summary>
+    CAR_STATUS_NOT_IN_PARK = 0x2,
+
+    /// <summary>
+    /// 102.5.2 Charging system fault
+    /// Can timeout? Other timeout? Too long/short in state?
+    /// This is analog to ChargerStatus::CHARGER_STATUS_ERROR, only opposite direction
+    /// </summary>
+    CAR_STATUS_ERROR = 0x4,
+
+    /// <summary>
+    /// 102.5.3 Vehicle status
     /// Car initially send 0 here, kind of wrong...then it changes to 1 (OPEN).
     /// Set the flag to 0 when the vehicle relay is closed (start)
     /// and set as 1 after the termination of welding detection (end)
     /// </summary>
-    CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 8, // main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
+    CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 0x8, // main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
    
-
-    CAR_STATUS_STOP_BEFORE_CHARGING = 16, // charger stop before charging (changed my mind, error, timeout?) 
+    /// <summary>
+    /// 102.5.4 Normal stop request before charging
+    /// </summary>
+    CAR_STATUS_STOP_BEFORE_CHARGING = 0x10,
 
     /// <summary>
     /// Vehicle reports a fault specifically in its charging system. (Bit 6)?
     /// Possibly battery cooling in progress??? Or hot battery in general?
     /// </summary>
-    CAR_STATUS_UNK_64 = 64,
+    CAR_STATUS_UNK_64 = 0x40,
 
-    CAR_STATUS_DISCHARGE_COMPATIBLE = 128, // car is V2X compatible (can deliver power to grid)
+    CAR_STATUS_DISCHARGE_COMPATIBLE = 0x80, // car is V2X compatible (can deliver power to grid)
 };
 
 enum ChargerStatus
@@ -88,30 +106,35 @@ enum ChargerStatus
     /// during rundown: This is tied 1:1 with OutputCurrent > 0. Meaning we can be stopped, but still charging since amps > 0.
     /// During startup, CHARGER_STATUS_CHARGING is set and then amps are still 0.
     /// </summary>
-    CHARGER_STATUS_CHARGING = 1, // 0: standby 1: charging (power transfer from charger)
+    CHARGER_STATUS_CHARGING = 0x1, // 0: standby 1: charging (power transfer from charger)
 
-    CHARGER_STATUS_ERROR = 2, // something went wrong (fault caused by (or inside) the charger)
-    CHARGER_STATUS_PLUG_LOCKED = 4, // connector is currently locked (electromagnetic lock, plug locked into the car)
-    CHARGER_STATUS_INCOMPAT = 8,// parameters between vehicle and charger not compatible (battery incompatible?)
+    /// <summary>
+    /// 
+    /// </summary>
+    CHARGER_STATUS_ERROR = 0x2, // something went wrong (fault caused by (or inside) the charger)
 
-    CHARGER_STATUS_CAR_ERROR = 16, // can be CAN timeout, or other timeout (too short/long in state). problem with the car, such as improper connection (or something wrong with the battery?)
+    CHARGER_STATUS_PLUG_LOCKED = 0x4, // connector is currently locked (electromagnetic lock, plug locked into the car)
+    CHARGER_STATUS_INCOMPAT = 0x8,// parameters between vehicle and charger not compatible (battery incompatible?)
 
-    CHARGER_STATUS_STOPPED = 32, //charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
+    CHARGER_STATUS_CAR_ERROR = 0x10, // can be CAN timeout, or other timeout (too short/long in state). problem with the car, such as improper connection (or something wrong with the battery?)
+
+    CHARGER_STATUS_STOPPED = 0x20, //charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
 };
 
 enum StopReason
 {
-    NONE = 0,
-    CAR_CAN_AMPS_TIMEOUT = 1,
+    NONE = 0x0,
+    CAR_CAN_AMPS_TIMEOUT = 0x1,
     //            CAR_ASK_FOR_ZERO_AMPS = 2, // asking for 0 amps
-    CAR_NOT_READY_TO_CHARGE = 4,
-    CAR_NOT_IN_PARK = 8,
-    CAR_K_OFF = 16,
+    CAR_NOT_READY_TO_CHARGE = 0x4,
+    CAR_NOT_IN_PARK = 0x8,
+    CAR_K_OFF = 0x10,
     /// <summary>
     /// Typically the ccs charger want us to stop
     /// </summary>
-    CHARGER = 32,
-    ADAPTER_STOP_BUTTON = 64,
+    CHARGER = 0x20,
+    ADAPTER_STOP_BUTTON = 0x40,
+    CAR_ERROR = 0x80,
 };
 //
 //enum ChargerState
@@ -198,11 +221,17 @@ struct CarData
     // valid after k-switch
     uint8_t ChargingRateReferenceConstant;
 
-    uint8_t MinimumChargeCurrent
-        ;
+    uint8_t MinimumChargeCurrent;
     uint8_t ChademoRawVersion;
     uint8_t EstimatedChargingTimeMins;
     //uint8_t MaxChargingTime10Sec;
+
+    //bool operator==(const CarData& other) const {
+    //    return MaxChargeVoltage == other.MaxChargeVoltage &&
+    //        MaxChargingTimeMins == other.MaxChargingTimeMins &&
+    //        TargetVoltage == other.TargetVoltage &&
+    //        AskingAmps
+   // }
 };
 
 struct ChargerData
@@ -242,6 +271,7 @@ public:
     void SendCanMessages();
     void RunStateMachine(void);
     void Run();
+    void RunSend();
 	void HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t len);
 
     void SetState(ChargerState newState, int delay_cycled = 0);
@@ -310,6 +340,8 @@ public:
         bool _powerOffOk = true;
         int _cyclesInState = 0;
         
+//        char _last[400];
+  //      char _now[400];
   //      int _lastCanRecieveTime = 0;
 //        int _lastCanSendTime = 0;
 
@@ -320,5 +352,6 @@ public:
         ChargerState _state = ChargerState::Start;
 
         CarData _carData = {};
+        //CarData _lastLoggedCarData = {};
         ChargerData _chargerData = {};
 };

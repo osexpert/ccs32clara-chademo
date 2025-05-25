@@ -51,20 +51,22 @@ void ChademoCharger::NotifyCarContactorsClosed()
 
 
 
+
 #ifndef SENDBUFFER_LEN
-#define SENDBUFFER_LEN 20
-#endif // SENDBUFFER_LEN
+#define SENDBUFFER_LEN 16  // must be power of 2!
+#endif
 
-struct SENDBUFFER
-{
+#define SENDBUFFER_MASK (SENDBUFFER_LEN - 1)
+
+typedef struct {
     uint32_t id;
-    uint32_t len;
+    uint8_t len;
     uint32_t data[2];
-};
+} SENDBUFFER;
 
-SENDBUFFER sendBuffer[SENDBUFFER_LEN];
-int sendCnt;
-
+static volatile uint8_t txHead = 0;
+static volatile uint8_t txTail = 0;
+static SENDBUFFER sendBuffer[SENDBUFFER_LEN];
 
 
 /** \brief Send a user defined CAN message
@@ -79,20 +81,32 @@ void Stm32CanSend(uint32_t canId, uint32_t data[2], uint8_t len)
 {
     can_disable_irq(CAN1, CAN_IER_TMEIE);
 
-    if (can_transmit(CAN1, canId, canId > 0x7FF, false, len, (uint8_t*)data) < 0 && sendCnt < SENDBUFFER_LEN)
-    {
-        // enqueue in send buffer if all TX mailboxes are full
-        sendBuffer[sendCnt].id = canId;
-        sendBuffer[sendCnt].len = len;
-        sendBuffer[sendCnt].data[0] = data[0];
-        sendBuffer[sendCnt].data[1] = data[1];
-        sendCnt++;
+    // Try to send directly (but only if q is empty, want fifo)
+    if (txHead == txTail && can_transmit(CAN1, canId, canId > 0x7FF, false, len, (uint8_t*)data) >= 0) {
+        // Sent immediately, and ring buffer is empty, no need to enable IRQ
+
+        if (canId == 0x108)
+            _global.cha108++;
+        else if (canId == 0x109)
+            _global.cha109++;
+
+        return;
     }
 
-    if (sendCnt > 0)
-    {
-        can_enable_irq(CAN1, CAN_IER_TMEIE);
+    // Queue if failed or buffer already has messages
+    uint8_t nextHead = (txHead + 1) & SENDBUFFER_MASK;
+    if (nextHead == txTail) {
+        printf("Buffer full — drop message or track it\r\n");
+        return;
     }
+
+    sendBuffer[txHead].id = canId;
+    sendBuffer[txHead].len = len;
+    sendBuffer[txHead].data[0] = data[0];
+    sendBuffer[txHead].data[1] = data[1];
+    txHead = nextHead;
+
+    can_enable_irq(CAN1, CAN_IER_TMEIE); // Enable interrupt only if queue has data
 }
 
 void ChademoCharger::CanSend(int id, int len, uint8_t* data)
@@ -117,19 +131,42 @@ void Stm32CanHandleMessage(int fifo)
     }
 }
 
+//void Stm32CanHandleTx()
+//{
+//    SENDBUFFER* b = sendBuffer; //alias
+//
+//    while (sendCnt > 0 && can_transmit(CAN1, b[sendCnt - 1].id, b[sendCnt - 1].id > 0x7FF, false, b[sendCnt - 1].len, (uint8_t*)b[sendCnt - 1].data) >= 0)
+//        sendCnt--;
+//
+//    if (sendCnt == 0)
+//    {
+//        can_disable_irq(CAN1, CAN_IER_TMEIE);
+//    }
+//}
 void Stm32CanHandleTx()
 {
     SENDBUFFER* b = sendBuffer; //alias
 
-    while (sendCnt > 0 && can_transmit(CAN1, b[sendCnt - 1].id, b[sendCnt - 1].id > 0x7FF, false, b[sendCnt - 1].len, (uint8_t*)b[sendCnt - 1].data) >= 0)
-        sendCnt--;
-
-    if (sendCnt == 0)
+    while (txTail != txHead)
     {
+        SENDBUFFER* msg = &b[txTail];
+        if (can_transmit(CAN1, msg->id, msg->id > 0x7FF, false, msg->len, (uint8_t*)msg->data) < 0)
+            break;  // Hardware TX mailbox full, exit and wait for next IRQ
+
+        if (msg->id == 0x108)
+            _global.cha108++;
+        else if (msg->id == 0x109)
+            _global.cha109++;
+
+        txTail = (txTail + 1) & SENDBUFFER_MASK;
+    }
+
+    if (txTail == txHead)
+    {
+        // Buffer empty, disable TX empty interrupt
         can_disable_irq(CAN1, CAN_IER_TMEIE);
     }
 }
-
 
 
 
@@ -139,10 +176,11 @@ extern "C" void can1_rx0_isr(void)
     Stm32CanHandleMessage(0);
 }
 
-extern "C" void can1_rx1_isr()
-{
-    Stm32CanHandleMessage(1);
-}
+//we only have filter for fifo0
+//extern "C" void can1_rx1_isr()
+//{
+//    Stm32CanHandleMessage(1);
+//}
 
 extern "C" void can1_tx_isr()
 {

@@ -4,6 +4,12 @@
 #include "chademoCharger.h"
 #include "params.h"
 #include "my_fp.h"
+#include "main.h"
+
+#define LOW_BYTE(x)  ((uint8_t)((x) & 0xFF))
+#define HIGH_BYTE(x) ((uint8_t)(((x) >> 8) & 0xFF))
+
+extern global_data _global;
 
 #define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES 10 // 10 x 100ms = 1sec.
 #define CYCLES_PER_SEC 10 // 100ms ticks
@@ -28,7 +34,10 @@ void ChademoCharger::Run()
     RunStateMachine();
 
     Log();
+}
 
+void ChademoCharger::RunSend()
+{
     // this was not being called at all before...but lets try the new logic:-)
     // only send when d1 is set
     if (_state >= WaitForCarReadyToCharge && _state < End)
@@ -64,6 +73,12 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_STOP_BEFORE_CHARGING))
         {
             printf("cha: Car stopped before starting\r\n");
+            // cancel before start. go straight to rundown.
+            SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
+        }
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_ERROR))
+        {
+            printf("cha: Car status error\r\n");
             // cancel before start. go straight to rundown.
             SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
         }
@@ -106,7 +121,8 @@ void ChademoCharger::RunStateMachine()
         {
             // we got volts! done with can for now. turn off to make car happy, reset its states, not timeout, stop before starting etc.
             // TODO: was not sending CAN earier........................it may also be the prioblem........................anyways....this seems like a better solution...
-            SetSwitchD1(false);
+            // we can't wait here for more tha 3-4 sec before er get error.
+//            SetSwitchD1(false);
 
             SetState(ChargerState::WaitForChargerAvailableVoltsAndAmps);
 
@@ -121,13 +137,19 @@ void ChademoCharger::RunStateMachine()
         {
             // we have gotten so far we got availables back from ccs. We can then enable can again (or is it too soon??? it may be. seems like i take 16 sec. until we reach CurrentDemandReq,
             // it may be too much, but from Using-OCPP-with-CHAdeMO.pdf it seems like T-time 22+6 seconds, so should be ok...)
-            SetSwitchD1(true); // will trigger car sending can
+//            SetSwitchD1(true); // will trigger car sending can
 
             SetState(ChargerState::WaitForCarReadyToCharge);
         }
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
+        // simulate what I saw in some canlog...alternating
+        /*if (_chargerData.OutputVoltage == 0)
+            _chargerData.OutputVoltage = 1;
+        else if (_chargerData.OutputVoltage == 1)
+            _chargerData.OutputVoltage = 0;*/
+
         bool canEna = has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE);
         bool switchEna = GetSwitchK() == true;
 
@@ -212,6 +234,7 @@ void ChademoCharger::RunStateMachine()
         //if (_carData.AskingAmps == 0) stopReason |= StopReason.CAR_ASK_FOR_ZERO_AMPS; no....this is not a valid reason!
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE) == false) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         if (GetSwitchK() == false) set_flag(&stopReason, StopReason::CAR_K_OFF);
         if (IsChargingStoppedByCharger()) set_flag(&stopReason, StopReason::CHARGER);
         if (IsChargingStoppedByAdapter()) set_flag(&stopReason, StopReason::ADAPTER_STOP_BUTTON);
@@ -314,7 +337,7 @@ void ChademoCharger::RunStateMachine()
 
 void ChademoCharger::SetState(ChargerState newState, int delay_cycles)
 {
-    printf("cha: enter state %d/%s\r\n", newState, GetStateName());
+    printf("cha: enter state %d/%s\r\n", newState, _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
     _delayCycles = delay_cycles;
@@ -325,7 +348,7 @@ void ChademoCharger::SetState(ChargerState newState, int delay_cycles)
 
 void ChademoCharger::Log(bool force)
 {
-    if (force || _logCycleCounter++ > 10)
+    if (force || _logCycleCounter++ > 10 )//|| _carData != _lastLoggedCarData)
     {
         //if (_carData.ChargingRateReferenceConstant != 100)
         {
@@ -364,6 +387,7 @@ void ChademoCharger::Log(bool force)
         );
 
         _logCycleCounter = 0;
+        //_lastLoggedCarData = _carData;
     }
 }
 
@@ -393,24 +417,25 @@ void ChademoCharger::SendCanMessages()
 
     data[0] = _chargerData.SupportWeldingDetection;
 
-    data[1] = _chargerData.AvailableOutputVoltage & 0xFF;
-    data[2] = (_chargerData.AvailableOutputVoltage >> 8) & 0xFF; // upper byte
+    data[1] = LOW_BYTE(_chargerData.AvailableOutputVoltage);
+    data[2] = HIGH_BYTE(_chargerData.AvailableOutputVoltage); // upper byte
 
     data[3] = _chargerData.AvailableOutputCurrent;
     // Threshold voltage for terminating the charging process to protect the car battery
     // BUT WHY IS THE CHARGER SENDING THIS TO THE CAR?????
-    data[4] = _chargerData.ThresholdVoltage & 0xFF;
-    data[5] = (_chargerData.ThresholdVoltage >> 8) & 0xFF;
+    data[4] = LOW_BYTE(_chargerData.ThresholdVoltage);
+    data[5] = HIGH_BYTE(_chargerData.ThresholdVoltage);
 
     data[6] = 0;
     data[7] = 0;
 
     CanSend(0x108, length, data);
 
+    // Adapter uses 1...
     data[0] = _chargerData.ChademoRawVersion;// ChademoRawVersion 1:0.9 2:1.0 etc.
 
-    data[1] = _chargerData.OutputVoltage & 0xFF;
-    data[2] = (_chargerData.OutputVoltage >> 8) & 0xFF;
+    data[1] = LOW_BYTE(_chargerData.OutputVoltage);
+    data[2] = HIGH_BYTE(_chargerData.OutputVoltage);
 
     data[3] = _chargerData.OutputCurrent;
 
@@ -433,13 +458,20 @@ void ChademoCharger::SendCanMessages()
     CanSend(0x109, length, data);
 }
 
+
+
 void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t len)
 {
     if (len != 8)
+    {
+        printf("wrong len %d %d\r\n", len, id);
         return;
+    }
 
     if (id == 0x100)
     {
+        _global.cha100++;
+
         _carData.MinimumChargeCurrent = data[0];
         _carData.MaxChargeVoltage = (uint16_t)(data[4] | data[5] << 8);
         // Allways 100%? no...240 is seen
@@ -449,13 +481,18 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t le
     }
     else if (id == 0x101)
     {
+        _global.cha101++;
+
         uint8_t maxChargingTime10Sec = data[1];
         uint8_t maxChargingTimeMins = data[2]; // = 90; //ask for how long of a charge? Charging will be forceably stopped if we hit this time (from any side?)
 
         if (maxChargingTime10Sec == 0xff)
             _carData.MaxChargingTimeMins = maxChargingTimeMins;
         else
+        {
+            printf("seconds %d\r\n", maxChargingTime10Sec);
             _carData.MaxChargingTimeMins = (uint8_t)(maxChargingTime10Sec / 6);
+        }
 
         // estimated charging time mins
         // Added in Chademo 1.0.1 so the (old) leaf does not exmit this? Seems to always be 0?
@@ -466,6 +503,8 @@ void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t le
     }
     else if (id == 0x102)
     {
+        _global.cha102++;
+
         _carData.ChademoRawVersion = data[0];// 1: v0.9, 2: v1.0
 
         // This is the charging voltage? I think so...

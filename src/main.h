@@ -41,6 +41,13 @@ extern "C" {
         bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
         uint32_t auto_power_off_timer_count_up_sec = 0;
+
+        int cha100 = 0;
+        int cha101 = 0;
+        int cha102 = 0;
+
+        int cha108 = 0;
+        int cha109 = 0;
     };
 
 

@@ -23,6 +23,7 @@
 #include <libopencm3/stm32/can.h>
 //#include <libopencm3/stm32/memorymap.h>
 #include <libopencm3/stm32/adc.h>
+#include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/iwdg.h>
 #include <libopencm3/cm3/systick.h>
 #include <libopencmsis/core_cm3.h>
@@ -45,8 +46,9 @@
 #include "chademoCharger.h"
 #include "led_blinker.h"
 #include "my_fp.h"
-#include "scheduler.h"
+//#include "scheduler.h"
 #include "main.h"
+#include "stm32scheduler.h"
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
@@ -54,6 +56,8 @@
 //#define __enable_irq()  __asm__ volatile ("cpsie i")
 
 //#define PRINT_JSON 0
+
+Stm32Scheduler* scheduler;
 
 global_data _global;
 
@@ -158,6 +162,21 @@ void power_off_check()
 
 static void Ms100Task(void)
 {
+//    static int counter = 0;
+//    static bool setOnce = false;
+//  //  if (counter++ > (30 * 10))// 1,5 min 90 sec, change to 30
+//    {
+////        if (!setOnce)
+//        {
+//            Param::SetInt(Param::EvseMaxVoltage, 500);
+//            Param::SetInt(Param::EvseMaxCurrent, 200);
+//            //out:0V / 0A avail : 464V / 200A
+//
+//            printf("hack: set available volt and amps\r\n");
+//            setOnce = true;
+//        }
+//    }
+
     ledBlinker->tick(100); // 100 ms tick
 
     chademoCharger->Run();
@@ -230,6 +249,11 @@ static void Ms100Task(void)
     //wakecontrol_mainfunction();
 }
 
+static void Ms99CanSendTask(void)
+{
+    // no printf here to make it most stable
+    chademoCharger->RunSend();
+}
 
 static void Ms30Task()
 {
@@ -310,7 +334,7 @@ static void PrintCcsTrace()
 //}
 
 
-extern uint8_t scheduler_get_cpu_usage(void);
+//extern uint8_t scheduler_get_cpu_usage(void);
 
 // Buffer to store ADC results (PA8, VREFINT, VBAT)
 #define ADC_CHANNEL_COUNT 3
@@ -357,8 +381,8 @@ static void Ms1000Task()
 {
     _global.auto_power_off_timer_count_up_sec++;
 
-    if (_global.ccsKickoff)
-        PrintCcsTrace();
+    //if (_global.ccsKickoff)
+    //    PrintCcsTrace();
 
     // only every 10sec
     static uint32_t nextPrint = 0;
@@ -368,13 +392,20 @@ static void Ms1000Task()
 
         float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
 
-        printf("Sysinfo: %fV (nom:5) %fV (nom:12) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
+        // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
+        printf("Sysinfo: %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d 100:%d 101:%d 102:%d 108:%d 109:%d\r\n",
             FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
             FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
             FP_FROMFLT(vdd_voltage),
-            scheduler_get_cpu_usage(),
+            //scheduler_get_cpu_usage(),
+            scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_sec,
-            _global.ccsDeliveredAmpsEvent
+            _global.ccsDeliveredAmpsEvent,
+            _global.cha100,
+            _global.cha101,
+            _global.cha102,
+            _global.cha108,
+            _global.cha109
         );
 
 		nextPrint = system_millis + 5000; // 5 sec.
@@ -471,27 +502,43 @@ extern "C" int main(void)
     LedBlinker lb(600, 600); // medium blinking
     ledBlinker = &lb;
 
-    scheduler_add_task(Ms30Task, 30);
-    scheduler_add_task(Ms100Task, 100);
-//    scheduler_add_task(Ms500Task, 500);
-    scheduler_add_task(Ms1000Task, 1000);
-    
+    // scheduler and TIM4 stuff
+    rcc_periph_clock_enable(RCC_TIM4);
+    Stm32Scheduler s(TIM4);
+    scheduler = &s;
+
+    nvic_set_priority(NVIC_TIM4_IRQ, 0xe << 4); //second lowest priority
+    nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
+
+
+    // temp hack
+    Param::SetInt(Param::EvseMaxVoltage, 500);
+    Param::SetInt(Param::EvseMaxCurrent, 200);
+
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
     // TODO: set Param::MaxCurrent to 200?? does it matter? can it hurt? could choose from battery size...
+
+
+    //    scheduler_add_task(Ms30Task, 30);
+    scheduler->AddTask(Ms100Task, 100);
+    //    scheduler_add_task(Ms500Task, 500);
+    scheduler->AddTask(Ms99CanSendTask, 99);
+    scheduler->AddTask(Ms1000Task, 1000);
+
 
     printf("begin WFI loop\r\n");
 
     while(1)
     {
         // irqs may run faster than 1ms, now that we have can irqs
-        static uint32_t nextRun = 0;
-        if (system_millis >= nextRun)
-        {
-            // TODO: to save cpu, we could do this only every 10ms instead of every 1ms as currently.
-            scheduler_run();
-            nextRun = system_millis + 1;
-        }
+        //static uint32_t nextRun = 0;
+        //if (system_millis >= nextRun)
+        //{
+        //    // TODO: to save cpu, we could do this only every 10ms instead of every 1ms as currently.
+        //    scheduler_run();
+        //    nextRun = system_millis + 1;
+        //}
 
         __WFI();
     }
@@ -506,6 +553,14 @@ extern "C" void putchar(char c)
     usart_send_blocking(USART1, c);
 };
 
+//Whichever timer(s) you use for the scheduler, you have to
+//implement their ISRs here and call into the respective scheduler
+extern "C" void tim4_isr(void)
+{
+    scheduler->Run();
+}
+
+// 
 //extern "C" double __aeabi_f2d(float f) {
 //    return (double)f;
 //}
