@@ -256,6 +256,8 @@ static void Ms100Task(void)
 //        }
 //    }
 
+    chademoCharger->Run();
+
     _global.auto_power_off_timer_count_up_ms += 100;
 
     ledBlinker->tick(100); // 100 ms tick
@@ -316,17 +318,17 @@ static void Ms100Task(void)
     //wakecontrol_mainfunction();
 }
 
-static void Ms100CanSendTask(void)
-{
-    // no printf here to make it most stable
-    chademoCharger->SendCanMessages();
-}
+//static void Ms100CanSendTask(void)
+//{
+//    // no printf here to make it most stable
+//    chademoCharger->SendCanMessages();
+//}
 
-static void Ms10Task()
-{
-    // maybe it can be relaxed later and run less often
-    chademoCharger->Run();
-}
+//static void Ms10Task()
+//{
+//    // maybe it can be relaxed later and run less often
+//    chademoCharger->Run();
+//}
 
 static void Ms30Task()
 {
@@ -344,8 +346,8 @@ static void Ms30Task()
           //          _cyclesWaitingForCcsStart++; auto power off attempt...
     }
 
-    // hack
-//    if (!_global.ccsKickoff)
+    // !hack
+    if (!_global.ccsKickoff)
         return; 
 
     spiQCA7000checkForReceivedData();
@@ -483,7 +485,7 @@ extern "C" int main(void)
     DigIo::switch_d1_out.Clear();
     DigIo::contactor_out.Clear();
     DigIo::switch_d2_out_inverted.Set(); // important!
-
+    
     // leds
     DigIo::internal_led_out_inverted.Set(); // led off
     DigIo::external_led_out_inverted.Set(); // led off
@@ -513,7 +515,8 @@ extern "C" int main(void)
 
     ChademoCharger cc;
     chademoCharger = &cc;
-    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial
+    // !hack
+//    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial hack
 
     LedBlinker lb(600, 600); // medium blinking
     ledBlinker = &lb;
@@ -528,9 +531,9 @@ extern "C" int main(void)
 
 
     // temp hack
-    Param::SetInt(Param::EvseMaxVoltage, 464);
+//    Param::SetInt(Param::EvseMaxVoltage, 464);
     // I see that sometimes...this changes after car tell its target voltage etc.
-    Param::SetInt(Param::EvseMaxCurrent, 100);
+//    Param::SetInt(Param::EvseMaxCurrent, 100);
     //Param::SetInt(Param::EvseVoltage, 350); // FAKE IT HARD
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
@@ -539,7 +542,7 @@ extern "C" int main(void)
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
-    scheduler->AddTask(Ms10Task, CHA_CYCLE_MS); // hack: probably too often
+//    scheduler->AddTask(Ms10Task, CHA_CYCLE_MS); // hack: probably too often
     
 
     
@@ -551,18 +554,18 @@ extern "C" int main(void)
     return 0;
 }
 
-void AddCanSendTask()
-{
-    static bool taskAdded = false;
-    if (!taskAdded)
-    {
-        printf("[cha] AddCanSendTask\r\n");
-        taskAdded = true;
-        scheduler->AddTask(Ms100CanSendTask, 100);
-    }
-}
+//void AddCanSendTask()
+//{
+//    static bool taskAdded = false;
+//    if (!taskAdded)
+//    {
+//        printf("[cha] AddCanSendTask\r\n");
+//        taskAdded = true;
+//        scheduler->AddTask(Ms100CanSendTask, 100);
+//    }
+//}
 
-extern int usart1_dma_putchar(char c);
+//extern int usart1_dma_putchar(char c);
 
 extern "C" void putchar(char c)
 {

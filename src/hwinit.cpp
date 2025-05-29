@@ -33,6 +33,7 @@
 #include <libopencm3/stm32/flash.h>
 #include <libopencm3/stm32/desig.h>
 #include "hwinit.h"
+#include "printf.h"
 #include "main.h"
 #include "my_string.h"
 
@@ -59,49 +60,13 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_CAN1);
 }
 
-/*
- * systick_setup(void)
- *
- * This function sets up the 1khz "system tick" count. The SYSTICK counter is a
- * standard feature of the Cortex-M series.
- */
 void systick_setup(void)
 {
-    /* clock rate / 1000 to get 1mS interrupt rate */
-//    systick_set_reload(168000 - 1); // 1ms
     systick_set_reload(rcc_ahb_frequency / 1000 - 1); // 1ms
-    //systick_set_reload(1680000); // for 168 MHz core clock -> 10ms
-
     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
-
     systick_counter_enable();
-    /* this done last */
     systick_interrupt_enable();
 }
-
-
-
-/**
-* Enable Timer refresh and break interrupts
-*/
-//void nvic_setup(void)
-//{
-//   nvic_set_priority(NVIC_TIM4_IRQ, 0xe << 4); //second lowest priority
-//   nvic_enable_irq(NVIC_TIM4_IRQ); //Scheduler
-//
-//
-//   // no idea....
-////   nvic_enable_irq(NVIC_DMA1_CHANNEL2_IRQ); //SPI RX complete
-////   nvic_set_priority(NVIC_DMA1_CHANNEL2_IRQ, 0xd << 4); //third lowest priority
-//}
-
-//void rtc_setup()
-//{
-//   //Base clock is HSE/128 = 8MHz/128 = 62.5kHz
-//   //62.5kHz / (624 + 1) = 100Hz
-//   rtc_auto_awake(RCC_HSE, 624); //10ms tick
-//   rtc_set_counter_val(0);
-//}
 
 extern volatile uint32_t system_millis;
 
@@ -112,6 +77,45 @@ uint32_t rtc_get_ms(void)
 {
     //return rtc_get_counter_val()*10; /* The RTC has a 10ms tick (see rtc_setup()). So we multiply by 10 to get the milliseconds. */
     return system_millis;
+}
+
+int gpio_get_speed(uint32_t gpioport, uint16_t gpio)
+{
+    // Make sure only one bit is set (i.e., a single pin)
+    if (gpio == 0 || (gpio & (gpio - 1)) != 0) {
+        return -1; // Invalid input: zero or multiple bits set
+    }
+
+    uint32_t ospeedr = GPIO_OSPEEDR(gpioport);
+
+    // Find the bit position (0..15)
+    int pin = __builtin_ctz(gpio); // GCC/Clang builtin: Count Trailing Zeros
+
+    // Extract and return the speed (2 bits per pin)
+    return (ospeedr >> (2 * pin)) & 0x3;
+}
+
+void gpio_print_speed(const char* str,uint32_t gpioport, uint16_t gpio)
+{
+    int res = gpio_get_speed(gpioport, gpio);
+    switch (res)
+    {
+    case GPIO_OSPEED_2MHZ:
+        printf("gpio %s speed GPIO_OSPEED_2MHZ\r\n", str);
+        break;
+    case GPIO_OSPEED_25MHZ:
+        printf("gpio %s speed GPIO_OSPEED_25MHZ\r\n", str);
+        break;
+    case GPIO_OSPEED_50MHZ:
+        printf("gpio %s speed GPIO_OSPEED_50MHZ\r\n", str);
+        break;
+    case GPIO_OSPEED_100MHZ:
+        printf("gpio %s speed GPIO_OSPEED_100MHZ\r\n", str);
+        break;
+    default:
+        printf("gpio %s speed UNKNOWN\r\n");
+        break;
+    }
 }
 
 void can_setup(void) {
@@ -127,16 +131,17 @@ void can_setup(void) {
     // Configure GPIOD pin 1 as AF9, No Pull, Very High Speed, Alternate function push-pull. Can TX.
     gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO1);
     gpio_set_af(GPIOD, GPIO_AF9, GPIO1);
+    
     // TODO: what is def speed??? figure out and print it
+    gpio_print_speed("D1", GPIOD, GPIO1);
     gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
+    gpio_print_speed("D1", GPIOD, GPIO1);
 
-
-    nvic_set_priority(NVIC_CAN1_RX0_IRQ, IRQ_PRIORITY_CAN); //lowest priority
+    nvic_set_priority(NVIC_CAN1_RX0_IRQ, IRQ_PRIORITY_CAN_RX); //lowest priority
     nvic_enable_irq(NVIC_CAN1_RX0_IRQ); //CAN RX
 
+//    nvic_set_priority(NVIC_CAN1_TX_IRQ, IRQ_PRIORITY_CAN_TX); //lowest priority
 //    nvic_enable_irq(NVIC_CAN1_TX_IRQ); //CAN TX
-  //  nvic_set_priority(NVIC_CAN1_TX_IRQ, 0xf << 4); //lowest priority
-
 
     can_reset(CAN1);
 
@@ -170,50 +175,18 @@ void can_setup(void) {
         true                    // Enable filter
     );
 
-    // all
-    //can_filter_id_mask_32bit_init(
-    //    0, // Filter bank 0
-    //    0x00000000,             // Match any ID, IDE=0, RTR=0
-    //    0x00000006,             // Mask IDE and RTR bits (bits 3 and 2)
-    //    0, // Assign to FIFO 0
-    //    true // enable
-    //);
-
-
-    // all known
-    //uint16_t ids[] = { 0x100, 0x101, 0x102, 0x110, 0x200, 0x201, 0x202, 0x700 };
-    //int n = sizeof(ids) / sizeof(ids[0]);
-
-    //for (int i = 0; i < n; i++) {
-    //    can_filter_id_mask_32bit_init(
-    //        i,                  // Filter bank number
-    //        ((uint32_t)ids[i]) << 21, // ID shifted for 32-bit mode
-    //        0x7FF << 21,        // Mask for exact ID match (11 bits)
-    //        0,                  // FIFO 0
-    //        true                // Enable filter
-    //    );
-    //}
-
-
+    // FIFO Message Pending Interrupt Enable (FIFO 0) (RX)
     can_enable_irq(CAN1, CAN_IER_FMPIE0);
+
+    // Transmit Mailbox Empty Interrupt  (TX)
+//    can_enable_irq(CAN1, CAN_IER_TMEIE);
 }
-
-#if USART_DMA
-
-#define TX_BUF_SIZE 200
-static char tx_buf[TX_BUF_SIZE];
-static volatile int tx_buf_pos = 0;
-static volatile bool tx_dma_busy = false;
-
-#endif
 
 void usart1_setup(void)
 {
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_USART1);
-#if USART_DMA
-    rcc_periph_clock_enable(RCC_DMA2); // USART1 TX uses DMA2 Stream7 Channel4
-#endif
+
     // PA9 = USART1_TX
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
     gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
@@ -226,89 +199,4 @@ void usart1_setup(void)
     usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
 
     usart_enable(USART1);
-
-#if USART_DMA
-    // DMA setup
-    dma_stream_reset(DMA2, DMA_STREAM7);
-    dma_channel_select(DMA2, DMA_STREAM7, DMA_SxCR_CHSEL_4);
-
-    dma_set_priority(DMA2, DMA_STREAM7, DMA_SxCR_PL_HIGH);
-    dma_set_memory_size(DMA2, DMA_STREAM7, DMA_SxCR_MSIZE_8BIT);
-    dma_set_peripheral_size(DMA2, DMA_STREAM7, DMA_SxCR_PSIZE_8BIT);
-    dma_enable_memory_increment_mode(DMA2, DMA_STREAM7);
-    //dma_set_transfer_direction(DMA2, DMA_STREAM7, DMA_SxCR_DIR_MEM_TO_PERIPHERAL);
-    dma_set_transfer_mode(DMA2, DMA_STREAM7, DMA_SxCR_DIR_MEM_TO_PERIPHERAL);
-
-    // When using DMA to transmit data via USART, the DMA controller must know where to write each byte of data.
-    // In this case, we're transmitting via USART1, and transmit data register for USART1 is USART1_DR.
-    dma_set_peripheral_address(DMA2, DMA_STREAM7, (uint32_t)&USART1_DR);
-
-    dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM7);
-
-    nvic_set_priority(NVIC_DMA2_STREAM7_IRQ, IRQ_PRIORITY_LOG); // lowest priority
-    nvic_enable_irq(NVIC_DMA2_STREAM7_IRQ);
-#endif
 }
-
-#if USART_DMA
-
-extern "C" void dma2_stream7_isr(void)
-{
-    if (dma_get_interrupt_flag(DMA2, DMA_STREAM7, DMA_TCIF)) {
-        dma_clear_interrupt_flags(DMA2, DMA_STREAM7, DMA_TCIF);
-        dma_disable_stream(DMA2, DMA_STREAM7);
-        tx_dma_busy = false;
-
-        // If active buffer has data, flush again
-        //if (tx_buf_pos[tx_buf_active] > 0) {
-        //    usart1_dma_flush();
-        //}
-    }
-}
-
-//#define TX_BUF_SIZE 250
-//
-//static char tx_buf[2][TX_BUF_SIZE];
-//static volatile uint8_t tx_buf_active = 0;    // Index of buffer being written to
-//static volatile uint8_t tx_dma_busy = false;
-//static volatile size_t tx_buf_pos[2] = { 0 };
-
-static void usart1_dma_flush(void)
-{
-    if (tx_dma_busy) return;
-
-    uint8_t sending_buf = tx_buf_active;
-    size_t len = tx_buf_pos[sending_buf];
-
-    if (len == 0) return;
-
-    // Switch to other buffer for continued logging
-    tx_buf_active ^= 1;
-
-    tx_dma_busy = true;
-    tx_buf_pos[sending_buf] = 0;
-
-    dma_disable_stream(DMA2, DMA_STREAM7);  // Just in case
-    dma_set_memory_address(DMA2, DMA_STREAM7, (uint32_t)tx_buf[sending_buf]);
-    dma_set_number_of_data(DMA2, DMA_STREAM7, len);
-    dma_enable_stream(DMA2, DMA_STREAM7);
-    usart_enable_tx_dma(USART1);
-}
-
-int usart1_dma_putchar(char c)
-{
-    uint8_t active = tx_buf_active;
-
-    if (tx_buf_pos[active] < TX_BUF_SIZE) {
-        tx_buf[active][tx_buf_pos[active]++] = c;
-    }
-
-    if (c == '\n' || tx_buf_pos[active] == TX_BUF_SIZE) {
-        if (!tx_dma_busy) {
-            usart1_dma_flush();
-        }
-    }
-
-    return (int)c;
-}
-#endif

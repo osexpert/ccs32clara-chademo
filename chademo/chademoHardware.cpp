@@ -12,6 +12,8 @@ extern global_data _global;
 
 void ChademoCharger::SetSwitchD2(bool set)
 {
+    printf("[cha] set switch (d2) %d\r\n", set);
+
     if (set)
         DigIo::switch_d2_out_inverted.Clear(); // 0: on
     else
@@ -20,6 +22,8 @@ void ChademoCharger::SetSwitchD2(bool set)
 
 void ChademoCharger::SetSwitchD1(bool set)
 {
+    printf("[cha] set switch (d1) %d\r\n", set);
+
     if (set)
         DigIo::switch_d1_out.Set();
     else
@@ -42,41 +46,38 @@ bool ChademoCharger::IsChargingStoppedByAdapter()
     return _global.stopButtonEvent;
 };
 
+/// <summary>
+/// We are just mirroring the car contactors, so the adapter contactor pointless,
+/// unless the software allows ccs to go live before adapter is connected to the car:-)
+/// And yes, yhe manual says to connect ccs first and then power on, and after ccs is live, connect to car.
+/// In this case, the adapter contactor has meaning. But this is not the sensible way to use the adapter,
+/// but it is probably how they developed it, without plugged into a car. So it made sense to them,
+/// not having a liv adapter in their lap. And the original software still works like this, it make ccs live
+/// regardless of chademo state.
+/// This software require car/chademo before ccs starts, so then adapter contactor is a NOOP.
+/// </summary>
 void ChademoCharger::NotifyCarContactorsClosed()
 {
-    printf("[cha] Adapter contactor closed\r\n");
+    printf("[cha] Adapter contactor closing\r\n");
 
     // close our contactor too. it is not opened until power off
     DigIo::contactor_out.Set();
     // DigIo::external_led_out.Clear(); led on. pointless?
 };
 
-extern ChademoCharger* chademoCharger;
-
-/* Interrupt service routines */
-extern "C" void can1_rx0_isr(void)
+void ChademoCharger::NotifyCarContactorsOpen()
 {
-    uint32_t id;
-    bool ext, rtr;
-    uint8_t length, fmi;
-    uint32_t data[2];
+    printf("[cha] Adapter contactor opening\r\n");
 
-    while (can_receive(CAN1,
-        0, // fifo
-        true,  // release
-        &id,
-        &ext,
-        &rtr,
-        &fmi, // ID of the matched filter
-        &length,
-        (uint8_t*)data,
-        0 // timestamp
-    ) > 0 && length == 8)
-    {
-        chademoCharger->HandleCanMessage(id, data);
-        //lastRxTimestamp = time_value;
-    }
-}
+    // close our contactor too. it is not opened until power off (it is now)
+    DigIo::contactor_out.Clear();
+    // DigIo::external_led_out.Clear(); led on. pointless?
+};
+
+
+
+
+
 
 //#ifndef SENDBUFFER_LEN
 //#define SENDBUFFER_LEN 16  // must be power of 2!
@@ -151,21 +152,6 @@ extern "C" void can1_rx0_isr(void)
 //
 
 
-
-//void Stm32CanHandleMessage(int fifo)
-//{
-//    uint32_t id;
-//    bool ext, rtr;
-//    uint8_t length, fmi;
-//    uint32_t data[2];
-//
-//    while (can_receive(CAN1, fifo, true, &id, &ext, &rtr, &fmi, &length, (uint8_t*)data, 0) > 0)
-//    {
-//        chademoCharger->HandleChademoMessage(id, (uint8_t*)data, length);
-//        //lastRxTimestamp = time_value;
-//    }
-//}
-
 //void Stm32CanHandleTx()
 //{
 //    SENDBUFFER* b = sendBuffer; //alias
@@ -178,6 +164,8 @@ extern "C" void can1_rx0_isr(void)
 //        can_disable_irq(CAN1, CAN_IER_TMEIE);
 //    }
 //}
+
+
 //void Stm32CanHandleTx()
 //{
 //    SENDBUFFER* b = sendBuffer; //alias

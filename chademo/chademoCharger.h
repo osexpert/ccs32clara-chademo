@@ -61,7 +61,7 @@ has_flag(E value, E flag) {
 /// </summary>
 enum CarFaults
 {
-    //CAR_FAULT_NONE = 0,
+    CAR_FAULT_NONE = 0,
 
     CAR_FAULT_OVER_VOLT = 1,
     CAR_FAULT_UNDER_VOLT = 2,
@@ -73,7 +73,7 @@ enum CarFaults
 
 enum CarStatus
 {
-    //CAR_STATUS_NONE = 0,
+    CAR_STATUS_NONE = 0x0,
 
     /// <summary>
     /// 102.5.0 Vehicle charging enabled
@@ -149,10 +149,10 @@ enum StopReason
 {
     NONE = 0x0, // binary: 0000 0000
     CAR_CAN_AMPS_TIMEOUT = 0x1, // binary: 0000 0001
-    //            CAR_ASK_FOR_ZERO_AMPS = 2, // asking for 0 amps
+    CHARGING_TIME = 0x2, // out of time
     CAR_NOT_READY_TO_CHARGE = 0x4, // binary: 0000 0100
     CAR_NOT_IN_PARK = 0x8, // binary: 0000 1000
-    CAR_K_OFF = 0x10, // binary: 0001 0000
+    CAR_SWITCH_K_OFF = 0x10, // binary: 0001 0000
     /// <summary>
     /// Typically the ccs charger want us to stop
     /// </summary>
@@ -292,7 +292,6 @@ struct msg109
 struct CarData
 {
     // valid after kswitch
-    uint16_t MinimumBatteryVoltage;
     uint16_t MaxBatteryVoltage;
 
     uint16_t MaxChargingTimeSec;
@@ -322,6 +321,8 @@ struct CarData
     // ChargingRate reference constant
     // valid after k-switch
  
+    uint8_t ProtocolNumber;
+
     uint8_t EstimatedChargingTimeMins;
 
 };
@@ -351,16 +352,15 @@ struct ChargerData
     bool SupportWeldingDetection = 1;
 
     uint8_t AvailableOutputCurrent;// ??
-    uint8_t CcsAvailableOutputCurrent;// ?? hack...
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
 
     // initial value from car, charger count it down
-    uint8_t RemainingChargeTimeSec;// = 60; //HACK......
-    uint16_t ThresholdVoltage;
+    uint16_t RemainingChargeTimeSec;// = 60; //HACK......
+    uint32_t RemainingChargeTimeCycles;
 
-   // uint32_t AvailableWatts; hack
+    uint16_t ThresholdVoltage;
 };
 
 
@@ -369,15 +369,17 @@ class ChademoCharger
 public:
     void UpdateChargerMessages();
    // void CalcChargerThreasholdVoltage();
-    void HandlePendingIsrMessages();
+    void HandlePendingMessages();
     void ExtractAndSetCcsData();
     void SendCanMessages();
     void RunStateMachine(void);
     void Run();
     //void RunSend();
-	void HandleCanMessage(uint32_t id, uint32_t data[2]);
-
+	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
+    
     void SetState(ChargerState newState, int delay_ms = 0);
+
+    void NotifyCarContactorsOpen();
 
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
@@ -438,7 +440,6 @@ public:
         int _logCycleCounter = 0;
         bool _powerOffOk = true;
         int _cyclesInState = 0;
-        bool _k_switch = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
@@ -448,11 +449,14 @@ public:
         bool _msg102_pending = false;
         msg102 _msg102_isr = {};
 
-       // bool _sendCanKickoff = false;
+        bool _switch_k = false;
+
+        bool _sendCanMessages = false;
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
+        
 
         ChargerState _state = ChargerState::Start;
         CarData _carData = {};

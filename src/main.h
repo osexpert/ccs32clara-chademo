@@ -32,13 +32,14 @@ extern "C" {
 
 // Priority levels (lower = higher priority)
 //#define IRQ_PRIORITY_LOG     IRQ_PRI(13)  // dont interupt logging
-#define IRQ_PRIORITY_CAN        IRQ_PRI(14) // can most important?
+#define IRQ_PRIORITY_CAN_TX        IRQ_PRI(14)
+#define IRQ_PRIORITY_CAN_RX        IRQ_PRI(14)
 #define IRQ_PRIORITY_SCHED      IRQ_PRI(15) // dont preemt anything but can?
 
 
 
 
-#define CHA_CYCLE_MS 10
+#define CHA_CYCLE_MS 100 // was 10
 #define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
 
     struct global_data
@@ -72,24 +73,6 @@ extern "C" {
 
 
 
-/* Exported functions prototypes ---------------------------------------------*/
-//void Error_Handler(void);
-
-/* USER CODE BEGIN EFP */
-
-/* USER CODE END EFP */
-
-/* Private defines -----------------------------------------------------------*/
-//#define OUT_STATE_C_CONTROL_Pin GPIO_PIN_4
-//#define OUT_STATE_C_CONTROL_GPIO_Port GPIOB
-//#define OUT_CONTACTOR_CONTROL1_Pin GPIO_PIN_5
-//#define OUT_CONTACTOR_CONTROL1_GPIO_Port GPIOB
-//#define OUT_CONTACTOR_CONTROL2_Pin GPIO_PIN_6
-//#define OUT_CONTACTOR_CONTROL2_GPIO_Port GPIOB
-
-/* USER CODE BEGIN Private defines */
-
-/* USER CODE END Private defines */
 
 #ifdef __cplusplus
 }
