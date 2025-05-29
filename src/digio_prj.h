@@ -34,7 +34,7 @@
         DIG_IO_ENTRY(stop_button_in_inverted, GPIOD, 0x8/*GPIO3*/, PinMode::INPUT_PD)   \
 \
         /* car switch(k) 0 = car ready, 1 = not ready. checked together with car CAR_STATUS_READY_TO_CHARGE being set */ \
-        DIG_IO_ENTRY(switch_k_in_inverted, GPIOC, 0x400 /*GPIO10*/, PinMode::INPUT_PU)   \
+        DIG_IO_ENTRY(switch_k_in_inverted, GPIOC, 0x400 /*GPIO10*/, PinMode::INPUT_PU) \
 \
         /* init to 1, set to 0 when ready, set to 1 at end of stop charging  
         measured: it does something with d2 when measured with diode measurer againt ground.... its not a relay, but something else.

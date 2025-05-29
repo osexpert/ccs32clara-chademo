@@ -27,6 +27,20 @@ extern "C" {
 #endif
 
 
+    // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
+#define IRQ_PRI(x) ((x) << 4)
+
+// Priority levels (lower = higher priority)
+//#define IRQ_PRIORITY_LOG     IRQ_PRI(13)  // dont interupt logging
+#define IRQ_PRIORITY_CAN        IRQ_PRI(14) // can most important?
+#define IRQ_PRIORITY_SCHED      IRQ_PRI(15) // dont preemt anything but can?
+
+
+
+
+#define CHA_CYCLE_MS 10
+#define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
+
     struct global_data
     {
         int stopButtonCounter = 0;
@@ -40,14 +54,20 @@ extern "C" {
 
         bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
-        uint32_t auto_power_off_timer_count_up_sec = 0;
+        uint32_t auto_power_off_timer_count_up_ms = 0;
 
         int cha100 = 0;
         int cha101 = 0;
         int cha102 = 0;
+        int chaOther = 0;
 
         int cha108 = 0;
         int cha109 = 0;
+
+        uint32_t cha108last = 0;
+        uint32_t cha108dur = 0;
+        uint32_t cha109last = 0;
+        uint32_t cha109dur = 0;
     };
 
 

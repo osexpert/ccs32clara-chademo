@@ -49,7 +49,7 @@ int16_t hardwareInterface_getChargingTargetCurrent(void)
     if (Param::GetInt(Param::EvseCurrent) > 0)
     {
         // still delivering amps, reset countUp timer
-        _global.auto_power_off_timer_count_up_sec = 0;
+        _global.auto_power_off_timer_count_up_ms = 0;
     }
 
     return Param::GetInt(Param::ChargeCurrent);

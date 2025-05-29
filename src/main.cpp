@@ -50,12 +50,11 @@
 #include "main.h"
 #include "stm32scheduler.h"
 
+
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
 //#define __disable_irq() __asm__ volatile ("cpsid i")
 //#define __enable_irq()  __asm__ volatile ("cpsie i")
-
-//#define PRINT_JSON 0
 
 Stm32Scheduler* scheduler;
 
@@ -126,7 +125,7 @@ void power_off_check()
 
     // fixme: power off after charging?
 
-    bool inactivity = _global.auto_power_off_timer_count_up_sec > AUTO_POWER_OFF_LIMIT_SEC;
+    bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
 
     bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
     bool powerOffOkCha = chademoCharger->IsPowerOffOk();
@@ -155,6 +154,86 @@ void power_off_check()
     }
 }
 
+// Buffer to store ADC results (PA8, VREFINT, VBAT)
+#define ADC_CHANNEL_COUNT 3
+uint16_t adc_results[ADC_CHANNEL_COUNT];
+static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+
+void adc_battery_init(void)
+{
+    gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
+
+    //adc_enable_vrefint();
+    //ADC_CCR(ADC1) |= ADC_CCR_VREFEN;
+    // Enable VREFINT for calibration by setting bit 22 in ADC_CCR
+    ADC_CCR |= (1 << 22);
+
+    // Enable required clocks
+    rcc_periph_clock_enable(RCC_ADC1);
+
+    adc_power_off(ADC1);
+    // ADC clock: PCLK2/8 = 168/2/8 = 10.5 MHz
+    adc_set_clk_prescale(ADC_CCR_ADCPRE_BY8);
+    // Set ADC to 12-bit resolution, right-aligned
+    adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
+    adc_set_single_conversion_mode(ADC1);
+    // Set sample time for all channels (84 cycles, conservative choice)
+    adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_84CYC);
+    adc_power_on(ADC1);
+}
+
+static void adc_read_all(void) {
+    for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
+        adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
+        adc_start_conversion_regular(ADC1);
+        while (!adc_eoc(ADC1));
+        adc_results[i] = adc_read_regular(ADC1);
+    }
+}
+
+float adc_to_voltage(uint16_t adc, float gain) {
+    return adc * (3.3f / 4095.0f) * gain;
+}
+
+void print_sysinfo()
+{
+    // only every 5sec
+    static uint32_t nextPrint = 0;
+    if (system_millis >= nextPrint)
+    {
+        adc_read_all();
+
+        float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
+
+        // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
+        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d 100c:%d 101c:%d 102c:%d 108c:%d 109c:%d ???c:%d 108l:%d 108d:%d 109l:%d 109d:%d\r\n",
+            system_millis / 1000,
+            FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
+            FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
+            FP_FROMFLT(vdd_voltage),
+            //scheduler_get_cpu_usage(),
+            scheduler->GetCpuLoad(),
+            _global.auto_power_off_timer_count_up_ms / 1000,
+            _global.ccsDeliveredAmpsEvent,
+            _global.cha100,
+            _global.cha101,
+            _global.cha102,
+            _global.cha108,
+            _global.cha109,
+            _global.chaOther,
+
+            _global.cha108last,
+            _global.cha108dur,
+            _global.cha109last,
+            _global.cha109dur
+
+        );
+
+        nextPrint = system_millis + 2000; // 1 sec.
+    }
+    // Min values seen and working: 3.78V 11.56V 3.4V
+}
+
 
 // FIXME: find a good wad to manage auto power off. By some custom wdog etc.
 // OR maybe...if chargingAccomplished + currently stopped\unlocked (imply 0 amps delivered))?
@@ -177,9 +256,9 @@ static void Ms100Task(void)
 //        }
 //    }
 
-    ledBlinker->tick(100); // 100 ms tick
+    _global.auto_power_off_timer_count_up_ms += 100;
 
-    chademoCharger->Run();
+    ledBlinker->tick(100); // 100 ms tick
 
     iwdg_reset();
 
@@ -214,23 +293,11 @@ static void Ms100Task(void)
         ledBlinker->setOnOffDuration(1200, 1200); // long blinking
     }
 
-   
-    if (!_global.ccsKickoff)
-    {
-        // chademo will set these and then ccs can start
-        // TODO: wait until soc has correct value.....need to check some value?
-        _global.ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
-            && Param::GetInt(Param::MaxVoltage) > 0
-            && Param::GetInt(Param::TargetVoltage) > 0;
-
-        if (_global.ccsKickoff)
-            printf("ccs kickoff, voltages satisfied!\r\n");
-//        else
-  //          _cyclesWaitingForCcsStart++; auto power off attempt...
-    }
-
     power_off_check();
 
+    print_sysinfo();
+
+    
     //Watchdog
     //int wd = Param::GetInt(Param::CanWatchdog);
     //if (wd < CAN_TIMEOUT)
@@ -249,16 +316,37 @@ static void Ms100Task(void)
     //wakecontrol_mainfunction();
 }
 
-static void Ms99CanSendTask(void)
+static void Ms100CanSendTask(void)
 {
     // no printf here to make it most stable
-    chademoCharger->RunSend();
+    chademoCharger->SendCanMessages();
+}
+
+static void Ms10Task()
+{
+    // maybe it can be relaxed later and run less often
+    chademoCharger->Run();
 }
 
 static void Ms30Task()
 {
     if (!_global.ccsKickoff)
-        return;
+    {
+        // chademo will set these and then ccs can start
+        // TODO: wait until soc has correct value.....need to check some value?
+        _global.ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
+            && Param::GetInt(Param::MaxVoltage) > 0
+            && Param::GetInt(Param::TargetVoltage) > 0;
+
+        if (_global.ccsKickoff)
+            printf("ccs kickoff, voltages satisfied!\r\n");
+        //        else
+          //          _cyclesWaitingForCcsStart++; auto power off attempt...
+    }
+
+    // hack
+//    if (!_global.ccsKickoff)
+        return; 
 
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
@@ -331,87 +419,14 @@ static void PrintCcsTrace()
 //    }
 //    // magic mask has no effect?
 //    //magic 0: 0x2023123f 0x2023123f magic 1 : 0x32335313 0x32335313 magic 2 : 0x36333a37 0x36333a37
+// TODO: could scan all of memory hunting for these? we have the offsets they should be separated with.
 //}
 
 
 //extern uint8_t scheduler_get_cpu_usage(void);
 
-// Buffer to store ADC results (PA8, VREFINT, VBAT)
-#define ADC_CHANNEL_COUNT 3
-uint16_t adc_results[ADC_CHANNEL_COUNT];
-static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
 
-void adc_battery_init(void)
-{
-    gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
 
-    //adc_enable_vrefint();
-    //ADC_CCR(ADC1) |= ADC_CCR_VREFEN;
-    // Enable VREFINT for calibration by setting bit 22 in ADC_CCR
-    ADC_CCR |= (1 << 22);
-
-    // Enable required clocks
-    rcc_periph_clock_enable(RCC_ADC1);
-
-    adc_power_off(ADC1);
-    // ADC clock: PCLK2/8 = 168/2/8 = 10.5 MHz
-    adc_set_clk_prescale(ADC_CCR_ADCPRE_BY8);
-    // Set ADC to 12-bit resolution, right-aligned
-    adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
-    adc_set_single_conversion_mode(ADC1);
-    // Set sample time for all channels (84 cycles, conservative choice)
-    adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_84CYC);
-    adc_power_on(ADC1);
-}
-
-static void adc_read_all(void) {
-    for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
-        adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
-        adc_start_conversion_regular(ADC1);
-        while (!adc_eoc(ADC1));
-        adc_results[i] = adc_read_regular(ADC1);
-    }
-}
-
-float adc_to_voltage(uint16_t adc, float gain) {
-    return adc * (3.3f / 4095.0f) * gain;
-}
-
-static void Ms1000Task()
-{
-    _global.auto_power_off_timer_count_up_sec++;
-
-    //if (_global.ccsKickoff)
-    //    PrintCcsTrace();
-
-    // only every 10sec
-    static uint32_t nextPrint = 0;
-    if (system_millis >= nextPrint)
-    {
-        adc_read_all();
-
-        float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
-
-        // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("Sysinfo: %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d 100:%d 101:%d 102:%d 108:%d 109:%d\r\n",
-            FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
-            FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
-            FP_FROMFLT(vdd_voltage),
-            //scheduler_get_cpu_usage(),
-            scheduler->GetCpuLoad(),
-            _global.auto_power_off_timer_count_up_sec,
-            _global.ccsDeliveredAmpsEvent,
-            _global.cha100,
-            _global.cha101,
-            _global.cha102,
-            _global.cha108,
-            _global.cha109
-        );
-
-		nextPrint = system_millis + 5000; // 5 sec.
-    }
-    // Min values seen and working: 3.78V 11.56V 3.4V
-}
 
 /* Called when systick fires */
 extern "C" void sys_tick_handler(void)
@@ -467,7 +482,7 @@ extern "C" int main(void)
     // chademo
     DigIo::switch_d1_out.Clear();
     DigIo::contactor_out.Clear();
-    // d2?
+    DigIo::switch_d2_out_inverted.Set(); // important!
 
     // leds
     DigIo::internal_led_out_inverted.Set(); // led off
@@ -475,7 +490,7 @@ extern "C" int main(void)
 
     usart1_setup();
 
-    printf("ccs32clara-chademo v0.3\r\n");
+    printf("ccs32clara-chademo v0.5\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -498,6 +513,7 @@ extern "C" int main(void)
 
     ChademoCharger cc;
     chademoCharger = &cc;
+    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial
 
     LedBlinker lb(600, 600); // medium blinking
     ledBlinker = &lb;
@@ -507,50 +523,51 @@ extern "C" int main(void)
     Stm32Scheduler s(TIM4);
     scheduler = &s;
 
-    nvic_set_priority(NVIC_TIM4_IRQ, 0xe << 4); //second lowest priority
+    nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
     nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
 
 
     // temp hack
-    Param::SetInt(Param::EvseMaxVoltage, 500);
-    Param::SetInt(Param::EvseMaxCurrent, 200);
+    Param::SetInt(Param::EvseMaxVoltage, 464);
+    // I see that sometimes...this changes after car tell its target voltage etc.
+    Param::SetInt(Param::EvseMaxCurrent, 100);
+    //Param::SetInt(Param::EvseVoltage, 350); // FAKE IT HARD
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
     // TODO: set Param::MaxCurrent to 200?? does it matter? can it hurt? could choose from battery size...
 
-
-    //    scheduler_add_task(Ms30Task, 30);
+    scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
-    //    scheduler_add_task(Ms500Task, 500);
-    scheduler->AddTask(Ms99CanSendTask, 99);
-    scheduler->AddTask(Ms1000Task, 1000);
+    scheduler->AddTask(Ms10Task, CHA_CYCLE_MS); // hack: probably too often
+    
 
-
-    printf("begin WFI loop\r\n");
-
-    while(1)
+    
+    while (1)
     {
-        // irqs may run faster than 1ms, now that we have can irqs
-        //static uint32_t nextRun = 0;
-        //if (system_millis >= nextRun)
-        //{
-        //    // TODO: to save cpu, we could do this only every 10ms instead of every 1ms as currently.
-        //    scheduler_run();
-        //    nextRun = system_millis + 1;
-        //}
-
         __WFI();
     }
 
     return 0;
 }
 
+void AddCanSendTask()
+{
+    static bool taskAdded = false;
+    if (!taskAdded)
+    {
+        printf("[cha] AddCanSendTask\r\n");
+        taskAdded = true;
+        scheduler->AddTask(Ms100CanSendTask, 100);
+    }
+}
 
+extern int usart1_dma_putchar(char c);
 
 extern "C" void putchar(char c)
 {
     usart_send_blocking(USART1, c);
+    //usart1_dma_putchar(c);
 };
 
 //Whichever timer(s) you use for the scheduler, you have to
@@ -590,3 +607,15 @@ extern "C" void tim4_isr(void)
 //    //    //enableReceived = true;
 //    //    break;
 //}
+
+
+// minimal memset implementation for embedded
+#include <stddef.h>  // for size_t
+
+extern "C" void* memset(void* ptr, int value, size_t num) {
+    unsigned char* p = (unsigned char*)ptr;
+    while (num--) {
+        *p++ = (unsigned char)value;
+    }
+    return ptr;
+}

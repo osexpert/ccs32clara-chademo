@@ -33,6 +33,7 @@
 #include <libopencm3/stm32/flash.h>
 #include <libopencm3/stm32/desig.h>
 #include "hwinit.h"
+#include "main.h"
 #include "my_string.h"
 
 /**
@@ -40,12 +41,12 @@
 */
 void clock_setup(void)
 {
-   //RCC_CLOCK_SETUP();
    rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 
-   //The reset value for PRIGROUP (=0) is not actually a defined
-   //value. Explicitly set 16 preemtion priorities
-   SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_PRIGROUP_GROUP16_NOSUB;
+   //The reset value for PRIGROUP (=0) is not actually a definedvalue. Explicitly set 16 preemtion priorities
+//   SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_PRIGROUP_GROUP16_NOSUB;
+   //NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4); // Equivalent to GROUP16_NOSUB
+   // removed, dont know what it does...
 
    rcc_periph_clock_enable(RCC_GPIOA);
    rcc_periph_clock_enable(RCC_GPIOB);
@@ -56,8 +57,6 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_ADC1);
 
    rcc_periph_clock_enable(RCC_CAN1);
-
-//   rcc_periph_clock_enable(RCC_SPI1); //QCA comms
 }
 
 /*
@@ -69,10 +68,12 @@ void clock_setup(void)
 void systick_setup(void)
 {
     /* clock rate / 1000 to get 1mS interrupt rate */
-    systick_set_reload(168000 - 1); // 1ms
+//    systick_set_reload(168000 - 1); // 1ms
+    systick_set_reload(rcc_ahb_frequency / 1000 - 1); // 1ms
     //systick_set_reload(1680000); // for 168 MHz core clock -> 10ms
 
     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
+
     systick_counter_enable();
     /* this done last */
     systick_interrupt_enable();
@@ -126,27 +127,23 @@ void can_setup(void) {
     // Configure GPIOD pin 1 as AF9, No Pull, Very High Speed, Alternate function push-pull. Can TX.
     gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO1);
     gpio_set_af(GPIOD, GPIO_AF9, GPIO1);
+    // TODO: what is def speed??? figure out and print it
     gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
 
 
-
-    /*gpio_set_af(GPIOD, GPIO_AF9, GPIO0 | GPIO1);
-    gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO0 | GPIO1);*/
-
-
-
-             //CAN1 RX and TX IRQs
+    nvic_set_priority(NVIC_CAN1_RX0_IRQ, IRQ_PRIORITY_CAN); //lowest priority
     nvic_enable_irq(NVIC_CAN1_RX0_IRQ); //CAN RX
-    nvic_set_priority(NVIC_CAN1_RX0_IRQ, 0xf << 4); //lowest priority
 
-    nvic_enable_irq(NVIC_CAN1_RX1_IRQ); //CAN RX
-    nvic_set_priority(NVIC_CAN1_RX1_IRQ, 0xf << 4); //lowest priority
-
-    nvic_enable_irq(NVIC_CAN1_TX_IRQ); //CAN TX
-    nvic_set_priority(NVIC_CAN1_TX_IRQ, 0xf << 4); //lowest priority
+//    nvic_enable_irq(NVIC_CAN1_TX_IRQ); //CAN TX
+  //  nvic_set_priority(NVIC_CAN1_TX_IRQ, 0xf << 4); //lowest priority
 
 
     can_reset(CAN1);
+
+
+//#define CAN_BTR_TS1_7TQ  (0x6 << 16)  // TS1 bits = 6 (TimeSeg1=7)
+//#define CAN_BTR_TS2_6TQ  (0x5 << 20)  // TS2 bits = 5 (TimeSeg2=6)
+
 
     // Configure CAN for 500 kbps assuming APB1 clock is 42 MHz
     can_init(CAN1,
@@ -157,8 +154,8 @@ void can_setup(void) {
         false,           // RFLM (Receive FIFO Locked Mode)
         false,           // TXFP (Transmit FIFO Priority)
         CAN_BTR_SJW_1TQ,
-        CAN_BTR_TS1_11TQ,
-        CAN_BTR_TS2_2TQ,
+        CAN_BTR_TS1_7TQ,//        CAN_BTR_TS1_11TQ, // fff = 0x000a0000
+        CAN_BTR_TS2_6TQ,//      CAN_BTR_TS2_2TQ, // 0x00100000
         6, // Baudrate prescaler (for 500 kbps)
         false, // loopback
         false // silent
@@ -173,23 +170,50 @@ void can_setup(void) {
         true                    // Enable filter
     );
 
+    // all
+    //can_filter_id_mask_32bit_init(
+    //    0, // Filter bank 0
+    //    0x00000000,             // Match any ID, IDE=0, RTR=0
+    //    0x00000006,             // Mask IDE and RTR bits (bits 3 and 2)
+    //    0, // Assign to FIFO 0
+    //    true // enable
+    //);
+
+
+    // all known
+    //uint16_t ids[] = { 0x100, 0x101, 0x102, 0x110, 0x200, 0x201, 0x202, 0x700 };
+    //int n = sizeof(ids) / sizeof(ids[0]);
+
+    //for (int i = 0; i < n; i++) {
+    //    can_filter_id_mask_32bit_init(
+    //        i,                  // Filter bank number
+    //        ((uint32_t)ids[i]) << 21, // ID shifted for 32-bit mode
+    //        0x7FF << 21,        // Mask for exact ID match (11 bits)
+    //        0,                  // FIFO 0
+    //        true                // Enable filter
+    //    );
+    //}
+
+
     can_enable_irq(CAN1, CAN_IER_FMPIE0);
-//    can_enable_irq(CAN1, CAN_IER_FMPIE1); we only have filter for fifo0
-
-    // Don't use irq's. Polling seems to work fine and dropped messages should not matter.
-
-    // Enable interrupts for FIFO 0 message received TODO currently polling
-//    can_enable_interrupt(CAN1, CAN_IER_FMPIE0);
-
-    // Enable CAN1 RX0 interrupt in the NVIC TODO currently polling
-//    nvic_enable_irq(NVIC_CAN1_RX0_IRQ);
 }
+
+#if USART_DMA
+
+#define TX_BUF_SIZE 200
+static char tx_buf[TX_BUF_SIZE];
+static volatile int tx_buf_pos = 0;
+static volatile bool tx_dma_busy = false;
+
+#endif
 
 void usart1_setup(void)
 {
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_USART1);
-
+#if USART_DMA
+    rcc_periph_clock_enable(RCC_DMA2); // USART1 TX uses DMA2 Stream7 Channel4
+#endif
     // PA9 = USART1_TX
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
     gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
@@ -202,4 +226,89 @@ void usart1_setup(void)
     usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
 
     usart_enable(USART1);
+
+#if USART_DMA
+    // DMA setup
+    dma_stream_reset(DMA2, DMA_STREAM7);
+    dma_channel_select(DMA2, DMA_STREAM7, DMA_SxCR_CHSEL_4);
+
+    dma_set_priority(DMA2, DMA_STREAM7, DMA_SxCR_PL_HIGH);
+    dma_set_memory_size(DMA2, DMA_STREAM7, DMA_SxCR_MSIZE_8BIT);
+    dma_set_peripheral_size(DMA2, DMA_STREAM7, DMA_SxCR_PSIZE_8BIT);
+    dma_enable_memory_increment_mode(DMA2, DMA_STREAM7);
+    //dma_set_transfer_direction(DMA2, DMA_STREAM7, DMA_SxCR_DIR_MEM_TO_PERIPHERAL);
+    dma_set_transfer_mode(DMA2, DMA_STREAM7, DMA_SxCR_DIR_MEM_TO_PERIPHERAL);
+
+    // When using DMA to transmit data via USART, the DMA controller must know where to write each byte of data.
+    // In this case, we're transmitting via USART1, and transmit data register for USART1 is USART1_DR.
+    dma_set_peripheral_address(DMA2, DMA_STREAM7, (uint32_t)&USART1_DR);
+
+    dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM7);
+
+    nvic_set_priority(NVIC_DMA2_STREAM7_IRQ, IRQ_PRIORITY_LOG); // lowest priority
+    nvic_enable_irq(NVIC_DMA2_STREAM7_IRQ);
+#endif
 }
+
+#if USART_DMA
+
+extern "C" void dma2_stream7_isr(void)
+{
+    if (dma_get_interrupt_flag(DMA2, DMA_STREAM7, DMA_TCIF)) {
+        dma_clear_interrupt_flags(DMA2, DMA_STREAM7, DMA_TCIF);
+        dma_disable_stream(DMA2, DMA_STREAM7);
+        tx_dma_busy = false;
+
+        // If active buffer has data, flush again
+        //if (tx_buf_pos[tx_buf_active] > 0) {
+        //    usart1_dma_flush();
+        //}
+    }
+}
+
+//#define TX_BUF_SIZE 250
+//
+//static char tx_buf[2][TX_BUF_SIZE];
+//static volatile uint8_t tx_buf_active = 0;    // Index of buffer being written to
+//static volatile uint8_t tx_dma_busy = false;
+//static volatile size_t tx_buf_pos[2] = { 0 };
+
+static void usart1_dma_flush(void)
+{
+    if (tx_dma_busy) return;
+
+    uint8_t sending_buf = tx_buf_active;
+    size_t len = tx_buf_pos[sending_buf];
+
+    if (len == 0) return;
+
+    // Switch to other buffer for continued logging
+    tx_buf_active ^= 1;
+
+    tx_dma_busy = true;
+    tx_buf_pos[sending_buf] = 0;
+
+    dma_disable_stream(DMA2, DMA_STREAM7);  // Just in case
+    dma_set_memory_address(DMA2, DMA_STREAM7, (uint32_t)tx_buf[sending_buf]);
+    dma_set_number_of_data(DMA2, DMA_STREAM7, len);
+    dma_enable_stream(DMA2, DMA_STREAM7);
+    usart_enable_tx_dma(USART1);
+}
+
+int usart1_dma_putchar(char c)
+{
+    uint8_t active = tx_buf_active;
+
+    if (tx_buf_pos[active] < TX_BUF_SIZE) {
+        tx_buf[active][tx_buf_pos[active]++] = c;
+    }
+
+    if (c == '\n' || tx_buf_pos[active] == TX_BUF_SIZE) {
+        if (!tx_dma_busy) {
+            usart1_dma_flush();
+        }
+    }
+
+    return (int)c;
+}
+#endif

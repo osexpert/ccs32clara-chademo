@@ -6,49 +6,148 @@
 #include "my_fp.h"
 #include "main.h"
 
-#define LOW_BYTE(x)  ((uint8_t)((x) & 0xFF))
-#define HIGH_BYTE(x) ((uint8_t)(((x) >> 8) & 0xFF))
+#include <libopencm3/stm32/can.h>
 
+#define low_byte(x)  ((uint8_t)(x))
+#define high_byte(x) ((uint8_t)((x) >> 8))
+#define max_byte(x) ((x) > 0xFF ? 0xFF : (x))
+
+#define SWAP16(x) (uint16_t)((((x) & 0x00FF) << 8) | (((x) & 0xFF00) >> 8))
+
+// only for bytes
+//#define set_flag(x, flag)    ((x) = static_cast<decltype(x)>((x) | (flag)))
+//#define clear_flag(x, flag)  ((x) = static_cast<decltype(x)>((x) & ~(flag)))
+//#define has_flag(x, flag)    (((x) & (flag)) != static_cast<decltype(x)>(0))
+//#define has_flags(x, flags) (((x) & (flags)) == static_cast<decltype(x)>(flags))
+
+#define COMPARE_SET(oldval, newval, fmt) \
+    do { \
+        if ((oldval) != (newval)) { \
+            printf(fmt, (oldval), (newval)); \
+            (oldval) = (newval); \
+        } \
+    } while (0)
+
+extern volatile uint32_t system_millis;
 extern global_data _global;
 
-#define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES 10 // 10 x 100ms = 1sec.
-#define CYCLES_PER_SEC 10 // 100ms ticks
+
+#define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1)
+
+
+
+void ChademoCharger::HandlePendingIsrMessages()
+{
+    static msg100 _msg100 = {};
+    static msg101 _msg101 = {};
+    static msg102 _msg102 = {};
+
+    if (_msg100_pending)
+    {
+        _msg100_pending = false;
+
+        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n");
+        // cha 2.0?
+        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage changed %d -> %d\r\n");
+
+        // Allways 100%? no...240 is seen
+        COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "[cha] 100.SocPercentConstant changed %d -> %d\r\n");
+
+        COMPARE_SET(_msg100.m.Unused1, _msg100_isr.m.Unused1, "[cha] 100.Unused1 changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "[cha] 100.Unused7 changed %d -> %d\r\n");
+
+        _carData.MinimumChargeCurrent = _msg100.m.MinimumChargeCurrent;
+
+        _carData.MinimumBatteryVoltage = _msg100.m.MinimumBatteryVoltage;
+        _carData.MaxBatteryVoltage = _msg100.m.MaximumBatteryVoltage;
+
+        Param::SetInt(Param::MaxVoltage, _carData.MaxBatteryVoltage);
+    }
+    if (_msg101_pending)
+    {
+        _msg101_pending = false;
+
+        COMPARE_SET(_msg101.m.MaximumChargingTime10s, _msg101_isr.m.MaximumChargingTime10s, "[cha] 101.MaximumChargingTime10s changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.MaximumChargingTimeMinutes, _msg101_isr.m.MaximumChargingTimeMinutes, "[cha] 101.MaximumChargingTimeMinutes changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.EstimatedChargingTimeMinutes, _msg101_isr.m.EstimatedChargingTimeMinutes, "[cha] 101.EstimatedChargingTimeMins changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.BatteryCapacity, _msg101_isr.m.BatteryCapacity, "[cha] 101.BatteryCapacity changed %d -> %d\r\n");
+
+        COMPARE_SET(_msg101.m.Unused0, _msg101_isr.m.Unused0, "[cha] 101.Unused0 changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.Unused4, _msg101_isr.m.Unused4, "[cha] 101.Unused4 changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.Unused7, _msg101_isr.m.Unused7, "[cha] 101.Unused7 changed %d -> %d\r\n");
+
+        _carData.EstimatedChargingTimeMins = _msg101.m.EstimatedChargingTimeMinutes;
+
+        if (_msg101.m.MaximumChargingTime10s == 0xff)
+            _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTimeMinutes * 60;
+        else
+            _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTime10s * 10;
+
+        // Even thou spec says 0.1, 0.11 give correct value on Leaf 40kwh: 38.94kwt (with 0.1: 35.4kwt)
+        _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.11f;
+    }
+    if (_msg102_pending)
+    {
+        _msg102_pending = false;
+
+        COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "[cha] 102.ProtocolNumber changed %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.TargetBatteryVoltage, _msg102_isr.m.TargetBatteryVoltage, "[cha] 102.TargetBatteryVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.ChargingCurrentRequest, _msg102_isr.m.ChargingCurrentRequest, "[cha] 102.ChargingCurrentRequest changed %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.Fault, _msg102_isr.m.Fault, "[cha] 102.Fault changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "[cha] 102.Status changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "[cha] 102.SocPercent changed %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "[cha] 102.Unused7 changed %d -> %d\r\n");
+
+        // for timeout
+        _carData.CyclesSinceLastAskingAmps = 0;
+        _carData.TargetBatteryVoltage = _msg102.m.TargetBatteryVoltage;
+        _carData.Fault = (CarFaults)_msg102.m.Fault;
+        _carData.Status = (CarStatus)_msg102.m.Status;
+
+        // limit to adapter max
+        if (_msg102.m.ChargingCurrentRequest > ADAPTER_MAX_AMPS)
+            _carData.AskingAmps = ADAPTER_MAX_AMPS;
+        else
+            _carData.AskingAmps = _msg102.m.ChargingCurrentRequest;
+
+        if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
+            _carData.SocPercent = (uint8_t)((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant * 100.0f);
+        else
+            _carData.SocPercent = _msg102.m.SocPercent;
+
+        Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
+        Param::SetInt(Param::BatteryVoltage, _carData.TargetBatteryVoltage - 10); // not really correct but...
+        Param::SetInt(Param::soc, _carData.SocPercent);
+        Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
+
+//        _sendCanKickoff = true;
+    }
+
+}
 
 
 void ChademoCharger::Run()
 {
-    SetChargerData();
+    ExtractAndSetCcsData();
 
-   // ReadPendingCanMessages();
-
-    //uint16_t timeout_s = _stateTimeoutsSec[_state];
-//if (timeout_s > 0 && (timeout_s * 10) > _cyclesInState)
-//{
-//    printf("cha: timeout in state %d/%s. What todo....\r\n", _state, GetStateName());
-// 
-//     TODO: timeout may be needed to make sure we make it to the plug unlocked state, because this is important for safety and auto off.
-//     TODO: so if we get stuck on some state, we can not rely on plug locked/unlocker for chademo
-//     TODO: also unlocked is a nice check that chademo is rundown completely
-//}
+    HandlePendingIsrMessages();
 
     RunStateMachine();
+
+    UpdateChargerMessages();
+
+    //if (_sendCanKickoff)
+    //    AddCanSendTask();
 
     Log();
 }
 
-void ChademoCharger::RunSend()
-{
-    // this was not being called at all before...but lets try the new logic:-)
-    // only send when d1 is set
-    if (_state >= WaitForCarReadyToCharge && _state < End)
-        SendCanMessages();
-}
-
 bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
 {
-    if (_cyclesInState > (max_sec * CYCLES_PER_SEC))
+    if (_cyclesInState > (max_sec * CHA_CYCLES_PER_SEC))
     {
-        printf("cha: Timeout in %d/%s (max:%dsec)\r\n", _state, GetStateName(), max_sec);
+        printf("[cha] Timeout in %d/%s (max:%dsec)\r\n", _state, GetStateName(), max_sec);
         return true;
     }
     return false;
@@ -62,6 +161,13 @@ void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
 
+    bool k = GetSwitchK();
+    if (k != _k_switch)
+    {
+        printf("[cha] k-switch changed %d -> %d\r\n", _k_switch, k);
+        _k_switch = k;
+    }
+
     if (_delayCycles > 0)
     {
         _delayCycles--;
@@ -70,61 +176,59 @@ void ChademoCharger::RunStateMachine()
 
     if (_state < ChargerState::ChargingLoop)
     {
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_STOP_BEFORE_CHARGING))
-        {
-            printf("cha: Car stopped before starting\r\n");
-            // cancel before start. go straight to rundown.
-            SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
-        }
+        // not in cha0.9?
+        // everyone seems to ignor it??? lets try................
+        // hack removed
+        //if (has_flag(_carData.Status, CarStatus::CAR_STATUS_STOP_BEFORE_CHARGING))
+        //{
+        //    printf("[CHA] Car stopped before starting\r\n");
+        //    SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
+        //}
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_ERROR))
         {
-            printf("cha: Car status error\r\n");
-            // cancel before start. go straight to rundown.
+            printf("[cha] Car status error before starting\r\n");
             SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
         }
         if (IsChargingStoppedByCharger())
         {
-            printf("cha: Charger stopped before starting\r\n");
-            // cancel before start. go straight to rundown.
+            printf("[cha] Charger stopped before starting\r\n");
             SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
         }
         if (IsChargingStoppedByAdapter())
         {
-            printf("cha: Adapter stopped before starting\r\n");
-            // cancel before start. go straight to rundown.
+            printf("[cha] Adapter stopped before starting\r\n");
             SetState(ChargerState::Stopping_WaitForLowAmpsDelivered);
         }
 
-        // set to the minimum of AvailableOutputVoltage and MaxChargeVoltage, until charging start.
-        // special case for MaxChargeVoltage == 0 if no message recieved from car yet
-        if (/*_carData.MaxChargeVoltage == 0 ||*/ _chargerData.AvailableOutputVoltage < _carData.MaxChargeVoltage)
-            _chargerData.ThresholdVoltage = _chargerData.AvailableOutputVoltage;
-        else
-            _chargerData.ThresholdVoltage = _carData.MaxChargeVoltage;
+        
 
         // Take car as initial value and countdown the minutes
-        _chargerData.RemainingChargeTimeMins = _carData.MaxChargingTimeMins;
+//        if (_carData.MaxChargingTimeMins > 0 && )
+  //          _chargerData.RemainingChargeTimeMins = _carData.MaxChargingTimeMins;
+
     }
 
     // Car seem to immediately go into stopped before starting, i am guessing if available volts and amps are 0 from the start. So do it in two steps...
     if (_state == ChargerState::Start)
     {
-        printf("cha: start\r\n");
+        printf("[cha] start\r\n");
 
-        SetSwitchD1(true); // will trigger car sending can
+        SetSwitchD1(true); // will trigger car sending can 102?
 
         SetState(ChargerState::WaitForCarMaxAndTargetVolts);
     }
     else if (_state == ChargerState::WaitForCarMaxAndTargetVolts)
     {
-        if (_carData.MaxChargeVoltage > 0 && _carData.TargetVoltage > 0)
+        // if we have these 2 set, we have data from at least 100 and 102.
+        if (_carData.MaxBatteryVoltage > 0 && _carData.TargetBatteryVoltage > 0)
         {
             // we got volts! done with can for now. turn off to make car happy, reset its states, not timeout, stop before starting etc.
             // TODO: was not sending CAN earier........................it may also be the prioblem........................anyways....this seems like a better solution...
             // we can't wait here for more tha 3-4 sec before er get error.
 //            SetSwitchD1(false);
 
-            SetState(ChargerState::WaitForChargerAvailableVoltsAndAmps);
+            // wait 500ms before we ack. MaxBatteryVoltage -> threashold voltage
+            SetState(ChargerState::WaitForChargerAvailableVoltsAndAmps, 400); //or 500?
 
             // clear misc stuff, ready for next restart (or not)
            // _carData.Faults = CAR_FAULT_NONE;
@@ -133,8 +237,22 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForChargerAvailableVoltsAndAmps)
     {
-        if (_chargerData.AvailableOutputVoltage > 0 && _chargerData.AvailableOutputCurrent > 0)
+        // FIXME: this check is pointless now??????
+        if (_chargerData.AvailableOutputVoltage > 0 && _chargerData.CcsAvailableOutputCurrent > 0)
         {
+            // we waited 500ms and now we can calc it. If we calc it too soon, the CAR will punish us with an error...
+            // WE canø 3 things: charger max amps, thresshodl voltage, remaining chanrging time
+            _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxBatteryVoltage);
+            _chargerData.RemainingChargeTimeSec = _carData.MaxChargingTimeSec;
+            // its ment to not be set before this point??
+            _chargerData.AvailableOutputCurrent = _chargerData.CcsAvailableOutputCurrent;
+
+            // wrong place....according to spec......
+//            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
+
+            // TODO: fake a current calc from watts?????????????????????????????????
+//            _chargerData.AvailableOutputCurrent =
+
             // we have gotten so far we got availables back from ccs. We can then enable can again (or is it too soon??? it may be. seems like i take 16 sec. until we reach CurrentDemandReq,
             // it may be too much, but from Using-OCPP-with-CHAdeMO.pdf it seems like T-time 22+6 seconds, so should be ok...)
 //            SetSwitchD1(true); // will trigger car sending can
@@ -144,46 +262,37 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
-        // simulate what I saw in some canlog...alternating
-        /*if (_chargerData.OutputVoltage == 0)
-            _chargerData.OutputVoltage = 1;
-        else if (_chargerData.OutputVoltage == 1)
-            _chargerData.OutputVoltage = 0;*/
+        // why never here????
 
-        bool canEna = has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE);
-        bool switchEna = GetSwitchK() == true;
+        
+       
 
-        if ((canEna || switchEna) && (canEna != switchEna))
-            printf("cha: only one of can %d and SwitchK %d enabled", canEna, switchEna);
+        /*if ((canEna || _k_switch) && (canEna != _k_switch))
+            printf("[cha] only one of can %d and SwitchK %d enabled", canEna, _k_switch);*/
 
-        if (canEna && switchEna)
+        if (_k_switch)
         {
             SetState(ChargerState::CarReadyToCharge);
         }
     }
     else if (_state == ChargerState::CarReadyToCharge)
     {
-        // Mismatch between spec and log:
-        // Spec: Lock charging connector -> Insulation test
-        // Log: charger uses ca 4 seconds to gradually increase the voltage. Then it locks the plug and continue the gradually increase in voltage in 4 more seconds?
-
         LockChargingPlug(true);
-        // Add artificial delay here?
+
         set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
 
-        // Ramp-up/down: 0volt -> max volt -> 0volt (allthou logs show it often stays high / lowers to batt/target)
-        // End of insulation test: measured volt <= 20v. BUT logs tell a different story...volt is kept after insultayion test, only lowerd to eg. 380 (from eg. 480)
         PerformInsulationTest();
 
-        SetState(ChargerState::WaitForChargerLive);
+        bool canEna = has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE);
+        if (canEna)
+        {
+            SetState(ChargerState::WaitForChargerLive);
+        }
     }
     else if (_state == ChargerState::WaitForChargerLive)
     {
         if (IsChargerLive())
         {
-            // This means the charger has its voltage at "battery" voltage we gave it and is ready to charge
-
-            // this will trigger car to acticate contactors
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
@@ -191,18 +300,10 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
+        // for cha 0.9 this is always 0?
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) == false)
         {
-            // Contactors closed
-
-            // Adapter set 2 GPIO's at this point. They do not fit into the spec/flow chart in any way...so its not easy to tell what they are.
             NotifyCarContactorsClosed();
-
-            // At this point, deliveredVolts should match battery + 10v?
-            // No...I think it should be 0 and gradually increased.
-
-            // Next, AskingAmps is going to increase. It take approx 2 seconds between the transition from 0 to 2 amps in the log.
-            // Only after this does the charger remove its CHARGER_STATUS_STOP
 
             SetState(ChargerState::WaitForCarAskingAmps);
         }
@@ -228,10 +329,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
-        // Spec: k-signal and CAR_NOT_READY_TO_CHARGE both exist to make sure at least one of them reach the charger in case of cable error.
-
         StopReason stopReason = StopReason::NONE;
-        //if (_carData.AskingAmps == 0) stopReason |= StopReason.CAR_ASK_FOR_ZERO_AMPS; no....this is not a valid reason!
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE) == false) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
@@ -242,12 +340,11 @@ void ChademoCharger::RunStateMachine()
 
         if (stopReason != StopReason::NONE)
         {
-            printf("cha: Stopping: 0x%x\r\n", stopReason);
+            printf("[cha] Stopping: 0x%x\r\n", stopReason);
 
             // Checking for State >= ChargerState.Stopping_WaitForLowAmpsDelivered is probably better if we need to know we are in this state, instead of mutating the car data?
             _carData.AskingAmps = 0;
 
-            // TODO: reason the charger stopped?
             set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_STOPPED);
 
             // make sure ccs stop delivering amps and turn down volts (if stop initiated by adapter or car)
@@ -258,49 +355,33 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmpsDelivered)
     {
-        // Spec says <= 5 amps. Weird but true... Why not 0 or 1?
-        // TODO: IS this only something the car need to do? According to spec...yes. But the log show that CHARGER_STATUS_CHARGING flag is only driven by OutputCurrent...
         if (_chargerData.OutputCurrent <= 5)
         {
-            _chargerData.RemainingChargeTimeMins = 0;
+            _chargerData.RemainingChargeTimeSec = 0;
 
             // this just mirror the OutputCurrent during stop
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_CHARGING);
 
-            // spec: after this, car has 4 seconds max to perform welding detection (turn contactors off, on, off)
-            // If charger tell car it support welding detection, charger should help the car: (its the car that perform the welding detection)
-            // The circuit voltage shall drop below 25 % of circuit voltage, which is monitored before EV
-            // contactors are opened, within 1 s after the charger terminates charging output and EV contactors
-            // are opened.
-             
-            // FIXME: what is the charger really supposed to do to help the car with WD?????
-            // Charger should drop its voltage below 25 % of circuit voltage within 1 second. I guess this is the help.
-            // I a charger is not helping WD, it can not drop its voltage this quickly, in case the car will probably skip WD (after 4 sec).
-            // It may be hard to know up front if ccs can drop volt this quickly.
             StopVoltageDelivery();
-
-            // The log take 2 seconds from remove of CHARGER_STATUS_CHARGING to car log showing CAR_STATUS_CONTACTOR_OPEN (yes, it used this tme to do welding detection)
 
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        // The car will open the contactor by itself, when amps drop <= 5 and welding detection done (based on what we told it in M108 CarWeldingDetection)
-        // TODO: if can-bus broke down, we will never get past this...so only wait max 4 sec. (40 * 100ms)
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) 
-            //|| IsTimeoutSec(4) // if can get stuck, make sure we can progress stopping TODO: ADD timeout only if needed??
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE)
+            // With RawVer = 1, i got hanging here. It seems it did then never get to set CAR_STATUS_CONTACTOR_OPEN in the first place....
+            || IsTimeoutSec(10) // if can get stuck, make sure we can progress stopping TODO: ADD timeout only if needed?? Got stuck here once...
             )
         {
             SetSwitchD2(false);
 
-            // spec says, after setting D2:false wait 0.5sec before setting D1:false (so 5 cycles)
-            SetState(ChargerState::Stopping_WaitForLowVoltsDelivered, 5);
+            // spec says, after setting D2:false wait 0.5sec (500ms) before setting D1:false
+            SetState(ChargerState::Stopping_WaitForLowVoltsDelivered, 500);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForLowVoltsDelivered)
     {
-        // charger output voltage should drop <= 10 before plug can be unlocked.
         // TODO: is it possible the volt is never dropped? need timeout here too perhaps????
         if (_chargerData.OutputVoltage <= 10)
         {
@@ -312,8 +393,6 @@ void ChademoCharger::RunStateMachine()
     {
         // safe to unlock plug
         LockChargingPlug(false);
-
-        // remove plug locked flag
         clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
 
         SetState(ChargerState::Stopping_StopCan);
@@ -322,7 +401,6 @@ void ChademoCharger::RunStateMachine()
     {
         // this stops can
         SetSwitchD1(false);
-
         SetState(ChargerState::End);
     }
     else if (_state == ChargerState::End)
@@ -335,12 +413,12 @@ void ChademoCharger::RunStateMachine()
 
 }
 
-void ChademoCharger::SetState(ChargerState newState, int delay_cycles)
+void ChademoCharger::SetState(ChargerState newState, int delay_ms)
 {
-    printf("cha: enter state %d/%s\r\n", newState, _stateNames[newState]);
+    printf("[cha] enter state %d/%s\r\n", newState, _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
-    _delayCycles = delay_cycles;
+    _delayCycles = delay_ms / CHA_CYCLE_MS;
 
     // force log on state change
     Log(true);
@@ -348,42 +426,36 @@ void ChademoCharger::SetState(ChargerState newState, int delay_cycles)
 
 void ChademoCharger::Log(bool force)
 {
-    if (force || _logCycleCounter++ > 10 )//|| _carData != _lastLoggedCarData)
+    if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))//|| _carData != _lastLoggedCarData)
     {
-        //if (_carData.ChargingRateReferenceConstant != 100)
-        {
-          //  printf("Alt. soc %d%%\r\n", (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f));
-        }
-
-        int alt_soc = (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f);
-
         // every second or when forced
-        printf("cha: state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA rem_t:%dm weld:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh rv=%d rate:%d est_t:%dm err:0x%x max:%dV max_t:%dm min:%dA soc:%d%% st:0x%x target:%dV alt_soc:%d%%\r\n",
+        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/ccs:%d/cha:%dA rem_t:%ds weld:%d rv:%d thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x target:%dV ksw:%d min:%dV\r\n",
             _state,
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
+            _chargerData.CcsAvailableOutputCurrent,
             _chargerData.AvailableOutputCurrent,
-            _chargerData.RemainingChargeTimeMins,
+            _chargerData.RemainingChargeTimeSec,
             _chargerData.SupportWeldingDetection,
+            _chargerData.ProtocolNumber,
             _chargerData.ThresholdVoltage,
             _chargerData.Status,
 
             _carData.AskingAmps,
             FP_FROMFLT(_carData.BatteryCapacityKwh),
-            _carData.ChademoRawVersion,
-            _carData.ChargingRateReferenceConstant,
             _carData.EstimatedChargingTimeMins,
-            _carData.Faults,
-            _carData.MaxChargeVoltage,
-            _carData.MaxChargingTimeMins,
+            _carData.Fault,
+            _carData.MaxBatteryVoltage,
+            _carData.MaxChargingTimeSec,
             _carData.MinimumChargeCurrent,
             _carData.SocPercent,
             _carData.Status,
-            _carData.TargetVoltage,
-            alt_soc
+            _carData.TargetBatteryVoltage,
+            _k_switch,
+            _carData.MinimumBatteryVoltage
         );
 
         _logCycleCounter = 0;
@@ -391,175 +463,221 @@ void ChademoCharger::Log(bool force)
     }
 }
 
-
-void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
-{
-    _chargerData.AvailableOutputVoltage = maxV;
-    // convert from 16 to 8 bit int...default is to trunc...
-    _chargerData.AvailableOutputCurrent = maxA > 0xFF ? 0xFF : maxA;
-    if (_chargerData.AvailableOutputCurrent > ADAPTER_MAX_AMPS)
-        _chargerData.AvailableOutputCurrent = ADAPTER_MAX_AMPS;
-
-    _chargerData.OutputVoltage = outV;
-    // convert from 16 to 8 bit int...default is to trunc... (impossible that this can be over 0xff!!!)
-    _chargerData.OutputCurrent = outA > 0xFF ? 0xFF : outA;
-};
-
-//void ChademoCharger::SetChargerSetMaxVoltage(uint16_t maxV)
+// recalc every time _carData.MaxBatteryVoltage or _chargerData.AvailableOutputVoltage is set
+//void ChademoCharger::CalcChargerThreasholdVoltage()
 //{
-//
-//};
+//    //if (_state < ChargerState::ChargingLoop)
+//    {
+//        // set to the minimum of AvailableOutputVoltage and MaxChargeVoltage, until charging start.
+//        if (_carData.MaxBatteryVoltage > 0 && _carData.MaxBatteryVoltage < _chargerData.AvailableOutputVoltage)
+//            _chargerData.ThresholdVoltage = _carData.MaxBatteryVoltage;
+//        else
+//            _chargerData.ThresholdVoltage = _chargerData.AvailableOutputVoltage;
+//    }
+//}
 
-void ChademoCharger::SendCanMessages()
+
+
+extern void AddCanSendTask();
+
+void ChademoCharger::HandleCanMessage(uint32_t id, uint32_t data[2])
 {
-    uint8_t length = 8;                // Data length (0–8)
-    uint8_t data[8];
-
-    data[0] = _chargerData.SupportWeldingDetection;
-
-    data[1] = LOW_BYTE(_chargerData.AvailableOutputVoltage);
-    data[2] = HIGH_BYTE(_chargerData.AvailableOutputVoltage); // upper byte
-
-    data[3] = _chargerData.AvailableOutputCurrent;
-    // Threshold voltage for terminating the charging process to protect the car battery
-    // BUT WHY IS THE CHARGER SENDING THIS TO THE CAR?????
-    data[4] = LOW_BYTE(_chargerData.ThresholdVoltage);
-    data[5] = HIGH_BYTE(_chargerData.ThresholdVoltage);
-
-    data[6] = 0;
-    data[7] = 0;
-
-    CanSend(0x108, length, data);
-
-    // Adapter uses 1...
-    data[0] = _chargerData.ChademoRawVersion;// ChademoRawVersion 1:0.9 2:1.0 etc.
-
-    data[1] = LOW_BYTE(_chargerData.OutputVoltage);
-    data[2] = HIGH_BYTE(_chargerData.OutputVoltage);
-
-    data[3] = _chargerData.OutputCurrent;
-
-    data[4] = 0;
-
-    //DischargeCompatitible = data[4] == 1;
-    data[5] = _chargerData.Status;
-
-    if (_chargerData.RemainingChargeTimeMins > 0)
-    {
-        data[6] = 0xFF; //RemainingChargeTime10Sec
-        data[7] = _chargerData.RemainingChargeTimeMins;
-    }
-    else
-    {
-        data[6] = 0;
-        data[7] = 0;
-    }
-
-    CanSend(0x109, length, data);
-}
-
-
-
-void ChademoCharger::HandleChademoMessage(uint32_t id, uint8_t* data, uint8_t len)
-{
-    if (len != 8)
-    {
-        printf("wrong len %d %d\r\n", len, id);
-        return;
-    }
-
     if (id == 0x100)
     {
         _global.cha100++;
-
-        _carData.MinimumChargeCurrent = data[0];
-        _carData.MaxChargeVoltage = (uint16_t)(data[4] | data[5] << 8);
-        // Allways 100%? no...240 is seen
-        _carData.ChargingRateReferenceConstant = data[6]; // Charged rate reference constant, 100% fixed
-
-        Param::SetInt(Param::MaxVoltage, _carData.MaxChargeVoltage);
+        _msg100_pending = true;
+        _msg100_isr.pair[0] = data[0];
+        _msg100_isr.pair[1] = data[1];
     }
     else if (id == 0x101)
     {
         _global.cha101++;
-
-        uint8_t maxChargingTime10Sec = data[1];
-        uint8_t maxChargingTimeMins = data[2]; // = 90; //ask for how long of a charge? Charging will be forceably stopped if we hit this time (from any side?)
-
-        if (maxChargingTime10Sec == 0xff)
-            _carData.MaxChargingTimeMins = maxChargingTimeMins;
-        else
-        {
-            printf("seconds %d\r\n", maxChargingTime10Sec);
-            _carData.MaxChargingTimeMins = (uint8_t)(maxChargingTime10Sec / 6);
-        }
-
-        // estimated charging time mins
-        // Added in Chademo 1.0.1 so the (old) leaf does not exmit this? Seems to always be 0?
-        _carData.EstimatedChargingTimeMins = data[3];// = 60; //how long we think the charge will actually take
-
-        // 0 first, then 55, then correct :-) Correct after car ready?
-        _carData.BatteryCapacityKwh = (float)(data[5] | data[6] << 8) * 0.11f;
+        _msg101_pending = true;
+        _msg101_isr.pair[0] = data[0];
+        _msg101_isr.pair[1] = data[1];
     }
     else if (id == 0x102)
     {
         _global.cha102++;
+        _msg102_pending = true;
+        _msg102_isr.pair[0] = data[0];
+        _msg102_isr.pair[1] = data[1];
 
-        _carData.ChademoRawVersion = data[0];// 1: v0.9, 2: v1.0
-
-        // This is the charging voltage? I think so...
-        _carData.TargetVoltage = (uint16_t)(data[1] | data[2] << 8);
-
-        // Leaf 410 typical
-        Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
-        Param::SetInt(Param::BatteryVoltage, _carData.TargetVoltage - 10); // not really correct but...
- 
-        _carData.AskingAmps = data[3];
-        // limit to adapter max
-        if (_carData.AskingAmps > ADAPTER_MAX_AMPS)
-            _carData.AskingAmps = ADAPTER_MAX_AMPS;
-
-        Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
-        // for timeout
-        _carData.CyclesSinceLastAskingAmps = 0;
-
-        _carData.Faults = (CarFaults)data[4];
-        _carData.Status = (CarStatus)data[5];
-        //uint8_t kiloWattHours = msg.data[6];
-
-        // Start as 3, then 1, then to the real value:-)
-        _carData.SocPercent = data[6];
-
-        // changes from very low to higher :-) i guess this is ok...
-        // TODO: set only after X has happened (k-switch)
-        // strange values seen sometimes...
-        //if (_state >= CarReadyToCharge) //_carData.SocPercent <= 100 &&
-        {
-            /*Charged rate(for display) =
-                Charged rate(#102.6) / Charged rate
-                reference constant(#100.6) × 100*/
-            
-            //if (_carData.ChargingRateReferenceConstant != 100)
-            //{
-            //    printf("Alt. soc %d%%\r\n", (int)((float)_carData.SocPercent / _carData.ChargingRateReferenceConstant * 100.0f));
-            //}
-
-            Param::SetInt(Param::soc, _carData.SocPercent);
-            // TODO: estimate battery volts?
-        }
+        AddCanSendTask();
+    }
+    else
+    {
+        _global.chaOther++;
     }
 }
 
+
+
+
+#define CAN_TX_TIMEOUT_MS 5 // 5ms timeout
+
+//#ifdef CAN_DEBUG
+//#include <stdio.h>
+//#define CAN_LOG(...) printf(__VA_ARGS__)
+//#else
+//#define CAN_LOG(...)
+//#endif
+
+//typedef enum {
+//    CAN_TX_OK,
+//    CAN_TX_NO_MAILBOX,
+//    CAN_TX_TIMEOUT,
+//    CAN_TX_ERROR
+//} can_tx_result_t;
+
+uint8_t check_can_tx_ok(uint32_t can_peripheral) {
+    uint32_t tsr = CAN_TSR(can_peripheral);
+    uint8_t result = 0;
+
+    if ((tsr & CAN_TSR_TXOK0) != 0) {
+        result++;
+    }
+    if ((tsr & CAN_TSR_TXOK1) != 0) {
+        result++;
+    }
+    if ((tsr & CAN_TSR_TXOK2) != 0) {
+        result++;
+    }
+
+    return result;  // 0–3 mailboxes with successful transmission
+}
+
+void can_transmit_blocking(uint32_t canport, uint32_t id, bool ext, bool rtr, uint8_t len, uint8_t* data)
+{
+    // Check if CAN is initialized and not in bus-off state
+    //if (CAN_MSR(canport) & CAN_MSR_INAK) {
+    //    printf("[can] transmit: peripheral not initialized\r\n");
+    //    return;// CAN_TX_ERROR;
+    //}
+
+    int mailbox = can_transmit(canport, id, ext, rtr, len, data);
+    if (mailbox < 0) {
+        printf("[can] transmit: no mailbox available\r\n");
+        return;// CAN_TX_NO_MAILBOX;
+    }
+
+    //uint32_t tsr = CAN_TSR(canport);
+
+    //uint32_t rqcp_mask = CAN_TSR_RQCP0 << mailbox;
+    while (CAN_TSR(canport) && (CAN_TSR_TXOK0 << mailbox) == 0)
+    {
+        // loop
+    }
+
+
+    //uint32_t terr_mask = CAN_TSR_TERR0 << mailbox;
+
+    //// Use SysTick for precise timeout
+    //uint32_t start = system_millis;
+    //while ((CAN_TSR(canport) & (rqcp_mask | txok_mask)) != (rqcp_mask | txok_mask)) {
+    //    if (system_millis - start > CAN_TX_TIMEOUT_MS) {
+    //        printf("[can] transmit: timeout on mailbox %d\r\n", mailbox);
+    //        CAN_TSR(canport) |= rqcp_mask; // Clear request complete flag
+    //        return CAN_TX_TIMEOUT;
+    //    }
+    //    if (CAN_TSR(canport) & terr_mask) {
+    //        printf("[can] transmit: error on mailbox %d\r\n", mailbox);
+    //        CAN_TSR(canport) |= terr_mask | rqcp_mask; // Clear error and request flags
+    //        return CAN_TX_ERROR;
+    //    }
+    //}
+
+    //// Clear request complete flag
+    //CAN_TSR(canport) |= rqcp_mask;
+    //return CAN_TX_OK;
+}
+
+void ChademoCharger::UpdateChargerMessages()
+{
+
+    COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "[cha] 108.WeldingDetection changed %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.AvailableOutputCurrent, "[cha] 108.AvailableOutputCurrent changed %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "[cha] 108.AvailableOutputVoltage changed %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "[cha] 108.ThresholdVoltage changed %d -> %d\r\n");
+
+    COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.PresentVoltage, _chargerData.OutputVoltage, "[cha] 109.OutputVoltage changed %d -> %d\r\n");
+
+    uint8_t remainingChargingTime10s = 0;
+    uint8_t remainingChargingTimeMins = 0;
+    if (_chargerData.RemainingChargeTimeSec < 60)
+    {
+        remainingChargingTime10s = _chargerData.RemainingChargeTimeSec / 10;
+        remainingChargingTimeMins = 0;
+    }
+    else
+    {
+        remainingChargingTime10s = 0xff;
+        remainingChargingTimeMins = _chargerData.RemainingChargeTimeSec / 60;
+    }
+
+    COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "[cha] 109.RemainingChargingTime10s changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "[cha] 109.RemainingChargingTimeMinutes changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "[cha] 109.Status changed 0x%x -> 0x%x\r\n");
+    
+
+    //if (_chargerData.RemainingChargeTimeMins > 0)
+    //{
+    //    data[6] = 0xFF; //RemainingChargeTime10Sec
+    //    data[7] = _chargerData.RemainingChargeTimeMins;
+    //}
+    //else
+    //{
+    //    data[6] = 0; // adapter uses 0xff from start
+    //    data[7] = 0; // adapter uses 0xff from start
+    //}
+}
+
+void ChademoCharger::SendCanMessages()
+{
+//    if (_canSend)
+    {
+        can_transmit_blocking(CAN1, 0x108, false, false, 8, _msg108.bytes);
+        _global.cha108++;
+        _global.cha108dur = system_millis - _global.cha108last;
+        _global.cha108last = system_millis;
+
+        can_transmit_blocking(CAN1, 0x109, false, false, 8, _msg109.bytes);
+        _global.cha109++;
+        _global.cha109dur = system_millis - _global.cha109last;
+        _global.cha109last = system_millis;
+    }
+}
 
 const char* ChademoCharger::GetStateName()
 {
     return _stateNames[_state];
 };
 
-void ChademoCharger::SetChargerData()
+void ChademoCharger::SetCcsData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
+{
+    _chargerData.AvailableOutputVoltage = maxV;
+
+    if (_chargerData.ThresholdVoltage == 0)
+        _chargerData.ThresholdVoltage = _chargerData.AvailableOutputVoltage;
+
+    _chargerData.CcsAvailableOutputCurrent = clampToUint8(maxA);
+    if (_chargerData.CcsAvailableOutputCurrent > ADAPTER_MAX_AMPS)
+        _chargerData.CcsAvailableOutputCurrent = ADAPTER_MAX_AMPS;
+
+    _chargerData.OutputVoltage = outV;
+    _chargerData.OutputCurrent = clampToUint8(outA);
+
+//    _chargerData.AvailableWatts = _chargerData.AvailableOutputVoltage * _chargerData.AvailableOutputCurrent;
+
+//    CalcChargerThreasholdVoltage();
+};
+
+void ChademoCharger::ExtractAndSetCcsData()
 {
     // mirror these values (Change method is only called for some params...)
-    SetChargerData(
+    SetCcsData(
         Param::GetInt(Param::EvseMaxVoltage),
         Param::GetInt(Param::EvseMaxCurrent),
         Param::GetInt(Param::EvseVoltage),
@@ -569,7 +687,7 @@ void ChademoCharger::SetChargerData()
 
 void ChademoCharger::StopPowerDelivery()
 {
-    printf("cha: StopPowerDelivery\r\n");
+    printf("[cha] StopPowerDelivery\r\n");
 
     Param::SetInt(Param::ChargeCurrent, 0);
     // TODO: should we disable at the end of the machine instead?
@@ -578,7 +696,7 @@ void ChademoCharger::StopPowerDelivery()
 
 void ChademoCharger::StopVoltageDelivery()
 {
-    printf("cha: StopVoltageDelivery\r\n");
+    printf("[cha] StopVoltageDelivery\r\n");
 
     Param::SetInt(Param::TargetVoltage, 0);
     //    Param::Set(Param::BatteryVoltage, 0);
