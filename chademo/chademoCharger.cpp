@@ -37,6 +37,73 @@ extern global_data _global;
 #define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1)
 
 
+// Approximate ln(x) for x > 0 using float and similar idea as your fp_ln
+float fast_ln(float x)
+{
+    if (x <= 0.0f)
+        return -1e30f;  // or some error indicator for ln(0) or negative input
+
+    // Decompose x = m * 2^n, where m in [1, 2)
+    int n = 0;
+    float m = x;
+
+    while (m >= 2.0f)
+    {
+        m *= 0.5f;
+        n++;
+    }
+    while (m < 1.0f)
+    {
+        m *= 2.0f;
+        n--;
+    }
+
+    // ln(x) = ln(m) + n * ln(2)
+    const float LN2 = 0.6931471806f;
+
+    // Approximate ln(m) on [1,2) using a series or polynomial
+    // Here, use a simple polynomial approximation of ln(m) around 1:
+    // ln(m) ˜ (m-1) - (m-1)^2/2 + (m-1)^3/3 - (m-1)^4/4
+
+    float y = m - 1.0f;
+    float y2 = y * y;
+    float y3 = y2 * y;
+    float y4 = y3 * y;
+
+    float ln_m = y - y2 * 0.5f + y3 / 3.0f - y4 * 0.25f;
+
+    return ln_m + n * LN2;
+}
+
+
+float EstimateVoltage(float targetVoltage, float socPercentage)
+{
+    float maxVoltage = targetVoltage - 10.0f;
+
+    if (socPercentage < 0.0f) socPercentage = 0.0f;
+    if (socPercentage > 100.0f) socPercentage = 100.0f;
+
+    float nominalVoltage = maxVoltage * 0.9f;
+    float minVoltage = maxVoltage * 0.75f;
+
+    float voltage;
+    if (socPercentage < 50.0f)
+    {
+        float scale = 1.5f;
+        float x = 1.0f + (socPercentage / 50.0f) * scale;
+        float logValue = fast_ln(x);
+        float maxLog = fast_ln(1.0f + scale); // ln(1 + scale)
+        float t = logValue / maxLog;
+        voltage = minVoltage + (nominalVoltage - minVoltage) * t;
+    }
+    else
+    {
+        float t = socPercentage / 100.0f;
+        voltage = minVoltage + (maxVoltage - minVoltage) * t;
+    }
+
+    return voltage;
+}
 
 void ChademoCharger::HandlePendingMessages()
 {
@@ -114,17 +181,33 @@ void ChademoCharger::HandlePendingMessages()
         else
             _carData.AskingAmps = _msg102.m.ChargingCurrentRequest;
 
+        //if (_state >= CarReadyToCharge)
+        //    SetCarDataSoc();
         if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
             _carData.SocPercent = (uint8_t)((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant * 100.0f);
         else
             _carData.SocPercent = _msg102.m.SocPercent;
 
+        // soc and the constant both unstable before switch(k)
+        if (_state >= CarReadyToCharge)
+        {
+            Param::SetInt(Param::soc, _carData.SocPercent);
+            Param::SetInt(Param::BatteryVoltage, (int)EstimateVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent));
+        }
+        else
+        {
+            // can't trust soc yet. fake it.
+            Param::SetInt(Param::soc, 10);
+
+            // not really correct but...target is often 10+ over max battery voltage. With a reliable SOC we could estimate it better, but soc is unreliable, at least initially
+            Param::SetInt(Param::BatteryVoltage, _carData.TargetBatteryVoltage - 10);
+        }
+
         Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
         Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage); // set max to target as well
-        // not really correct but...target is often 10+ over max battery voltage. With a reliable SOC we could estimate it better, but soc is unreliable, at least initially
-        Param::SetInt(Param::BatteryVoltage, _carData.TargetBatteryVoltage - 10);
-        Param::SetInt(Param::soc, _carData.SocPercent);
         Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
+
+        _sendCanMessages = true;
     }
 }
 
@@ -138,6 +221,8 @@ void ChademoCharger::Run()
     RunStateMachine();
 
     UpdateChargerMessages();
+
+    SendCanMessages();
 
     Log();
 }
@@ -210,49 +295,26 @@ void ChademoCharger::RunStateMachine()
 
     }
 
-    // Car seem to immediately go into stopped before starting, i am guessing if available volts and amps are 0 from the start. So do it in two steps...
-    if (_state == ChargerState::Start)
+    // None-state ignored on purpose. First state must be set actively.
+    if (_state == ChargerState::PreStart_WaitForChargerLive)
     {
-        printf("[cha] start\r\n");
+        if (IsChargerLive())
+        {
+            SetState(ChargerState::Start);
+        }
+    }
+    else if (_state == ChargerState::Start)
+    {
+        if (_autoDetect)
+        {
+            // fake it for autodetect
+            _chargerData.AvailableOutputVoltage = 450;
+            _chargerData.AvailableOutputCurrent = 100;
+        }
 
         SetSwitchD1(true); // will trigger car sending can
 
-        SetState(ChargerState::WaitForCarMaxAndTargetVolts);
-    }
-    else if (_state == ChargerState::WaitForCarMaxAndTargetVolts)
-    {
-        // if we have these 2 set, we have data from at least 100 and 102.
-        if (_carData.MaxBatteryVoltage > 0 && _carData.TargetBatteryVoltage > 0)
-        {
-            // we got volts! done with can for now. turn off to make car happy, reset its states, not timeout, stop before starting etc.
-            // TODO: was not sending CAN earier........................it may also be the prioblem........................anyways....this seems like a better solution...
-            // we can't wait here for more tha 3-4 sec before er get error.
-            SetSwitchD1(false);
-
-            // clear misc stuff, ready for next SwitchD1 (but it may be that we recieve messages after this...)
-//            _carData.Fault = CAR_FAULT_NONE;
-//            _carData.Status = CAR_STATUS_NONE;
-
-            // wait 500ms before we ack. MaxBatteryVoltage -> threashold voltage
-            SetState(ChargerState::WaitForChargerAvailableVoltsAndAmps);// , 400); //or 500?
-        }
-    }
-    else if (_state == ChargerState::WaitForChargerAvailableVoltsAndAmps)
-    {
-        // FIXME: this check is pointless now??????
-        if (_chargerData.AvailableOutputVoltage > 0 && _chargerData.AvailableOutputCurrent > 0)
-        {
-            // clear misc stuff, ready for next SwitchD1
-            _carData.Fault = CAR_FAULT_NONE;
-            _carData.Status = CAR_STATUS_NONE;
-// 
-            // we have gotten so far we got availables back from ccs. We can then enable can again (or is it too soon??? it may be. seems like i take 16 sec. until we reach CurrentDemandReq,
-            // it may be too much, but from Using-OCPP-with-CHAdeMO.pdf it seems like T-time 22+6 seconds, so should be ok...)
-            SetSwitchD1(true); // will trigger car sending can
-            //_sendCanMessages = true;
-
-            SetState(ChargerState::WaitForCarReadyToCharge);
-        }
+        SetState(ChargerState::WaitForCarReadyToCharge);
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
@@ -263,13 +325,42 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::CarReadyToCharge)
     {
-        LockChargingPlug(true);
+        if (_autoDetect)
+        {
+            // autodetect done. Clean up for fresh restart.
+            // what did we gain?
+            // - _carData.SocPercent
+            // - _carData.TargetBatteryVoltage
+            // - _carData.MaxBatteryVoltage (maybe not so usefull...)
+            // Mainly we had to go this far (switch (k)) to be sure SOC could be trusted
 
-        set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
+            SetSwitchD1(false);
+            _sendCanMessages = false;
 
-        PerformInsulationTest();
+            _autoDetect = false;
 
-        SetState(ChargerState::WaitForChargerLive);
+            _chargerData.AvailableOutputVoltage = 0;
+            _chargerData.AvailableOutputCurrent = 0;
+
+            _carData.Fault = CAR_FAULT_NONE;
+            _carData.Status = CAR_STATUS_NONE;
+            _chargerData.Status = ChargerStatus::CHARGER_STATUS_STOPPED;
+
+            //SetCarDataSoc(); // set manually since we won't get any more can after we disabled switch(d1) so any logic in there is too late
+            Param::SetInt(Param::soc, _carData.SocPercent);
+
+            SetState(ChargerState::PreStart_WaitForChargerLive);
+        }
+        else
+        {
+            LockChargingPlug(true);
+
+            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
+
+            PerformInsulationTest();
+
+            SetState(ChargerState::WaitForChargerLive);
+        }
     }
     else if (_state == ChargerState::WaitForChargerLive)
     {
@@ -392,9 +483,21 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
+//void ChademoCharger::SetCarDataSoc()
+//{
+//
+//
+//    Param::SetInt(Param::soc, _carData.SocPercent);
+//}
+
+void ChademoCharger::EnableAutodetect()
+{
+    _autoDetect = true;
+}
+
 void ChademoCharger::SetState(ChargerState newState, int delay_ms)
 {
-    printf("[cha] enter state %d/%s\r\n", newState, _stateNames[newState]);
+    printf("[cha] enter state %d/%s (autodetect:%d)\r\n", newState, _stateNames[newState], _autoDetect);
     _state = newState;
     _cyclesInState = 0;
     _delayCycles = delay_ms / CHA_CYCLE_MS;
@@ -464,8 +567,8 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
 
         //AddCanSendTask();
         // wait until we are done with the max detection
-        if (_state > ChargerState::WaitForCarMaxAndTargetVolts)
-            _sendCanMessages = true;
+//        if (_state > ChargerState::WaitForCarMaxAndTargetVolts)
+  //          _sendCanMessages = true;
     }
     else
     {

@@ -163,9 +163,9 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
+    X(Idle, 0) \
+    X(PreStart_WaitForChargerLive, 0) \
     X(Start, 0) \
-    X(WaitForCarMaxAndTargetVolts, 0) \
-    X(WaitForChargerAvailableVoltsAndAmps, 0) \
     X(WaitForCarReadyToCharge, 0) \
     X(CarReadyToCharge, 0) \
     X(WaitForChargerLive, 0) \
@@ -305,26 +305,18 @@ struct CarData
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
-    // valid after k-switch
-    // soc = SocPercent / ChargingRateReferenceConstant * 100 ... .weird stuff... I guess if ChargingRateReferenceConstant
-
+    // PS: unstable before switch (k)
     uint8_t SocPercent;
 
-    /// <summary>
-    /// To be safe, only use SOC,MaxChargingTimeMins,BatteryCapacityKwh after car is ready to charge (before they can have invalid values).
-    /// </summary>
     CarStatus Status;
     CarFaults Fault;
 
+    // PS: unstable before switch (k)
     float BatteryCapacityKwh;
 
-    // ChargingRate reference constant
-    // valid after k-switch
- 
     uint8_t ProtocolNumber;
 
     uint8_t EstimatedChargingTimeMins;
-
 };
 
 struct ChargerData
@@ -391,7 +383,7 @@ public:
 
     void StopPowerDelivery();
     bool GetSwitchK();
-
+    //void SetCarDataSoc();
     bool IsPowerOffOk()
     {
         return _powerOffOk;
@@ -420,7 +412,7 @@ public:
     void PerformInsulationTest() { /* NOP */ }
     
     bool IsChargerLive();
-
+    void EnableAutodetect();
     void NotifyCarAskingForAmps()
     {
         // NOP
@@ -453,12 +445,14 @@ public:
 
         bool _sendCanMessages = false;
 
+        bool _autoDetect = false;
+
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
 
-        ChargerState _state = ChargerState::Start;
+        ChargerState _state = ChargerState::Idle;
         CarData _carData = {};
         ChargerData _chargerData = {};
 };

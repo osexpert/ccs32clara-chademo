@@ -117,10 +117,10 @@ void power_off_no_return(const char* reason)
 
 void power_off_check()
 {
-    bool buttonPressed30Seconds = _global.stopButtonCounter > 60; // 30 seconds
+    bool buttonPressed30Seconds = _global.stopButtonCounter > 10 * 30; // 30 seconds
     if (buttonPressed30Seconds)
     {
-        power_off_no_return("Stop pressed for 30sec");
+        power_off_no_return("Stop pressed for 30sec -> force off");
     }
 
     // fixme: power off after charging?
@@ -195,9 +195,10 @@ float adc_to_voltage(uint16_t adc, float gain) {
     return adc * (3.3f / 4095.0f) * gain;
 }
 
+#define SYSINFO_EVERY_MS 2000 // 2 sec
+
 void print_sysinfo()
 {
-    // only every 5sec
     static uint32_t nextPrint = 0;
     if (system_millis >= nextPrint)
     {
@@ -229,11 +230,42 @@ void print_sysinfo()
 
         );
 
-        nextPrint = system_millis + 2000; // 1 sec.
+        nextPrint = system_millis + SYSINFO_EVERY_MS;
     }
     // Min values seen and working: 3.78V 11.56V 3.4V
 }
 
+#define CCS_TRACE_EVERY_MS 1000 // 1 sec
+
+static void print_ccs_trace()
+{
+    static uint32_t nextPrint = 0;
+    if (system_millis >= nextPrint)
+    {
+        int state = Param::GetInt(Param::opmode);
+        const char* label = pevSttLabels[state];
+
+        //    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
+                //      lastSttPrint = rtc_get_ms();// counter_val();
+            // TODO: log events flags
+        printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n",
+            label,
+            tcp_getTotalNumberOfRetries(),
+            Param::GetInt(Param::EvseVoltage),
+            Param::GetInt(Param::EvseCurrent),
+            Param::GetInt(Param::EvseMaxVoltage),
+            Param::GetInt(Param::EvseMaxCurrent),
+            // car
+            Param::GetInt(Param::ChargeCurrent),
+            Param::GetInt(Param::TargetVoltage),
+            Param::GetInt(Param::BatteryVoltage),
+            Param::GetInt(Param::MaxVoltage),
+            Param::GetInt(Param::MaxCurrent)
+        );
+
+        nextPrint = system_millis + SYSINFO_EVERY_MS;
+    }
+}
 
 // FIXME: find a good wad to manage auto power off. By some custom wdog etc.
 // OR maybe...if chargingAccomplished + currently stopped\unlocked (imply 0 amps delivered))?
@@ -266,15 +298,27 @@ static void Ms100Task(void)
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
+        // after _global.ccsKickoff, a short press no longer stop, to allow unplug\plug...to make it kick in...
         if (!_global.stopButtonEvent)
         {
-            _global.stopButtonEvent = true; // one way street
-            printf("Stop button pressed. Stop pending...\r\n");
+            bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
+            if (!_global.ccsKickoff)
+            {
+                _global.stopButtonEvent = true; // one way street
+                printf("Stop button pressed briefly (before ccsKickoff). Stop pending...\r\n");
+
+                ledBlinker->setOnOffDuration(300, 300); // short blinking
+            }
+            else if (buttonPressed5Seconds)
+            {
+                _global.stopButtonEvent = true; // one way street
+                printf("Stop button pressed for 5 seconds (after ccsKickoff). Stop pending...\r\n");
+
+                ledBlinker->setOnOffDuration(300, 300); // short blinking
+            }
         }
 
         _global.stopButtonCounter++;
-
-        ledBlinker->setOnOffDuration(300, 300); // short blinking
     }
     else
     {
@@ -298,7 +342,7 @@ static void Ms100Task(void)
     power_off_check();
 
     print_sysinfo();
-
+    print_ccs_trace();
     
     //Watchdog
     //int wd = Param::GetInt(Param::CanWatchdog);
@@ -337,7 +381,7 @@ static void Ms30Task()
         // chademo will set these and then ccs can start
         // TODO: wait until soc has correct value.....need to check some value?
         _global.ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
-            && Param::GetInt(Param::MaxVoltage) > 0
+          //  && Param::GetInt(Param::MaxVoltage) > 0 pointless it has default value
             && Param::GetInt(Param::TargetVoltage) > 0;
 
         if (_global.ccsKickoff)
@@ -376,29 +420,7 @@ static void SetMacAddress()
     setOurMac(mac);
 }
 
-static void PrintCcsTrace()
-{
-    int state = Param::GetInt(Param::opmode);
-    const char* label = pevSttLabels[state];
 
-//    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
-        //      lastSttPrint = rtc_get_ms();// counter_val();
-    // TODO: log events flags
-    printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n", 
-        label,
-        tcp_getTotalNumberOfRetries(),
-        Param::GetInt(Param::EvseVoltage),
-        Param::GetInt(Param::EvseCurrent),
-        Param::GetInt(Param::EvseMaxVoltage),
-        Param::GetInt(Param::EvseMaxCurrent),
-        // car
-        Param::GetInt(Param::ChargeCurrent),
-        Param::GetInt(Param::TargetVoltage),
-        Param::GetInt(Param::BatteryVoltage),
-        Param::GetInt(Param::MaxVoltage),
-        Param::GetInt(Param::MaxCurrent)
-    );
-}
 
 // Weird stuff...
 //#define FLASH_REFERENCE_ADDR 0x0800C000
@@ -492,7 +514,7 @@ extern "C" int main(void)
 
     usart1_setup();
 
-    printf("ccs32clara-chademo v0.5\r\n");
+    printf("ccs32clara-chademo v0.6\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -515,6 +537,9 @@ extern "C" int main(void)
 
     ChademoCharger cc;
     chademoCharger = &cc;
+    chademoCharger->EnableAutodetect();
+    chademoCharger->SetState(ChargerState::Start);
+
     // !hack
 //    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial hack
 
