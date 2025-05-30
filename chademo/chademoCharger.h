@@ -321,12 +321,6 @@ struct CarData
 
 struct ChargerData
 {
-    /// <summary>
-    /// For v1: car send 100-102
-    /// I think for v2 it also send 200-202. It may also be checking that we read those messages...
-    /// So...it may be best to use raw v 1??
-    /// Trying with v2 and no filter! The car may require we read them all....
-    /// </summary>
     uint8_t ProtocolNumber = 2; // 1: chademo 0.9 2: chademo 1.0
 
     /// <summary>
@@ -334,7 +328,7 @@ struct ChargerData
     /// </summary>
     ChargerStatus Status = ChargerStatus::CHARGER_STATUS_STOPPED;
 
-    uint16_t AvailableOutputVoltage; //??
+    uint16_t AvailableOutputVoltage;
 
     /// <summary>
     /// If true, the charger support helping the car to do welding detection (by lowering the voltage)
@@ -343,13 +337,13 @@ struct ChargerData
     /// </summary>
     bool SupportWeldingDetection = 1;
 
-    uint8_t AvailableOutputCurrent;// ??
+    uint8_t AvailableOutputCurrent;
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
 
     // initial value from car, charger count it down
-    uint16_t RemainingChargeTimeSec;// = 60; //HACK......
+    uint16_t RemainingChargeTimeSec;
     uint32_t RemainingChargeTimeCycles;
 
     uint16_t ThresholdVoltage;
@@ -366,6 +360,7 @@ public:
     void SendCanMessages();
     void RunStateMachine(void);
     void Run();
+    bool IsAutodetectCompleted();
     //void RunSend();
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     

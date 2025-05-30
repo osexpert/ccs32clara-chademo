@@ -24,10 +24,10 @@
 #define DIG_IO_ON  1
 
 #undef DIG_IO_ENTRY
-#define DIG_IO_ENTRY(name, port, pin, mode) DigIo DigIo::name;
+#define DIG_IO_ENTRY(name, port, pin, mode, outputSpeed) DigIo DigIo::name;
 DIG_IO_LIST
 
-void DigIo::Configure(uint32_t port, uint16_t pin, PinMode::PinMode pinMode)
+void DigIo::Configure(uint32_t port, uint16_t pin, PinMode::PinMode pinMode, uint8_t outputSpeed)
 {
     uint8_t mode = GPIO_MODE_INPUT;
     uint8_t pull = GPIO_PUPD_NONE;
@@ -57,9 +57,9 @@ void DigIo::Configure(uint32_t port, uint16_t pin, PinMode::PinMode pinMode)
 
     gpio_mode_setup(port, mode, pull, pin);
 
-   // if (mode == GPIO_MODE_OUTPUT)
+    if (mode == GPIO_MODE_OUTPUT)
     {
-    //    gpio_set_output_options(port, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, pin);
+        gpio_set_output_options(port, GPIO_OTYPE_PP, outputSpeed, pin);
     }
 
 }

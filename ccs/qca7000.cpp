@@ -27,7 +27,25 @@ uint16_t myethreceivebufferLen;
 uint16_t debugCounter_cutted_myethreceivebufferLen;
 
 
+inline void small_delay()
+{
+    __asm__ volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop");       // Small delay
+}
 
+
+/// <summary>
+/// SPI Mode 3 (CPOL=1, CPHA=1)
+/// 
+/// Overall timing:
+///
+/// Each small_delay() is ~7 NOPs = ~7 * 6ns = ~42ns(approximate for 186mhz)
+/// 3 small_delay() calls per bit:
+/// after setting clock high at start, after clock low,
+/// after clock high before reading MISO
+/// This roughly adds up to around 80 - 90 ns per clock period, matching QCA7000 spec (The SPI CLK period should not be less than 83.3 ns)
+/// </summary>
+/// <param name="param"></param>
+/// <returns></returns>
 uint8_t read_write_byte(uint8_t param) 
 {
     uint8_t result = 0;
@@ -35,10 +53,14 @@ uint8_t read_write_byte(uint8_t param)
     // Set Clock high
     DigIo::spi_clock_out.Set();
 
+    small_delay();
+
     for (int bit = 7; bit >= 0; --bit) {
 
         // Clock low
         DigIo::spi_clock_out.Clear();
+
+        small_delay();
 
         // Send bit
         if ((param >> bit) & 1)
@@ -49,10 +71,12 @@ uint8_t read_write_byte(uint8_t param)
         // Clock high
         DigIo::spi_clock_out.Set();
 
+        small_delay();
+
         // Read bit
         bool read = DigIo::spi_miso_in.Get();
 
-        result = (result << 1) | (read == true);
+        result = (result << 1) | (read ? 1 : 0);
     }
 
     // Finish Clock high
@@ -69,6 +93,8 @@ static void mySpiTransmitReceive()
 
     //while (SPI_SR(SPI1) & SPI_SR_BSY);
     DigIo::spi_cs_out.Clear();
+
+    small_delay();
 
     for (uint32_t i = 0; i < mySpiDataSize; i++) 
     {

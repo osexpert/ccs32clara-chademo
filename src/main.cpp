@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <stdint.h>
-//#include <stddef.h>
+#include <stddef.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
@@ -46,7 +46,6 @@
 #include "chademoCharger.h"
 #include "led_blinker.h"
 #include "my_fp.h"
-//#include "scheduler.h"
 #include "main.h"
 #include "stm32scheduler.h"
 
@@ -212,7 +211,6 @@ void print_sysinfo()
             FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
             FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
             FP_FROMFLT(vdd_voltage),
-            //scheduler_get_cpu_usage(),
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.ccsDeliveredAmpsEvent,
@@ -245,9 +243,7 @@ static void print_ccs_trace()
         int state = Param::GetInt(Param::opmode);
         const char* label = pevSttLabels[state];
 
-        //    if ((Param::GetInt(Param::logging) & MOD_PEV) && ((rtc_get_ms() - lastSttPrint) >= 100 || lastState != state))
-                //      lastSttPrint = rtc_get_ms();// counter_val();
-            // TODO: log events flags
+        // TODO: log events flags
         printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n",
             label,
             tcp_getTotalNumberOfRetries(),
@@ -273,21 +269,6 @@ static void print_ccs_trace()
 
 static void Ms100Task(void)
 {
-//    static int counter = 0;
-//    static bool setOnce = false;
-//  //  if (counter++ > (30 * 10))// 1,5 min 90 sec, change to 30
-//    {
-////        if (!setOnce)
-//        {
-//            Param::SetInt(Param::EvseMaxVoltage, 500);
-//            Param::SetInt(Param::EvseMaxCurrent, 200);
-//            //out:0V / 0A avail : 464V / 200A
-//
-//            printf("hack: set available volt and amps\r\n");
-//            setOnce = true;
-//        }
-//    }
-
     chademoCharger->Run();
 
     _global.auto_power_off_timer_count_up_ms += 100;
@@ -344,48 +325,17 @@ static void Ms100Task(void)
     print_sysinfo();
     print_ccs_trace();
     
-    //Watchdog
-    //int wd = Param::GetInt(Param::CanWatchdog);
-    //if (wd < CAN_TIMEOUT)
-    //{
-    //    Param::SetInt(Param::CanWatchdog, ++wd);
-    //}
-    //else
-    //{
-    //    /* we rely on the CAN input, so we set the error indication if the CAN messages timed out. */
-    //    ErrorMessage::Post(ERR_CANTIMEOUT);
-    //}
-
-    //CAN bus a sleep !!!to decide
-    //Param::SetInt(Param::CanAwake, (rtc_get_counter_val() - can->GetLastRxTimestamp()) < 200);
-    //Param::SetInt(Param::CanAwake, (rtc_get_ms() - can->GetLastRxTimestamp()) < 200);
-    //wakecontrol_mainfunction();
 }
-
-//static void Ms100CanSendTask(void)
-//{
-//    // no printf here to make it most stable
-//    chademoCharger->SendCanMessages();
-//}
-
-//static void Ms10Task()
-//{
-//    // maybe it can be relaxed later and run less often
-//    chademoCharger->Run();
-//}
 
 static void Ms30Task()
 {
     if (!_global.ccsKickoff)
     {
         // chademo will set these and then ccs can start
-        // TODO: wait until soc has correct value.....need to check some value?
-        _global.ccsKickoff = Param::GetInt(Param::BatteryVoltage) > 0
-          //  && Param::GetInt(Param::MaxVoltage) > 0 pointless it has default value
-            && Param::GetInt(Param::TargetVoltage) > 0;
+        _global.ccsKickoff = chademoCharger->IsAutodetectCompleted();
 
         if (_global.ccsKickoff)
-            printf("ccs kickoff, voltages satisfied!\r\n");
+            printf("ccs kickoff, cha autodetect completed\r\n");
         //        else
           //          _cyclesWaitingForCcsStart++; auto power off attempt...
     }
@@ -420,8 +370,6 @@ static void SetMacAddress()
     setOurMac(mac);
 }
 
-
-
 // Weird stuff...
 //#define FLASH_REFERENCE_ADDR 0x0800C000
 //#define MAGIC_MASK 0x20231212
@@ -446,12 +394,6 @@ static void SetMacAddress()
 // TODO: could scan all of memory hunting for these? we have the offsets they should be separated with.
 //}
 
-
-//extern uint8_t scheduler_get_cpu_usage(void);
-
-
-
-
 /* Called when systick fires */
 extern "C" void sys_tick_handler(void)
 {
@@ -465,7 +407,6 @@ extern "C" void sys_tick_handler(void)
 //    while (wake > system_millis);
 //}
 
-
 void iwdg_configure(uint16_t period_ms)
 {
     // Set watchdog timeout period
@@ -474,9 +415,6 @@ void iwdg_configure(uint16_t period_ms)
     // Start the watchdog
     iwdg_start();
 }
-
-
-
 
 extern "C" int main(void)
 {
@@ -567,9 +505,6 @@ extern "C" int main(void)
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
-//    scheduler->AddTask(Ms10Task, CHA_CYCLE_MS); // hack: probably too often
-    
-
     
     while (1)
     {
@@ -579,23 +514,9 @@ extern "C" int main(void)
     return 0;
 }
 
-//void AddCanSendTask()
-//{
-//    static bool taskAdded = false;
-//    if (!taskAdded)
-//    {
-//        printf("[cha] AddCanSendTask\r\n");
-//        taskAdded = true;
-//        scheduler->AddTask(Ms100CanSendTask, 100);
-//    }
-//}
-
-//extern int usart1_dma_putchar(char c);
-
 extern "C" void putchar(char c)
 {
     usart_send_blocking(USART1, c);
-    //usart1_dma_putchar(c);
 };
 
 //Whichever timer(s) you use for the scheduler, you have to
@@ -614,32 +535,7 @@ extern "C" void tim4_isr(void)
 //}
 
 
-/** This function is called when the user changes a parameter */
-//void Param::Change(Param::PARAM_NUM paramNum)
-//{
-////    static bool enableReceived = false;
-//    //switch (paramNum)
-//    //{
-//    //case Param::EVTargetCurrent:
-//    //    //Charge current is the single most important item that must be constantly updated
-//    //    //by the BMS or VCU. Whenever it is updated we feed the dog
-//    //    //When it is no longer updated the dog will bark and stop the charge session
-//    //    //if (enableReceived)
-//    //    //Param::SetInt(Param::CanWatchdog, 0);
-//    //    //enableReceived = false; //this will be set back to true once enable is received again
-//    //    break;
-//    //// OBS: enableReceived is false by default...so enable must be set somewhere?????????????????????????????????????????????????????????????????????????????????
-//    //case Param::enable:
-//    //    //by the BMS or VCU. Whenever this AND ChargeCurrent is updated we feed the dog
-//    //    //When it is no longer updated the dog will bark and stop the charge session
-//    //    //enableReceived = true;
-//    //    break;
-//}
-
-
 // minimal memset implementation for embedded
-#include <stddef.h>  // for size_t
-
 extern "C" void* memset(void* ptr, int value, size_t num) {
     unsigned char* p = (unsigned char*)ptr;
     while (num--) {

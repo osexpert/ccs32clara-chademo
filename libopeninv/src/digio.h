@@ -38,7 +38,7 @@ namespace PinMode {
 class DigIo
 {
 public:
-#define DIG_IO_ENTRY(name, port, pin, mode) static DigIo name;
+#define DIG_IO_ENTRY(name, port, pin, mode, outputSpeed) static DigIo name;
     DIG_IO_LIST
 #undef DIG_IO_ENTRY
 
@@ -47,7 +47,7 @@ public:
          * @param[in] pin port-pin to use for this pin
          * @param[in] mode pinmode to use
          */
-        void Configure(uint32_t port, uint16_t pin, PinMode::PinMode pinMode);
+        void Configure(uint32_t port, uint16_t pin, PinMode::PinMode pinMode, uint8_t outputSpeed);
 
     /**
     * Get pin value
@@ -83,7 +83,7 @@ private:
     uint16_t _pin;
 };
 //Configure all digio objects from the given list
-#define DIG_IO_ENTRY(name, port, pin, mode) DigIo::name.Configure(port, pin, mode);
+#define DIG_IO_ENTRY(name, port, pin, mode, outputSpeed) DigIo::name.Configure(port, pin, mode, outputSpeed);
 #define DIG_IO_CONFIGURE(l) l
 
 #endif // DIGIO_H_INCLUDED

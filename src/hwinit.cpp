@@ -95,6 +95,7 @@ int gpio_get_speed(uint32_t gpioport, uint16_t gpio)
     return (ospeedr >> (2 * pin)) & 0x3;
 }
 
+// TODO: what is def speed??? figure out and print it. Def is 2MHZ
 void gpio_print_speed(const char* str,uint32_t gpioport, uint16_t gpio)
 {
     int res = gpio_get_speed(gpioport, gpio);
@@ -126,22 +127,15 @@ void can_setup(void) {
     // Configure GPIOD pin 0 as AF9, Pull-Up, Very High Speed, Alternate function push-pull. Can RX.
     gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_PULLUP, GPIO0);
     gpio_set_af(GPIOD, GPIO_AF9, GPIO0);
-    //gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO0);
 
     // Configure GPIOD pin 1 as AF9, No Pull, Very High Speed, Alternate function push-pull. Can TX.
     gpio_mode_setup(GPIOD, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO1);
     gpio_set_af(GPIOD, GPIO_AF9, GPIO1);
-    
-    // TODO: what is def speed??? figure out and print it
-    gpio_print_speed("D1", GPIOD, GPIO1);
     gpio_set_output_options(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100MHZ, GPIO1);
-    gpio_print_speed("D1", GPIOD, GPIO1);
 
     nvic_set_priority(NVIC_CAN1_RX0_IRQ, IRQ_PRIORITY_CAN_RX); //lowest priority
     nvic_enable_irq(NVIC_CAN1_RX0_IRQ); //CAN RX
 
-//    nvic_set_priority(NVIC_CAN1_TX_IRQ, IRQ_PRIORITY_CAN_TX); //lowest priority
-//    nvic_enable_irq(NVIC_CAN1_TX_IRQ); //CAN TX
 
     can_reset(CAN1);
 
