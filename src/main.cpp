@@ -416,6 +416,15 @@ void iwdg_configure(uint16_t period_ms)
     iwdg_start();
 }
 
+void enable_all_faults(void) 
+{
+    // HAL call them "_Msk"
+    SCB_SHCSR |= SCB_SHCSR_USGFAULTENA | SCB_SHCSR_BUSFAULTENA | SCB_SHCSR_MEMFAULTENA;
+
+    // default is to ignore div/0 (undefined behaviour)
+ //   SCB_CCR |= SCB_CCR_DIV_0_TRP_Msk; // Trap divide-by-zero
+}
+
 extern "C" int main(void)
 {
     // set new vector table in a safe way (bootloader does not set it)
@@ -452,6 +461,8 @@ extern "C" int main(void)
 
     usart1_setup();
 
+    enable_all_faults();
+
     printf("ccs32clara-chademo v0.6\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
@@ -475,7 +486,7 @@ extern "C" int main(void)
 
     ChademoCharger cc;
     chademoCharger = &cc;
-    chademoCharger->EnableAutodetect();
+    chademoCharger->EnableAutodetect(true);
     chademoCharger->SetState(ChargerState::Start);
 
     // !hack
@@ -542,4 +553,77 @@ extern "C" void* memset(void* ptr, int value, size_t num) {
         *p++ = (unsigned char)value;
     }
     return ptr;
+}
+
+extern "C" void print_crash_info(const char* type, uint32_t* stack)
+{
+    printf("\r\n--- ");
+    printf(type);
+    printf(" ---\r\n");
+
+    printf("R0  : 0x%x\r\n", stack[0]);
+    printf("R1  : 0x%x\r\n", stack[1]);
+    printf("R2  : 0x%x\r\n", stack[2]);
+    printf("R3  : 0x%x\r\n", stack[3]);
+    printf("R12 : 0x%x\r\n", stack[4]);
+    printf("LR  : 0x%x\r\n", stack[5]);
+    printf("PC  : 0x%x\r\n", stack[6]);
+    printf("xPSR: 0x%x\r\n", stack[7]);
+
+    printf("CFSR : 0x%x\r\n", SCB_CFSR);
+    printf("HFSR : 0x%x\r\n", SCB_HFSR);
+    printf("MMFAR: 0x%x\r\n", SCB_MMFAR);
+    printf("BFAR : 0x%x\r\n", SCB_BFAR);
+
+    power_off_no_return("fault");
+}
+
+// Fault labels in flash
+extern "C" const char hardfault_label[] = "HardFault";
+extern "C" const char busfault_label[] = "BusFault";
+extern "C" const char usagefault_label[] = "UsageFault";
+extern "C" const char memfault_label[] = "MemManage";
+
+extern "C" __attribute__((naked)) void hard_fault_handler(void) {
+    __asm volatile (
+    "tst lr, #4        \n"
+        "ite eq            \n"
+        "mrseq r0, msp     \n"
+        "mrsne r0, psp     \n"
+        "ldr r1, =hardfault_label \n"
+        "b print_crash_info \n"
+        );
+}
+
+extern "C" __attribute__((naked)) void bus_fault_handler(void) {
+    __asm volatile (
+    "tst lr, #4        \n"
+        "ite eq            \n"
+        "mrseq r0, msp     \n"
+        "mrsne r0, psp     \n"
+        "ldr r1, =busfault_label \n"
+        "b print_crash_info \n"
+        );
+}
+
+extern "C" __attribute__((naked)) void usage_fault_handler(void) {
+    __asm volatile (
+    "tst lr, #4        \n"
+        "ite eq            \n"
+        "mrseq r0, msp     \n"
+        "mrsne r0, psp     \n"
+        "ldr r1, =usagefault_label \n"
+        "b print_crash_info \n"
+        );
+}
+
+extern "C" __attribute__((naked)) void mem_manage_handler(void) {
+    __asm volatile (
+    "tst lr, #4        \n"
+        "ite eq            \n"
+        "mrseq r0, msp     \n"
+        "mrsne r0, psp     \n"
+        "ldr r1, =memfault_label \n"
+        "b print_crash_info \n"
+        );
 }

@@ -164,7 +164,7 @@ enum StopReason
 
 #define CHARGER_STATE_LIST \
     X(Idle, 0) \
-    X(PreStart_WaitForChargerLive, 0) \
+    X(PreStart_Autodetect_Completed_WaitForChargerLive, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
     X(CarReadyToCharge, 0) \
@@ -355,9 +355,9 @@ class ChademoCharger
 public:
     void UpdateChargerMessages();
    // void CalcChargerThreasholdVoltage();
-    void HandlePendingMessages();
-    void ExtractAndSetCcsData();
-    void SendCanMessages();
+    void HandlePendingCarMessages();
+    void SetChargerDataFromCcsParams();
+    void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
     bool IsAutodetectCompleted();
@@ -374,7 +374,7 @@ public:
     void StopVoltageDelivery();
     bool IsChargingStoppedByAdapter();
     
-    void SetCcsData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
+    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
 
     void StopPowerDelivery();
     bool GetSwitchK();
@@ -407,7 +407,7 @@ public:
     void PerformInsulationTest() { /* NOP */ }
     
     bool IsChargerLive();
-    void EnableAutodetect();
+    void EnableAutodetect(bool enable);
     void NotifyCarAskingForAmps()
     {
         // NOP
@@ -438,7 +438,7 @@ public:
 
         bool _switch_k = false;
 
-        bool _sendCanMessages = false;
+        bool _sendMessages = false;
 
         bool _autoDetect = false;
 
