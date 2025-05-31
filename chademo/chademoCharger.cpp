@@ -107,11 +107,9 @@ float EstimateVoltage(float targetVoltage, float socPercentage)
 
 /// <summary>
 /// get estimated battery volt from target and soc.
-/// make a lot of assumtions:
+/// make a lot of assumtions:-)
 /// maxVolt = target - 10
-/// function is steeper 0-20% and 20-80%. flatter from 20-80.
-/// symmetrical around 50%
-/// constants are based on numbers from leaf and imiev
+/// Based on Leaf/i-MiEV data
 /// </summary>
 float getEstBattVoltage(float target, float soc)
 {
@@ -119,9 +117,11 @@ float getEstBattVoltage(float target, float soc)
     float nomVolt = 0.58f * target + 117.2f; // Linear interpolation/extrapolation
     float minVolt = nomVolt - (maxVolt - nomVolt);
 
-    float delta = 0.12f * (nomVolt - minVolt);
-    float volt20 = nomVolt - delta;
-    float volt80 = nomVolt + delta;
+    float deltaLow = 0.14f * (nomVolt - minVolt);   // Steeper drop below 20%
+    float deltaHigh = 0.10f * (maxVolt - nomVolt);  // Shallower rise above 80%
+
+    float volt20 = nomVolt - deltaLow;
+    float volt80 = nomVolt + deltaHigh;
 
     if (soc < 20.0f)
     {
