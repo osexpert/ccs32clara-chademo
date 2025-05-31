@@ -61,36 +61,47 @@ has_flag(E value, E flag) {
 /// </summary>
 enum CarFaults
 {
-    CAR_FAULT_NONE = 0,
-
-    CAR_FAULT_OVER_VOLT = 1,
-    CAR_FAULT_UNDER_VOLT = 2,
-    CAR_FAULT_DEV_AMPS = 4,
-    CAR_FAULT_OVER_TEMP = 8,
-    CAR_FAULT_DEV_VOLT = 16
+    /// <summary>
+    /// 102.4.0
+    /// </summary>
+    CAR_FAULT_OVER_VOLT = 0x1,
+    /// <summary>
+    /// 102.4.1
+    /// </summary>
+    CAR_FAULT_UNDER_VOLT = 0x2,
+    /// <summary>
+    /// 102.4.2
+    /// </summary>
+    CAR_FAULT_DEV_AMPS = 0x4,
+    /// <summary>
+    /// 102.4.3
+    /// </summary>
+    CAR_FAULT_OVER_TEMP = 0x8,
+    /// <summary>
+    /// 102.4.4
+    /// </summary>
+    CAR_FAULT_DEV_VOLT = 0x10
 };
 
 
 enum CarStatus
 {
-    CAR_STATUS_NONE = 0x0,
-
     /// <summary>
     /// 102.5.0 Vehicle charging enabled
     /// </summary>
-    CAR_STATUS_READY_TO_CHARGE = 0x1, // binary: 0000 0001
+    CAR_STATUS_READY_TO_CHARGE = 0x1,
 
     /// <summary>
     /// 102.5.1 Vehicle shift position
     /// </summary>
-    CAR_STATUS_NOT_IN_PARK = 0x2, // binary: 0000 0010
+    CAR_STATUS_NOT_IN_PARK = 0x2,
 
     /// <summary>
     /// 102.5.2 Charging system fault
     /// Can timeout? Other timeout? Too long/short in state?
     /// This is analog to ChargerStatus::CHARGER_STATUS_ERROR, only opposite direction
     /// </summary>
-    CAR_STATUS_ERROR = 0x4, // binary: 0000 0100
+    CAR_STATUS_ERROR = 0x4,
 
     /// <summary>
     /// 102.5.3 Vehicle status
@@ -99,83 +110,91 @@ enum CarStatus
     /// and set as 1 after the termination of welding detection (end)
     /// main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
     /// </summary>
-    CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 0x8, // binary: 0000 1000
+    CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
     /// </summary>
-    CAR_STATUS_STOP_BEFORE_CHARGING = 0x10, // binary: 0001 0000
-
-    CAR_STATUS_UNKNOWN_0x20 = 0x20, // binary: 0010 0000
+    CAR_STATUS_STOP_BEFORE_CHARGING = 0x10,
 
     /// <summary>
-    /// Vehicle reports a fault specifically in its charging system. (Bit 6)?
-    /// Possibly battery cooling in progress??? Or hot battery in general?
+    /// 102.5.7
+    /// car is V2X compatible (can deliver power to grid)
     /// </summary>
-    CAR_STATUS_UNKNOWN_0x40 = 0x40, // binary: 0100 0000
-
-    // car is V2X compatible (can deliver power to grid)
-    CAR_STATUS_DISCHARGE_COMPATIBLE = 0x80, // binary: 1000 0000
+    CAR_STATUS_DISCHARGE_COMPATIBLE = 0x80,
 };
 
 enum ChargerStatus
 {
     /// <summary>
+    /// 109.5.0
     /// during rundown: This is tied 1:1 with OutputCurrent > 0. Meaning we can be stopped, but still charging since amps > 0.
     /// During startup, CHARGER_STATUS_CHARGING is set and then amps are still 0.
     /// 0: standby 1: charging (power transfer from charger)
     /// </summary>
-    CHARGER_STATUS_CHARGING = 0x1, // binary: 0000 0001
+    CHARGER_STATUS_CHARGING = 0x1,
 
     /// <summary>
+    /// 109.5.1
     /// something went wrong (fault caused by (or inside) the charger)
     /// </summary>
-    CHARGER_STATUS_ERROR = 0x2, // binary: 0000 0010
+    CHARGER_STATUS_ERROR = 0x2,
 
-    // connector is currently locked (electromagnetic lock, plug locked into the car)
-    CHARGER_STATUS_PLUG_LOCKED = 0x4, // binary: 0000 0100
+    /// <summary>
+    /// 109.5.2
+    /// connector is currently locked (electromagnetic lock, plug locked into the car)
+    /// </summary>
+    CHARGER_STATUS_PLUG_LOCKED = 0x4,
 
-    // parameters between vehicle and charger not compatible (battery incompatible?)
-    CHARGER_STATUS_INCOMPAT = 0x8, // binary: 0000 1000
+    /// <summary>
+    /// 109.5.3
+    /// parameters between vehicle and charger not compatible (battery incompatible?)
+    /// </summary>
+    CHARGER_STATUS_INCOMPAT = 0x8,
 
-    // can be CAN timeout, or other timeout (too short/long in state). problem with the car, such as improper connection (or something wrong with the battery?)
-    CHARGER_STATUS_CAR_ERROR = 0x10, // binary: 0001 0000
+    /// <summary>
+    /// 109.5.4
+    /// can be CAN timeout, or other timeout (too short/long in state). problem with the car, such as improper connection (or something wrong with the battery?)
+    /// </summary>
+    CHARGER_STATUS_CAR_ERROR = 0x10,
 
-    //charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
-    CHARGER_STATUS_STOPPED = 0x20, // binary: 0010 0000
+    /// <summary>
+    /// 109.5.5
+    /// charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
+    /// </summary>
+    CHARGER_STATUS_STOPPED = 0x20,
 };
 
 enum StopReason
 {
-    NONE = 0x0, // binary: 0000 0000
-    CAR_CAN_AMPS_TIMEOUT = 0x1, // binary: 0000 0001
+    NONE = 0x0,
+    CAR_CAN_AMPS_TIMEOUT = 0x1,
     CHARGING_TIME = 0x2, // out of time
-    CAR_NOT_READY_TO_CHARGE = 0x4, // binary: 0000 0100
-    CAR_NOT_IN_PARK = 0x8, // binary: 0000 1000
-    CAR_SWITCH_K_OFF = 0x10, // binary: 0001 0000
+    CAR_NOT_READY_TO_CHARGE = 0x4,
+    CAR_NOT_IN_PARK = 0x8,
+    CAR_SWITCH_K_OFF = 0x10,
     /// <summary>
     /// Typically the ccs charger want us to stop
     /// </summary>
-    CHARGER = 0x20, // binary: 0010 0000
-    ADAPTER_STOP_BUTTON = 0x40, // binary: 0100 0000
-    CAR_ERROR = 0x80, // binary: 1000 0000
+    CHARGER = 0x20,
+    ADAPTER_STOP_BUTTON = 0x40,
+    CAR_ERROR = 0x80,
 };
 
 
 #define CHARGER_STATE_LIST \
     X(Idle, 0) \
-    X(PreStart_Autodetect_Completed_WaitForChargerLive, 0) \
+    X(PreStart_AutoDetectCompleted_WaitForPreChargeDone, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
     X(CarReadyToCharge, 0) \
-    X(WaitForChargerLive, 0) \
+    X(WaitForCurrentDemandStart, 0) \
     X(WaitForCarContactorsClosed, 8) \
     X(WaitForCarAskingAmps, 0) \
     X(ChargingLoop, 0) \
-    X(Stopping_WaitForLowAmpsDelivered, 0) \
+    X(Stopping_WaitForLowAmps, 0) \
     X(Stopping_WaitForCarContactorsOpen, 0) \
-    X(Stopping_WaitForLowVoltsDelivered, 0) \
-    X(Stopping_UnlockPlug, 0) \
+    X(Stopping_WaitForLowVolts, 0) \
     X(Stopping_StopCan, 0) \
     X(End, 0)
 
@@ -242,7 +261,7 @@ struct msg102
             uint8_t ProtocolNumber;
             uint16_t TargetBatteryVoltage;
             uint8_t ChargingCurrentRequest;
-            uint8_t Fault;
+            uint8_t Faults;
             uint8_t Status;
             uint8_t SocPercent;
             uint8_t Unused7;
@@ -298,6 +317,7 @@ struct CarData
 
     // Valid after kSwitch
     uint16_t TargetBatteryVoltage;
+    uint16_t EstimatedBatteryVoltage;
 
     uint16_t CyclesSinceLastAskingAmps;
 
@@ -309,7 +329,7 @@ struct CarData
     uint8_t SocPercent;
 
     CarStatus Status;
-    CarFaults Fault;
+    CarFaults Faults;
 
     // PS: unstable before switch (k)
     float BatteryCapacityKwh;
@@ -354,14 +374,15 @@ class ChademoCharger
 {
 public:
     void UpdateChargerMessages();
-   // void CalcChargerThreasholdVoltage();
+    bool IsCurrentDemandStarted();
+    bool IsPreChargeDone();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
-    bool IsAutodetectCompleted();
-    //void RunSend();
+    bool IsAutoDetectCompleted();
+  
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     
     void SetState(ChargerState newState, int delay_ms = 0);
@@ -370,44 +391,29 @@ public:
 
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
-
-    void StopVoltageDelivery();
+    void SetCcsParamsFromCarData();
+  
     bool IsChargingStoppedByAdapter();
     
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
 
-    void StopPowerDelivery();
     bool GetSwitchK();
-    //void SetCarDataSoc();
+
     bool IsPowerOffOk()
     {
         return _powerOffOk;
     }
-  /*  bool IsChargingPlugLocked()
-    {
-        return _locked;
-    };*/
 
     void LockChargingPlug(bool lock)
     {
-//        _locked = lock;
-
         if (lock)
             _powerOffOk = false;
     };
 
-    //bool IsChargerReady()
-    //{
-    //    // kickoff: Start of precharge??
-    //    // or end...maybe? hardwareInterface_setPowerRelayOn??
-    //    return true;
-    //};
-
     void NotifyCarContactorsClosed();
     void PerformInsulationTest() { /* NOP */ }
     
-    bool IsChargerLive();
-    void EnableAutodetect(bool enable);
+        void EnableAutoDetect(bool enable);
     void NotifyCarAskingForAmps()
     {
         // NOP
@@ -420,6 +426,7 @@ public:
 
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t max_sec);
+    bool IsTimeoutAndStopSec(uint16_t max_sec);
 
     int _delayCycles = 0;
 
@@ -441,6 +448,9 @@ public:
         bool _sendMessages = false;
 
         bool _autoDetect = false;
+
+        bool _stop_delivering_amps = false;
+        bool _stop_delivering_volts = false;
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};

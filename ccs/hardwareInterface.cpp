@@ -30,6 +30,9 @@ void hardwareInterface_simulateCharging(void)
 
 int16_t hardwareInterface_getInletVoltage(void)
 {
+    // only called in precharge, so we can abuse it as trigger
+   // _global.ccsPreChargeStartedEvent = true;
+
     // we have no inlet voltage sensor. 
     return Param::GetInt(Param::EvseVoltage);
 }
@@ -46,11 +49,15 @@ int16_t hardwareInterface_getChargingTargetVoltage(void)
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
-    if (Param::GetInt(Param::EvseCurrent) > 0)
-    {
-        // still delivering amps, reset countUp timer
-        _global.auto_power_off_timer_count_up_ms = 0;
-    }
+    // only called in CurrentDemand, so abuse it as trigger
+    _global.ccsCurrentDemandStartedEvent = true;
+
+    // we are in the charging loop here, this is probably reason enough to be powered, amps or not.
+    //if (Param::GetInt(Param::EvseCurrent) > 0)
+  //  {
+    // still delivering amps, reset countUp timer
+    _global.auto_power_off_timer_count_up_ms = 0;
+//    }
 
     return Param::GetInt(Param::ChargeCurrent);
 }
@@ -69,6 +76,7 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
+
     _global.ccsPowerRelayOnTrigger_prechargeDone = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...

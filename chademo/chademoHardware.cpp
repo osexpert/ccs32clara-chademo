@@ -30,11 +30,16 @@ void ChademoCharger::SetSwitchD1(bool set)
         DigIo::switch_d1_out.Clear();
 };
 
-bool ChademoCharger::IsChargerLive()
+bool ChademoCharger::IsCurrentDemandStarted()
 {
-    // TODO: OR....could check that voltage delivered > 1 ? (precharge started)
+    return _global.ccsCurrentDemandStartedEvent;
+};
+
+bool ChademoCharger::IsPreChargeDone()
+{
     return _global.ccsPowerRelayOnTrigger_prechargeDone;
 };
+
 
 bool ChademoCharger::GetSwitchK()
 {
@@ -55,6 +60,10 @@ bool ChademoCharger::IsChargingStoppedByAdapter()
 /// not having a liv adapter in their lap. And the original software still works like this, it make ccs live
 /// regardless of chademo state.
 /// This software require car/chademo before ccs starts, so then adapter contactor is a NOOP.
+/// 
+/// OTOH: if any arching _should_ happen during close, it will all be on the adapters contactor, and this is good.
+/// BUT to get the same protection when opening, the adapter contactor should open FIRST. And it currently does not, not in original FW nor here.
+/// Thou...its hard to open them BEFORE the car, logically we would mess with the cars logic and the welding check.
 /// </summary>
 void ChademoCharger::NotifyCarContactorsClosed()
 {

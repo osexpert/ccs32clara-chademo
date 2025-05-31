@@ -52,6 +52,8 @@ extern "C" {
 
         // ccs delivered 1 amps or more
         bool ccsDeliveredAmpsEvent = false;
+       // bool ccsPreChargeStartedEvent = false;
+        bool ccsCurrentDemandStartedEvent = false;
 
         bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
