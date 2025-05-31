@@ -1,26 +1,37 @@
 # ccs32clara-chademo
 
 Alternative firmware for adapter that uses My407ccs2chademo.bin.
-It may use a stm32f407 cpu.
-It has a boot loader with support for firmware update from usb fat32, very nice.
+Adapter probably uses a stm32f407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
-It has an internal 210-1200VDC transformator to charge the batteries. Out 12.6VDC 2A.
-It has 2 batteries. One short and one long. The long one seems to drive electronics. Guessing the short one drive contactors?
+It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A).
+It has 2 batteries. One short and one long. The long one seems to drive electronics. Guessing the short one drive contactors (one in the adapter itself + 2 in the car).
 2 stop buttons, but they are the same GPIO for both.
-
-Currently in development and untested/not working.
-Difference from original firmware:
-No automatic shutdown, timeout (todo: but auto shutdown after charging would be nice)
-Stop-button shut down adapter immediately, unless adapter is charging. If charging, stop button will set a flag and charging should eventually end.
-TODO: auto off after end of charging?
-Hold down stop-button continously for 30 seconds to force shutdown (emergency mode).
-Led: medium blinks: starting, long blinks: charging, short blinks: pending shutdown
+It has 2 controllable leds, one external and one internal.
+It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
+Some of the voltages are wired up to adc gpios. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
 
 Operation:
-Plug adapter into car. Ccs logic will not start until chademo communication is established and we have maxVoltage and targetVoltage from the car.
-Chademo can will stall until ccs know how much volts and amps to deliver. This should in theory make chademo can progress.
-Then chademo can will wait until end of ccs PreCharge, and from this point, ccs and chademo state machines should be in sync.
-TODO: adapter auto off after charging (or after 5 minutes without any charging started)
+Plug adapter into car. Ccs logic will not start until chademo communication is established and we have maxVoltage, targetVoltage, soc and estimated battery voltage from the car. After this, chademo is shut down and will restart when ccs reach end of ccs PreCharge.
+When ccs reach CurrentDemand, then hopefully chademo is also ready and they will join in their respective charge loops.
+
+Stop button/power off:
+When idle, stop button will power off instantly.
+When working (ccs logic started), a 5 sec. press will initiate power off. Led flash 300/300ms. Depending on how far it has progressed, it can power off instantly or after charging has stopped.
+When noting else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
+
+Led:
+Initially, led flash 600/600ms.
+When charging/after delivered amps, led flash 1200/1200ms.
+When stop/power off pending, led flash 300/300ms.
+
+Other:
+There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hang.
+
+Original firmware:
+Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
+Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower), else I had little problems.
+Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned:-)
+Happy hacking.
 
 # ccs32clara
 

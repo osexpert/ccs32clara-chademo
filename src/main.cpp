@@ -92,15 +92,33 @@ void LedBlinker::onLedChange(bool set)
     }
 }
 
+/* sleep for delay milliseconds */
+static void msleep(uint32_t delay)
+{
+    uint32_t wake = system_millis + delay;
+    while (wake > system_millis);
+}
 
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
-    // weird...i dont think this has any effect
-    DigIo::switch_d1_out.Clear();
+    // weird...i dont think this has any effect (here)
+    // commented it
+//    DigIo::switch_d1_out.Clear();
+    // todo: WAIT
 
     // stop can?
+
+    // power off adapter contactor here.
+    // if we did not, both the car contactors and the adapter contactor would loose power at the same time,
+    // and it would be chance who takes the hit.
+    // Its better that adapter contactor take the hit than the car, so power it off explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
+    if (DigIo::contactor_out.Get())
+    {
+        DigIo::contactor_out.Clear();
+        msleep(100);
+    }
 
     DigIo::power_on_out.Clear();
 
@@ -399,13 +417,6 @@ extern "C" void sys_tick_handler(void)
 {
     system_millis += 1;
 }
-
-/* sleep for delay milliseconds */
-//static void msleep(uint32_t delay)
-//{
-//    uint32_t wake = system_millis + delay;
-//    while (wake > system_millis);
-//}
 
 void iwdg_configure(uint16_t period_ms)
 {
