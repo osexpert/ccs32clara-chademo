@@ -18,6 +18,7 @@ Stop button/power off:
 When idle, stop button will power off instantly.
 When working (ccs logic started), a 5 sec. press will initiate power off. Led flash 300/300ms. Depending on how far it has progressed, it can power off instantly or after charging has stopped.
 When noting else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
+Auto power off after 5 minutes of not being active inside ccs CurrentDemand loop (WIP/could be smarter).
 
 Led:
 Initially, led flash 600/600ms.
@@ -32,6 +33,9 @@ Original firmware seems to be based on open-plc-utils. I think it uses a rtos of
 Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower), else I had little problems.
 Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned:-)
 Happy hacking.
+
+TODO:
+Add more led blibk sequences to track progress.
 
 # ccs32clara
 
