@@ -134,7 +134,6 @@ void RunLedStateMachine()
         if (_global.ccsDeliveredAmpsEvent)
         {
             ledBlinker->setPattern(blink_working);
-            _state = WaitForCurrentDemandLoop;
         }
     }
 
