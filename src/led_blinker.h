@@ -2,22 +2,35 @@
 
 #include <stdint.h>
 
-class LedBlinker {
+
+static const  uint8_t blink_five[] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_four[] = { 3, 3, 3, 3, 3, 3, 3, 9, 0, 0, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_three[] = { 3, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_two[] = { 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_one[] = { 3, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_working[] = { 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_stop[] = { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
+
+class StatusIndicator
+{
 public:
-    LedBlinker(uint32_t onDurationMs, uint32_t offDurationMs);
 
-    void setOnOffDuration(uint32_t on_durationMs, uint32_t off_durationMs);
+    static const int MaxPatternLength = 11;
 
-    // Call this with milliseconds elapsed since last tick
-    void tick(uint32_t ms);
+    StatusIndicator();
 
-    bool getState() const; // true = ON, false = OFF
+    // Set the pattern (array of tick counts, 0 terminates)
+    void setPattern(const uint8_t newPattern[MaxPatternLength]);
+
+    // Call this every 100ms
+    void tick();
+
+    // Override this method to control the hardware LED output
+    void applyLed(bool on);
 
 private:
-    uint32_t onDuration;
-    uint32_t offDuration;
-    uint32_t timeInState;
-    bool isOn;
-
-    void onLedChange(bool newState);
+    uint8_t pattern[MaxPatternLength];
+    int currentIndex;
+    int remainingTicks;
+    bool ledOn;
 };

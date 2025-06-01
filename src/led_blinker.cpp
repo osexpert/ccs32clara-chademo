@@ -1,33 +1,42 @@
 #include "led_blinker.h"
 
+StatusIndicator::StatusIndicator()
+{
+    for (int i = 0; i < MaxPatternLength; ++i)
+        pattern[i] = 0;
 
-LedBlinker::LedBlinker(uint32_t onDurationMs, uint32_t offDurationMs)
-    : onDuration(onDurationMs), offDuration(offDurationMs),
-    timeInState(0), isOn(false) {
+    currentIndex = 0;
+    remainingTicks = 0;
+    ledOn = false;
 }
 
-void LedBlinker::setOnOffDuration(uint32_t on_durationMs, uint32_t off_durationMs) {
-    onDuration = on_durationMs;
-    offDuration = off_durationMs;
-}
-
-
-void LedBlinker::tick(uint32_t ms) {
-    timeInState += ms;
-
-    if (isOn && timeInState >= onDuration) {
-        isOn = false;
-        timeInState = 0;
-        onLedChange(isOn);
+// Set the pattern (array of tick counts, 0 terminates)
+void StatusIndicator::setPattern(const uint8_t newPattern[MaxPatternLength])
+{
+    for (int i = 0; i < MaxPatternLength; ++i) {
+        pattern[i] = newPattern[i];
     }
-    else if (!isOn && timeInState >= offDuration) {
-        isOn = true;
-        timeInState = 0;
-        onLedChange(isOn);
+    currentIndex = 0;
+    remainingTicks = pattern[0];
+    ledOn = (currentIndex % 2 == 0);
+    applyLed(ledOn);
+}
+
+// Call this every 100ms
+void StatusIndicator::tick()
+{
+    if (remainingTicks > 1)
+    {
+        --remainingTicks;
+    }
+    else
+    {
+        ++currentIndex;
+        if (currentIndex >= MaxPatternLength || pattern[currentIndex] == 0) {
+            currentIndex = 0;
+        }
+        remainingTicks = pattern[currentIndex];
+        ledOn = (currentIndex % 2 == 0);
+        applyLed(ledOn);
     }
 }
-
-bool LedBlinker::getState() const {
-    return isOn;
-}
-

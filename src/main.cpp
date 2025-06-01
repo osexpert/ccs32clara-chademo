@@ -55,6 +55,9 @@
 //#define __disable_irq() __asm__ volatile ("cpsid i")
 //#define __enable_irq()  __asm__ volatile ("cpsie i")
 
+ChademoCharger* chademoCharger;
+StatusIndicator* ledBlinker;
+
 Stm32Scheduler* scheduler;
 
 global_data _global;
@@ -68,6 +71,74 @@ volatile uint32_t system_millis;
 
 #define AUTO_POWER_OFF_LIMIT_SEC (60 * 5)
 
+enum LedState
+{
+    Init,
+    WaitForCcsStarted,
+    WaitForSDPStart,
+    WaitForPevStateMachineStarted,
+    WaitForCurrentDemandLoop,
+    WaitForDeliveringAmps,
+    Stop
+};
+
+LedState _state = Init;
+
+void RunLedStateMachine()
+{
+    if (_state != Stop && _global.stopButtonEvent)
+    {
+        ledBlinker->setPattern(blink_stop);
+        _state = Stop;
+    }
+
+    if (_state == Init)
+    {
+        ledBlinker->setPattern(blink_one);
+        _state = WaitForCcsStarted;
+    }
+    else if (_state == WaitForCcsStarted)
+    {
+        if (_global.ccsKickoff)
+        {
+            ledBlinker->setPattern(blink_two);
+            _state = WaitForSDPStart;
+        }
+    }
+    else if (_state == WaitForSDPStart)
+    {
+        if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
+        {
+            ledBlinker->setPattern(blink_three);
+            _state = WaitForCurrentDemandLoop;
+        }
+    }
+    else if (_state == WaitForPevStateMachineStarted)
+    {
+        if (Param::GetInt(Param::checkpoint) >= 400)
+        {
+            ledBlinker->setPattern(blink_four);
+            _state = WaitForCurrentDemandLoop;
+        }
+    }
+    else if (_state == WaitForCurrentDemandLoop)
+    {
+        if (_global.ccsCurrentDemandStartedEvent)
+        {
+            ledBlinker->setPattern(blink_five);
+            _state = WaitForDeliveringAmps;
+        }
+    }
+    else if (_state == WaitForDeliveringAmps)
+    {
+        if (_global.ccsDeliveredAmpsEvent)
+        {
+            ledBlinker->setPattern(blink_working);
+            _state = WaitForCurrentDemandLoop;
+        }
+    }
+
+}
 
 /* to solve linker warning, see https://openinverter.org/forum/viewtopic.php?p=64546#p64546 */
 extern "C" void __cxa_pure_virtual()
@@ -75,10 +146,9 @@ extern "C" void __cxa_pure_virtual()
     while (1);
 }
 
-ChademoCharger* chademoCharger;
-LedBlinker* ledBlinker;
 
-void LedBlinker::onLedChange(bool set)
+
+void StatusIndicator::applyLed(bool set)
 {
     if (set)
     {
@@ -291,7 +361,8 @@ static void Ms100Task(void)
 
     _global.auto_power_off_timer_count_up_ms += 100;
 
-    ledBlinker->tick(100); // 100 ms tick
+    RunLedStateMachine();
+    ledBlinker->tick(); // 100 ms tick
 
     iwdg_reset();
 
@@ -306,14 +377,14 @@ static void Ms100Task(void)
                 _global.stopButtonEvent = true; // one way street
                 printf("Stop button pressed briefly (before ccsKickoff). Stop pending...\r\n");
 
-                ledBlinker->setOnOffDuration(300, 300); // short blinking
+                //ledBlinker->setPattern(blink_sff); // short blinking
             }
             else if (buttonPressed5Seconds)
             {
                 _global.stopButtonEvent = true; // one way street
                 printf("Stop button pressed for 5 seconds (after ccsKickoff). Stop pending...\r\n");
 
-                ledBlinker->setOnOffDuration(300, 300); // short blinking
+                //ledBlinker->setPattern(blink_off); // short blinking
             }
         }
 
@@ -333,10 +404,10 @@ static void Ms100Task(void)
     }
 
     // todo: use plug locked trigger instead?
-    if (!_global.stopButtonEvent && _global.ccsDeliveredAmpsEvent)
-    {
-        ledBlinker->setOnOffDuration(1200, 1200); // long blinking
-    }
+    //if (!_global.stopButtonEvent && _global.ccsDeliveredAmpsEvent)
+    //{
+    //    ledBlinker->setPattern(blink_working); // long blinking
+    //}
 
     power_off_check();
 
@@ -353,7 +424,10 @@ static void Ms30Task()
         _global.ccsKickoff = chademoCharger->IsAutoDetectCompleted();
 
         if (_global.ccsKickoff)
+        {
             printf("ccs kickoff, cha autodetect completed\r\n");
+            //ledBlinker->setPattern(blink_two);
+        }
         //        else
           //          _cyclesWaitingForCcsStart++; auto power off attempt...
     }
@@ -503,7 +577,7 @@ extern "C" int main(void)
     // !hack
 //    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial hack
 
-    LedBlinker lb(600, 600); // medium blinking
+    StatusIndicator lb;
     ledBlinker = &lb;
 
     // scheduler and TIM4 stuff
