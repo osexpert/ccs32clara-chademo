@@ -45,9 +45,10 @@ void clock_setup(void)
    rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 
    //The reset value for PRIGROUP (=0) is not actually a definedvalue. Explicitly set 16 preemtion priorities
-//   SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_PRIGROUP_GROUP16_NOSUB;
+   // What it does : Configures the ARM Cortex - M interrupt system to use 16 group priorities with no sub - priorities, ensuring interrupts are prioritized solely by their group priority.
+   // Without it : The system uses the default priority grouping(e.g., 8 groups with 2 sub - priorities)
+   SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_PRIGROUP_GROUP16_NOSUB;
    //NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4); // Equivalent to GROUP16_NOSUB
-   // removed, dont know what it does...
 
    rcc_periph_clock_enable(RCC_GPIOA);
    rcc_periph_clock_enable(RCC_GPIOB);
@@ -66,6 +67,8 @@ void systick_setup(void)
     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
     systick_counter_enable();
     systick_interrupt_enable();
+    // default I think, but set anyways...
+    nvic_set_priority(NVIC_SYSTICK_IRQ, 0);
 }
 
 extern volatile uint32_t system_millis;

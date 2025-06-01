@@ -28,6 +28,8 @@ void ChademoCharger::SetSwitchD1(bool set)
         DigIo::switch_d1_out.Set();
     else
         DigIo::switch_d1_out.Clear();
+
+    _switch_d1 = set;
 };
 
 bool ChademoCharger::IsCurrentDemandStarted()

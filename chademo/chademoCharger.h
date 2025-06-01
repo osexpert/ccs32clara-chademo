@@ -444,8 +444,10 @@ public:
         msg102 _msg102_isr = {};
 
         bool _switch_k = false;
+        bool _switch_d1 = false;
 
-        bool _sendMessages = false;
+//        bool _sendMessages = false;
+        bool _msg102_recieved = false;
 
         bool _autoDetect = false;
 

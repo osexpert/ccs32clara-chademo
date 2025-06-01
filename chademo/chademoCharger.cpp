@@ -154,7 +154,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent);
         }
 
-        _sendMessages = true;
+        _msg102_recieved = true;
     }
 }
 
@@ -287,6 +287,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Start)
     {
+        _msg102_recieved = false; // reset in case it is true after autodetect, so we do not send msg before d1 = true and first 102 recieved after this.
         SetSwitchD1(true); // will trigger car sending can
 
         SetState(ChargerState::WaitForCarReadyToCharge);
@@ -310,7 +311,9 @@ void ChademoCharger::RunStateMachine()
             // Mainly we had to go this far (switch(k)) to be sure SOC could be trusted
 
             SetSwitchD1(false);
-            _sendMessages = false;
+            // even if we set to false, a recieve of 102 will enable it again..agains our will..
+            // allthou we are not supposed to get can after D1 off, I am not really sure...
+            //_sendMessages = false;
 
             _autoDetect = false;
 
@@ -439,7 +442,7 @@ void ChademoCharger::RunStateMachine()
     {
         // this stops can
         SetSwitchD1(false);
-        _sendMessages = false;
+        //_sendMessages = false;
 
         SetState(ChargerState::End);
     }
@@ -506,28 +509,24 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
 {
     if (id == 0x100)
     {
-        _global.cha100++;
+//        _global.cha100++;
         _msg100_pending = true;
         _msg100_isr.pair[0] = data[0];
         _msg100_isr.pair[1] = data[1];
     }
     else if (id == 0x101)
     {
-        _global.cha101++;
+  //      _global.cha101++;
         _msg101_pending = true;
         _msg101_isr.pair[0] = data[0];
         _msg101_isr.pair[1] = data[1];
     }
     else if (id == 0x102)
     {
-        _global.cha102++;
+    //    _global.cha102++;
         _msg102_pending = true;
         _msg102_isr.pair[0] = data[0];
         _msg102_isr.pair[1] = data[1];
-    }
-    else
-    {
-        _global.chaOther++;
     }
 }
 
@@ -606,11 +605,10 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 
 void ChademoCharger::SendChargerMessages()
 {
-    // update even if not sending
-    UpdateChargerMessages();
-
-    if (_sendMessages)
+    if (_switch_d1 && _msg102_recieved)
     {
+        UpdateChargerMessages();
+
         can_transmit_blocking_fifo(CAN1, 0x108, 0x108 > 0x7FF, false, 8, _msg108.bytes);
         can_transmit_blocking_fifo(CAN1, 0x109, 0x109 > 0x7FF, false, 8, _msg109.bytes);
     }

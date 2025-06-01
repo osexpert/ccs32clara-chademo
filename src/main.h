@@ -59,18 +59,17 @@ extern "C" {
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
 
-        int cha100 = 0;
-        int cha101 = 0;
-        int cha102 = 0;
-        int chaOther = 0;
+        //int cha100 = 0;
+        //int cha101 = 0;
+        //int cha102 = 0;
 
-        int cha108 = 0;
-        int cha109 = 0;
+        //int cha108 = 0;
+        //int cha109 = 0;
 
-        uint32_t cha108last = 0;
-        uint32_t cha108dur = 0;
-        uint32_t cha109last = 0;
-        uint32_t cha109dur = 0;
+        //uint32_t cha108last = 0;
+        //uint32_t cha108dur = 0;
+        //uint32_t cha109last = 0;
+        //uint32_t cha109dur = 0;
     };
 
 

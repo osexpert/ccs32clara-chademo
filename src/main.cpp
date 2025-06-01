@@ -294,25 +294,24 @@ void print_sysinfo()
         float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
 
         // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d 100c:%d 101c:%d 102c:%d 108c:%d 109c:%d ???c:%d 108l:%d 108d:%d 109l:%d 109d:%d\r\n",
+        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
             system_millis / 1000,
             FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
             FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
             FP_FROMFLT(vdd_voltage),
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
-            _global.ccsDeliveredAmpsEvent,
-            _global.cha100,
-            _global.cha101,
-            _global.cha102,
-            _global.cha108,
-            _global.cha109,
-            _global.chaOther,
+            _global.ccsDeliveredAmpsEvent
+            //_global.cha100,
+            //_global.cha101,
+            //_global.cha102,
+            //_global.cha108,
+            //_global.cha109,
 
-            _global.cha108last,
-            _global.cha108dur,
-            _global.cha109last,
-            _global.cha109dur
+            //_global.cha108last,
+            //_global.cha108dur,
+            //_global.cha109last,
+            //_global.cha109dur
 
         );
 
