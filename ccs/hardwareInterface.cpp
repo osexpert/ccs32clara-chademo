@@ -77,7 +77,8 @@ void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
 
-//    _global.ccsPowerRelayOnTrigger_prechargeDone = true;
+    // abuse the fact that this is called at end of preCharge
+    _global.ccsPreChargeDoneEvent = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
@@ -158,4 +159,16 @@ void hardwareInterface_LogTheCpPpPhysicalData(void)
 //      addToTrace(MOD_HWIF, "AdcProximityPilot ", (int16_t)Param::GetInt(Param::AdcProximityPilot));
 //      addToTrace(MOD_HWIF, "ResistanceProxPilot [ohm] ", (int16_t)Param::GetInt(Param::ResistanceProxPilot));
 //      addToTrace(MOD_HWIF, "HardwareVariant ", (int16_t)Param::GetInt(Param::HardwareVariant));
+}
+
+bool hardwareInterface_prechargeDoneKickoff()
+{
+    bool canComplete = _global.ccsPreChargeDoneKickoff;
+
+    if (canComplete)
+        printf("[cha] ccs precharge is done and can continue\r\n");
+    else
+        printf("[cha] ccs precharge is done, but we hold it back until chademo is ready\r\n");
+
+    return canComplete;
 }

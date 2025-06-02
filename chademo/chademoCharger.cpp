@@ -280,9 +280,9 @@ void ChademoCharger::RunStateMachine()
         // It may be that PowerDelivery is a better place (this is after PreCharge).
 
         // when this happen, ChargeParameterDiscovery is done
-        bool hasChargeParameters = _chargerData.AvailableOutputCurrent > 0 && _chargerData.AvailableOutputVoltage > 0;
-        //if (IsPreChargeStarted())
-        if (hasChargeParameters)
+        //bool hasChargeParameters = _chargerData.AvailableOutputCurrent > 0 && _chargerData.AvailableOutputVoltage > 0;
+        if (_global.ccsPreChargeStartedEvent)
+        //if (hasChargeParameters)
         {
             SetState(ChargerState::Start);
         }
@@ -358,7 +358,12 @@ void ChademoCharger::RunStateMachine()
         // New idea: since ccs closes relays at end of precharge, this matches well with chademo car closing them soon(?) after we set D2=true.
         // Sometimes the car does not close contactors after d2=true but instead fails...don't know why....
         // Max 20sec from CarReadyToCharge to D2=true (should be plenty?)
-        if (IsPreChargeStarted())
+        //if (IsPreChargeStarted())
+
+        // prevent precharge from completing before we get here.
+        _global.ccsPreChargeDoneKickoff = true;
+
+        if (_global.ccsPreChargeDoneEvent)
         {
             // give car power for its contactors (it need both d1 and d2)
             SetSwitchD2(true);
@@ -380,6 +385,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
     {
+        // normally happens 3sec after we set D2=true
         if (_carData.AskingAmps > 0)
         {
             // At this point (car asked for amps), CAR_STATUS_STOP_BEFORE_CHARGING is no longer valid (State >= ChargingLoop)

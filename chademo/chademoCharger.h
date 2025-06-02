@@ -369,8 +369,8 @@ class ChademoCharger
 {
 public:
     void UpdateChargerMessages();
-    bool IsCurrentDemandStarted();
-    bool IsPreChargeStarted();
+  //  bool IsCurrentDemandStarted();
+//    bool IsPreChargeStarted();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
     void SendChargerMessages();

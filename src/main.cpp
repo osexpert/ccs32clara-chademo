@@ -520,7 +520,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.8\r\n");
+    printf("ccs32clara-chademo v0.9\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000

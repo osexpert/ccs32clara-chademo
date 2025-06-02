@@ -32,16 +32,16 @@ void ChademoCharger::SetSwitchD1(bool set)
     _switch_d1 = set;
 };
 
-bool ChademoCharger::IsCurrentDemandStarted()
-{
-    return _global.ccsCurrentDemandStartedEvent;
-};
+//bool ChademoCharger::IsCurrentDemandStarted()
+//{
+//    return _global.ccsCurrentDemandStartedEvent;
+//};
 
-bool ChademoCharger::IsPreChargeStarted()
-{
-    //return _global.ccsPowerRelayOnTrigger_prechargeDone;
-    return _global.ccsPreChargeStartedEvent;
-};
+//bool ChademoCharger::IsPreChargeStarted()
+//{
+//    //return _global.ccsPowerRelayOnTrigger_prechargeDone;
+//    return _global.ccsPreChargeStartedEvent;
+//};
 
 bool ChademoCharger::GetSwitchK()
 {

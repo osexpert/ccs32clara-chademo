@@ -40,6 +40,8 @@ extern void hardwareInterface_LogTheCpPpPhysicalData();
 //extern void hardwareInterface_cyclic(void);
 //extern void hardwareInterface_init(void);
 
+extern bool hardwareInterface_prechargeDoneKickoff();
+
 #ifdef __cplusplus
 }
 #endif
