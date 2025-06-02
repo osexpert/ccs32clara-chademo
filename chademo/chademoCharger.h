@@ -184,7 +184,7 @@ enum StopReason
 
 #define CHARGER_STATE_LIST \
     X(Idle, 0) \
-    X(PreStart_AutoDetectCompleted_WaitForPreChargeDone, 0) \
+    X(PreStart_AutoDetectCompleted_WaitForPreChargeStarted, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
     X(CarReadyToCharge, 0) \
@@ -321,7 +321,6 @@ struct CarData
 
     uint16_t CyclesSinceLastAskingAmps;
 
-    //ushort BattNominalVoltage = > (ushort)Program.get_estimated_nominal_voltage(TargetVoltage);
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
@@ -375,28 +374,21 @@ class ChademoCharger
 public:
     void UpdateChargerMessages();
     bool IsCurrentDemandStarted();
-    bool IsPreChargeDone();
+    bool IsPreChargeStarted();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
     bool IsAutoDetectCompleted();
-  
-	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
-    
+  	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, int delay_ms = 0);
-
     void NotifyCarContactorsOpen();
-
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
-  
     bool IsChargingStoppedByAdapter();
-    
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
-
     bool GetSwitchK();
 
     bool IsPowerOffOk()
@@ -413,24 +405,20 @@ public:
     void NotifyCarContactorsClosed();
     void PerformInsulationTest() { /* NOP */ }
     
-        void EnableAutoDetect(bool enable);
+    void EnableAutoDetect(bool enable);
     void NotifyCarAskingForAmps()
     {
         // NOP
     };
 
     bool IsChargingStoppedByCharger();
-    
-   
     void Log(bool force = false);
-
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t max_sec);
     bool IsTimeoutAndStopSec(uint16_t max_sec);
 
-    int _delayCycles = 0;
-
     private:
+        int _delayCycles = 0;
         int _logCycleCounter = 0;
         bool _powerOffOk = true;
         int _cyclesInState = 0;
@@ -446,7 +434,6 @@ public:
         bool _switch_k = false;
         bool _switch_d1 = false;
 
-//        bool _sendMessages = false;
         bool _msg102_recieved = false;
 
         bool _autoDetect = false;
@@ -458,8 +445,9 @@ public:
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
-
         ChargerState _state = ChargerState::Idle;
         CarData _carData = {};
         ChargerData _chargerData = {};
+
+        StopReason _stopReason = StopReason::NONE;
 };

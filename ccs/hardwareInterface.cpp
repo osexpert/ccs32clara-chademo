@@ -31,7 +31,7 @@ void hardwareInterface_simulateCharging(void)
 int16_t hardwareInterface_getInletVoltage(void)
 {
     // only called in precharge, so we can abuse it as trigger
-   // _global.ccsPreChargeStartedEvent = true;
+    _global.ccsPreChargeStartedEvent = true;
 
     // we have no inlet voltage sensor. 
     return Param::GetInt(Param::EvseVoltage);
@@ -77,7 +77,7 @@ void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
 
-    _global.ccsPowerRelayOnTrigger_prechargeDone = true;
+//    _global.ccsPowerRelayOnTrigger_prechargeDone = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling

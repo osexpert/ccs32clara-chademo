@@ -27,10 +27,10 @@ uint16_t myethreceivebufferLen;
 uint16_t debugCounter_cutted_myethreceivebufferLen;
 
 
-inline void small_delay()
-{
-    __asm__ volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop");       // Small delay
-}
+//inline void small_delay()
+//{
+//    __asm__ volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop");       // Small delay
+//}
 
 
 /// <summary>
@@ -53,14 +53,14 @@ uint8_t read_write_byte(uint8_t param)
     // Set Clock high
     DigIo::spi_clock_out.Set();
 
-    small_delay();
+//    small_delay();
 
     for (int bit = 7; bit >= 0; --bit) {
 
         // Clock low
         DigIo::spi_clock_out.Clear();
 
-        small_delay();
+//        small_delay();
 
         // Send bit
         if ((param >> bit) & 1)
@@ -71,7 +71,7 @@ uint8_t read_write_byte(uint8_t param)
         // Clock high
         DigIo::spi_clock_out.Set();
 
-        small_delay();
+//        small_delay();
 
         // Read bit
         bool read = DigIo::spi_miso_in.Get();
@@ -94,7 +94,7 @@ static void mySpiTransmitReceive()
     //while (SPI_SR(SPI1) & SPI_SR_BSY);
     DigIo::spi_cs_out.Clear();
 
-    small_delay();
+//    small_delay();
 
     for (uint32_t i = 0; i < mySpiDataSize; i++) 
     {

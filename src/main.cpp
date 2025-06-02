@@ -56,7 +56,7 @@
 //#define __enable_irq()  __asm__ volatile ("cpsie i")
 
 ChademoCharger* chademoCharger;
-StatusIndicator* ledBlinker;
+LedBlinker* ledBlinker;
 
 Stm32Scheduler* scheduler;
 
@@ -66,8 +66,6 @@ global_data _global;
  * overflows every 49 days if you're wondering
  */
 volatile uint32_t system_millis;
-// volatile?
-
 
 #define AUTO_POWER_OFF_LIMIT_SEC (60 * 5)
 
@@ -147,7 +145,7 @@ extern "C" void __cxa_pure_virtual()
 
 
 
-void StatusIndicator::applyLed(bool set)
+void LedBlinker::applyLed(bool set)
 {
     if (set)
     {
@@ -301,17 +299,6 @@ void print_sysinfo()
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.ccsDeliveredAmpsEvent
-            //_global.cha100,
-            //_global.cha101,
-            //_global.cha102,
-            //_global.cha108,
-            //_global.cha109,
-
-            //_global.cha108last,
-            //_global.cha108dur,
-            //_global.cha109last,
-            //_global.cha109dur
-
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
@@ -374,15 +361,11 @@ static void Ms100Task(void)
             {
                 _global.stopButtonEvent = true; // one way street
                 printf("Stop button pressed briefly (before ccsKickoff). Stop pending...\r\n");
-
-                //ledBlinker->setPattern(blink_sff); // short blinking
             }
             else if (buttonPressed5Seconds)
             {
                 _global.stopButtonEvent = true; // one way street
                 printf("Stop button pressed for 5 seconds (after ccsKickoff). Stop pending...\r\n");
-
-                //ledBlinker->setPattern(blink_off); // short blinking
             }
         }
 
@@ -401,12 +384,6 @@ static void Ms100Task(void)
         _global.ccsDeliveredAmpsEvent = true; // triggered
     }
 
-    // todo: use plug locked trigger instead?
-    //if (!_global.stopButtonEvent && _global.ccsDeliveredAmpsEvent)
-    //{
-    //    ledBlinker->setPattern(blink_working); // long blinking
-    //}
-
     power_off_check();
 
     print_sysinfo();
@@ -424,7 +401,6 @@ static void Ms30Task()
         if (_global.ccsKickoff)
         {
             printf("ccs kickoff, cha autodetect completed\r\n");
-            //ledBlinker->setPattern(blink_two);
         }
         //        else
           //          _cyclesWaitingForCcsStart++; auto power off attempt...
@@ -546,7 +522,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.7\r\n");
+    printf("ccs32clara-chademo v0.8\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -572,10 +548,7 @@ extern "C" int main(void)
     chademoCharger->EnableAutoDetect(true);
     chademoCharger->SetState(ChargerState::Start);
 
-    // !hack
-//    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial hack
-
-    StatusIndicator lb;
+    LedBlinker lb;
     ledBlinker = &lb;
 
     // scheduler and TIM4 stuff
@@ -585,13 +558,6 @@ extern "C" int main(void)
 
     nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
     nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
-
-
-    // temp hack
-//    Param::SetInt(Param::EvseMaxVoltage, 464);
-    // I see that sometimes...this changes after car tell its target voltage etc.
-//    Param::SetInt(Param::EvseMaxCurrent, 100);
-    //Param::SetInt(Param::EvseVoltage, 350); // FAKE IT HARD
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */

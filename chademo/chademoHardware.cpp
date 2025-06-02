@@ -37,9 +37,10 @@ bool ChademoCharger::IsCurrentDemandStarted()
     return _global.ccsCurrentDemandStartedEvent;
 };
 
-bool ChademoCharger::IsPreChargeDone()
+bool ChademoCharger::IsPreChargeStarted()
 {
-    return _global.ccsPowerRelayOnTrigger_prechargeDone;
+    //return _global.ccsPowerRelayOnTrigger_prechargeDone;
+    return _global.ccsPreChargeStartedEvent;
 };
 
 
