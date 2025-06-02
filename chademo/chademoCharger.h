@@ -173,12 +173,8 @@ enum StopReason
     CAR_NOT_READY_TO_CHARGE = 0x4,
     CAR_NOT_IN_PARK = 0x8,
     CAR_SWITCH_K_OFF = 0x10,
-    /// <summary>
-    /// Typically the ccs charger want us to stop
-    /// </summary>
-    CHARGER = 0x20,
-    ADAPTER_STOP_BUTTON = 0x40,
-    CAR_ERROR = 0x80,
+    POWER_OFF_PENDING = 0x20,
+    CAR_ERROR = 0x40
 };
 
 
@@ -387,7 +383,6 @@ public:
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
-    bool IsChargingStoppedByAdapter();
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
     bool GetSwitchK();
 
@@ -411,11 +406,15 @@ public:
         // NOP
     };
 
-    bool IsChargingStoppedByCharger();
     void Log(bool force = false);
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t max_sec);
     bool IsTimeoutAndStopSec(uint16_t max_sec);
+
+    StopReason GetStopReason()
+    {
+        return _stopReason;
+    }
 
     private:
         int _delayCycles = 0;

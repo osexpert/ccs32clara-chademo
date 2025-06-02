@@ -130,11 +130,11 @@ bool hardwareInterface_stopChargeRequested()
 {
     uint8_t stopReason = STOP_REASON_NONE;
 
-    if (_global.stopButtonEvent)//  pushbutton_isPressed500ms()) 
+    if (_global.powerOffPending)
     {
         stopReason = STOP_REASON_BUTTON;
         Param::SetInt(Param::StopReason, stopReason);
-        addToTrace(MOD_HWIF, "User pressed the stop button.");
+        addToTrace(MOD_HWIF, "Power off pending.");
     }
 
     if (!Param::GetBool(Param::enable)) 
@@ -143,14 +143,6 @@ bool hardwareInterface_stopChargeRequested()
         Param::SetInt(Param::StopReason, stopReason);
         addToTrace(MOD_HWIF, "Got enable=false.");
     }
-
-
-    //if (Param::GetInt(Param::CanWatchdog) >= CAN_TIMEOUT)// && (Param::GetInt(Param::DemoControl) != DEMOCONTROL_STANDALONE)) {
-    //{
-    //    stopReason = STOP_REASON_CAN_TIMEOUT;
-    //    Param::SetInt(Param::StopReason, stopReason);
-    //    addToTrace(MOD_HWIF, "Timeout of CanWatchdog.");
-    //}
 
     return (stopReason!=STOP_REASON_NONE);
 }

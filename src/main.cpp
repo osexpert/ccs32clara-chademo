@@ -67,7 +67,7 @@ global_data _global;
  */
 volatile uint32_t system_millis;
 
-#define AUTO_POWER_OFF_LIMIT_SEC (60 * 5)
+#define AUTO_POWER_OFF_LIMIT_SEC (60 * 2)
 
 enum LedState
 {
@@ -84,7 +84,7 @@ LedState _state = Init;
 
 void RunLedStateMachine()
 {
-    if (_state != Stop && _global.stopButtonEvent)
+    if (_state != Stop && _global.powerOffPending)
     {
         ledBlinker->setPattern(blink_stop);
         _state = Stop;
@@ -183,6 +183,7 @@ void power_off_no_return(const char* reason)
     // Its better that adapter contactor take the hit than the car, so power it off explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
     {
+		printf("Contactor was closed! This may be bad...\r\n");
         DigIo::contactor_out.Clear();
         msleep(100);
     }
@@ -207,34 +208,55 @@ void power_off_check()
         power_off_no_return("Stop pressed for 30sec -> force off");
     }
 
-    // fixme: power off after charging?
 
-    bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
-
-    bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
-    bool powerOffOkCha = chademoCharger->IsPowerOffOk();
-
-//    bool autoOffImmediatelyAfterCharging = _global.ccsDeliveredAmpsEvent && not_anymore;
-
-    if ((_global.stopButtonEvent || inactivity || _global.ccsDeliveredAmpsEvent) && powerOffOkCcs && powerOffOkCha)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
+    if (!_global.powerOffPending)
     {
-        if (_global.stopButtonEvent)
-            printf("power off: stopButtonEvent (and plugs unlocked)\r\n");
+        bool buttonPressedBriefly = _global.stopButtonCounter > 0;
+        bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
+        bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
+
+        // after _global.ccsKickoff, a short press no longer stops, to allow unplug\plug...fiddling...
+        if (buttonPressedBriefly && !_global.ccsKickoff)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Stop button pressed briefly (before ccsKickoff). Power off pending...\r\n");
+        }
+        if (buttonPressed5Seconds)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Stop button pressed for 5 seconds (after ccsKickoff). Power off pending...\r\n");
+        }
         if (inactivity)
-            printf("power off: inactivity (and plugs unlocked)\r\n");
-        if (_global.ccsDeliveredAmpsEvent)
-            printf("power off: amps delivered (but now plugs are unlocked)\r\n");
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Inactivity. Power off pending...\r\n");
+        }
 
-        power_off_no_return("Plugs unlocked");
+        int ccsStopReason = Param::GetInt(Param::StopReason);
+        if (ccsStopReason != STOP_REASON_NONE)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Ccs stop reason %d. Power off pending...\r\n", ccsStopReason);
+        }
 
-        // I Think it only need to check ccs here, i trust it more. If ccs is not delivering amps, it should not matter what chademo says.
-        //if (lockedCha || lockedCcs)
-        //    //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
-        //{
-        //    //printf("Power off request denied, connector is (logically) locked. pending stop charging. press for 30sec for emergency shutdown.\r\n");
-        //    return;
-        //}
+        StopReason chaStopReason = chademoCharger->GetStopReason(); // do we need one for success? eg. accu full?
+        if (chaStopReason != StopReason::NONE )
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Chademo stop reason %d. Power off pending...\r\n", chaStopReason);
+        }
+    }
 
+
+    if (_global.powerOffPending)
+    {
+        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
+        if (powerOffOkCcs && powerOffOkCha)
+        {
+            power_off_no_return("powerOffPending and both ccs and chademo says plugs are unlocked");
+        }
     }
 }
 
@@ -351,37 +373,15 @@ static void Ms100Task(void)
 
     iwdg_reset();
 
-    if (DigIo::stop_button_in_inverted.Get() == false)
-    {
-        // after _global.ccsKickoff, a short press no longer stop, to allow unplug\plug...to make it kick in...
-        if (!_global.stopButtonEvent)
-        {
-            bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
-            if (!_global.ccsKickoff)
-            {
-                _global.stopButtonEvent = true; // one way street
-                printf("Stop button pressed briefly (before ccsKickoff). Stop pending...\r\n");
-            }
-            else if (buttonPressed5Seconds)
-            {
-                _global.stopButtonEvent = true; // one way street
-                printf("Stop button pressed for 5 seconds (after ccsKickoff). Stop pending...\r\n");
-            }
-        }
-
+    if (DigIo::stop_button_in_inverted.Get() == false) {
         _global.stopButtonCounter++;
     }
-    else
-    {
+    else {
         _global.stopButtonCounter = 0;
     }
 
-    // TODO: maybe simply use Locked state? When locked, we assume chargingAccomplished. Then when unlocked, we power off.
-    // Becuse of we locked and unlocked, it does not matter if we delivered amps or not (for most cases)
-    if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
-    {
-        // dont care about chademo, if amps delivered it has to go somewhere:-)
-        _global.ccsDeliveredAmpsEvent = true; // triggered
+    if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) {
+        _global.ccsDeliveredAmpsEvent = true;
     }
 
     power_off_check();
@@ -402,11 +402,9 @@ static void Ms30Task()
         {
             printf("ccs kickoff, cha autodetect completed\r\n");
         }
-        //        else
-          //          _cyclesWaitingForCcsStart++; auto power off attempt...
     }
 
-    // !hack
+
     if (!_global.ccsKickoff)
         return; 
 

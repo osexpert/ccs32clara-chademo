@@ -205,8 +205,8 @@ void ChademoCharger::SetCcsParamsFromCarData()
         Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
     }
 
-    // min +1 logic is to silence warning in pev_sendCurrentDemandReq for cars who say max and target is the same
-    Param::SetInt(Param::MaxVoltage, max(_carData.MaxBatteryVoltage, (uint16_t)(_carData.TargetBatteryVoltage + 1))); // set max to same as target...NOT ANY MORE
+    // target +1 to silence warning in pev_sendCurrentDemandReq
+    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
 }
 
 bool ChademoCharger::IsTimeoutAndStopSec(uint16_t max_sec)
@@ -256,14 +256,9 @@ void ChademoCharger::RunStateMachine()
             printf("[cha] Car status error before starting\r\n");
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
-        if (IsChargingStoppedByCharger())
+        if (_global.powerOffPending)
         {
-            printf("[cha] Charger stopped before starting\r\n");
-            SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
-        }
-        if (IsChargingStoppedByAdapter())
-        {
-            printf("[cha] Adapter stopped before starting\r\n");
+            printf("[cha] Power off pending before starting\r\n");
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
 
@@ -332,10 +327,24 @@ void ChademoCharger::RunStateMachine()
         }
         else
         {
+            // from a log:
+            // after car ready to change, charger seem to do "precharge" (increase volt to 492-500). Insulation test?
+            // when max is reached (492) charger locks charging plug.
+            // assuming d2 is set here
+            // charger start to decrease voltage, and at about 470volt, car closes contactor (CAR_STATUS_CONTACTOR_OPEN cleared)
+            // car drop more and when dropping past 410, car start to ask for amps.
+            // So....to simulate this...we could:
+            // - precharge to 500v (after precharge, and in currentDemand with 410volt, we can hope voltage gradually drop (no guarantee....))
+            // End of precharge will kickoff this:
+            // - lock plug
+            // - set d2 = true
+            // Car will eventually close contactors. Profit.
+
             LockChargingPlug(true);
 
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
+            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED); // aka. energizing state
 
+            // increase volts to 500V. make sure they do not drop (it would be eg. because a leakage or grounding problem)
             PerformInsulationTest();
 
             SetState(ChargerState::WaitForCurrentDemandStart);
@@ -348,6 +357,7 @@ void ChademoCharger::RunStateMachine()
 
         // New idea: since ccs closes relays at end of precharge, this matches well with chademo car closing them soon(?) after we set D2=true.
         // Sometimes the car does not close contactors after d2=true but instead fails...don't know why....
+        // Max 20sec from CarReadyToCharge to D2=true (should be plenty?)
         if (IsPreChargeStarted())
         {
             // give car power for its contactors (it need both d1 and d2)
@@ -395,8 +405,7 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_NOT_IN_PARK)) set_flag(&_stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_ERROR)) set_flag(&_stopReason, StopReason::CAR_ERROR);
         if (_switch_k == false) set_flag(&_stopReason, StopReason::CAR_SWITCH_K_OFF);
-        if (IsChargingStoppedByCharger()) set_flag(&_stopReason, StopReason::CHARGER);
-        if (IsChargingStoppedByAdapter()) set_flag(&_stopReason, StopReason::ADAPTER_STOP_BUTTON);
+        if (_global.powerOffPending) set_flag(&_stopReason, StopReason::POWER_OFF_PENDING);
         if (_carData.CyclesSinceLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&_stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&_stopReason, StopReason::CHARGING_TIME);
 
@@ -686,8 +695,3 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     }
 }
 
-bool ChademoCharger::IsChargingStoppedByCharger()
-{
-    // TODO: any reason to not use ::enabled? Yes...ccs never set ::enabled, it only reads it.
-    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
-}

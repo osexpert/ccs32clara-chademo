@@ -43,15 +43,9 @@ bool ChademoCharger::IsPreChargeStarted()
     return _global.ccsPreChargeStartedEvent;
 };
 
-
 bool ChademoCharger::GetSwitchK()
 {
     return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
-};
-
-bool ChademoCharger::IsChargingStoppedByAdapter()
-{
-    return _global.stopButtonEvent;
 };
 
 /// <summary>
