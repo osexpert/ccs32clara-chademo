@@ -44,7 +44,7 @@ static uint32_t TcpSeqNr=200; /* a "random" start sequence number */
 static uint32_t TcpAckNr;
 static uint32_t tcp_debug_totalRetryCounter;
 
-static uint16_t highestWrongPort = 0;
+//static uint16_t highestWrongPort = 0;
 
 /*** local function prototypes ****************************************************/
 
@@ -92,11 +92,11 @@ void evaluateTcpPacket(void)
        // edit: Yes, it seems to help. I did not get reset of wrong ported packages to work thou, but should be possible too.
        // But also...to reduce overlapping/conflicting/reuse of ports, use higher ports than the one we got.
 
-       if (destinationPort > highestWrongPort)
-           highestWrongPort = destinationPort;
+//       if (destinationPort > highestWrongPort)
+  //         highestWrongPort = destinationPort;
 
       //addToTrace(MOD_TCP, "[TCP] wrong port.");
-      printf("[TCP] wrong port src:%d/%d dst:%d/%d highest_wrong:%d\r\n", sourcePort, seccTcpPort, destinationPort, evccPort, highestWrongPort);
+      printf("[TCP] wrong port src:%d/%d dst:%d/%d\r\n", sourcePort, seccTcpPort, destinationPort, evccPort);
 
 //      tcp_sendReset_reply();
 
@@ -454,13 +454,14 @@ void tcp_Mainfunction(void)
       /* SDP is finished, but no TCP connected yet. */
       /* use a new port */
 
-      if (evccPort < highestWrongPort)
-        evccPort = highestWrongPort + 10; // try to get some distance (+10) from the wrongness
-      else
-        evccPort++;
+      //if (evccPort < highestWrongPort)
+      //  evccPort = highestWrongPort + 10; // try to get some distance (+10) from the wrongness
+      //else
+
+      evccPort++;
 
       if (evccPort>65000) evccPort=60000;
-      printf("[TCP] Connect with port %d (highest_wrong:%d)\r\n", evccPort, highestWrongPort);
+      printf("[TCP] Connect with port %d\r\n", evccPort);
       tcp_connect();
    }
 }

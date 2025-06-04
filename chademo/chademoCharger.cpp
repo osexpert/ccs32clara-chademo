@@ -272,29 +272,11 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE))
         {
-            // from a log:
-            // after car ready to change, charger seem to do "precharge" (increase volt to 492-500). Insulation test?
-            // when max is reached (492) charger locks charging plug.
-            // assuming d2 is set here
-            // charger start to decrease voltage, and at about 470volt, car closes contactor (CAR_STATUS_CONTACTOR_OPEN cleared)
-            // car drop more and when dropping past 410, car start to ask for amps.
-            // So....to simulate this...we could:
-            // - precharge to 500v (after precharge, and in currentDemand with 410volt, we can hope voltage gradually drop (no guarantee....))
-            // End of precharge will kickoff this:
-            // - lock plug
-            // - set d2 = true
-            // Car will eventually close contactors. Profit.
-
-            LockChargingPlug(true);
-
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED); // aka. energizing state
+            _powerOffOk = false;
 
             // car probably want to compare that output voltage we claim matches what it can measure (it can probably measure volts before its contactors)
             // FIXME: maybe it should be a different place...
-            CloseAdapterContactor();
-
-            // increase volts to 500V. make sure they do not drop (it would be eg. because a leakage or grounding problem)
-            PerformInsulationTest();
+//            CloseAdapterContactor();
 
             SetState(ChargerState::WaitForPreChangeDone);
         }
@@ -315,7 +297,9 @@ void ChademoCharger::RunStateMachine()
         {
             // the car need live volts so it can measure and compare what we say we have is what it sees, specially when we say volts are not 0.
             // not sure if this is the right place, maybe we could close it even earlier, right after LockChargingPlug
-//            CloseAdapterContactor();
+            CloseAdapterContactor();
+
+            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING);
 
             // give car power for its contactors (it need both d1 and d2)
             SetSwitchD2(true);
@@ -332,6 +316,9 @@ void ChademoCharger::RunStateMachine()
         // for cha 0.9 this is always 0?
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) == false)
         {
+            // hard to tell where it make sense to do this....it depends totally on if the car uses voltage measurements _before_ the contactors, in its logic
+//            CloseAdapterContactor();
+
             // AFTER CAR OPEN CONTACTOR, it will start asking for amps pretty fast. and if it dont get it, it will fail pretty fast too.....
             SetState(ChargerState::WaitForCarAskingAmps);
         }
@@ -417,16 +404,14 @@ void ChademoCharger::RunStateMachine()
             OpenAdapterContactor();
 
             // spec says, after setting D2:false wait 0.5sec (500ms) before setting D1:false. We have 2 states after, so we already have 2 * 200ms and 300ms left.
-            SetState(ChargerState::Stopping_WaitForLowVolts, 300);
+            SetState(ChargerState::Stopping_WaitForLowVolts, 3);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
         if (_chargerData.OutputVoltage <= 10 || IsTimeoutSec(10))
         {
-            // safe to unlock plug
-            LockChargingPlug(false);
-            clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED);
+            clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING);
 
             // do stop can in own state to make sure we send this message to car before we kill can
             SetState(ChargerState::Stopping_End);
@@ -446,12 +431,12 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
-void ChademoCharger::SetState(ChargerState newState, int delay_ms)
+void ChademoCharger::SetState(ChargerState newState, int delayCycles)
 {
     printf("[cha] enter state %d/%s\r\n", newState, _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
-    _delayCycles = delay_ms / CHA_CYCLE_MS;
+    _delayCycles = delayCycles;
 
     // force log on state change
     Log(true);

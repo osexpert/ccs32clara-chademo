@@ -142,9 +142,9 @@ enum ChargerStatus
 
     /// <summary>
     /// 109.5.2
-    /// connector is currently locked (electromagnetic lock, plug locked into the car)
+    /// connector is currently locked (electromagnetic lock, plug locked into the car)??? Or is it related to locking at all????
     /// </summary>
-    CHARGER_STATUS_PLUG_LOCKED = 0x4,
+    CHARGER_STATUS_ENERGIZING = 0x4,
 
     /// <summary>
     /// 109.5.3
@@ -179,36 +179,36 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
-    X(WaitForPreChargeStart, 0) \
-    X(WaitForCarReadyToCharge, 0) \
-    X(WaitForPreChangeDone, 0) \
-    X(WaitForCarContactorsClosed, 8) \
-    X(WaitForCarAskingAmps, 0) \
-    X(ChargingLoop, 0) \
-    X(Stopping_Start, 0) \
-    X(Stopping_WaitForLowAmps, 0) \
-    X(Stopping_WaitForCarContactorsOpen, 0) \
-    X(Stopping_WaitForLowVolts, 0) \
-    X(Stopping_End, 0) \
-    X(Stopped, 0)
+    X(WaitForPreChargeStart) \
+    X(WaitForCarReadyToCharge) \
+    X(WaitForPreChangeDone) \
+    X(WaitForCarContactorsClosed) \
+    X(WaitForCarAskingAmps) \
+    X(ChargingLoop) \
+    X(Stopping_Start) \
+    X(Stopping_WaitForLowAmps) \
+    X(Stopping_WaitForCarContactorsOpen) \
+    X(Stopping_WaitForLowVolts) \
+    X(Stopping_End) \
+    X(Stopped)
 
 enum ChargerState {
-#define X(name, timeout) name,
+#define X(name) name,
     CHARGER_STATE_LIST
 #undef X
 };
 
 const char* const _stateNames[] = {
-#define X(name, timeout) #name,
+#define X(name) #name,
     CHARGER_STATE_LIST
 #undef X
 };
 
-const uint16_t _stateTimeoutsSec[] = {
-#define X(name, timeout) timeout,
-    CHARGER_STATE_LIST
-#undef X
-};
+//const uint16_t _stateTimeoutsSec[] = {
+//#define X(name, timeout) timeout,
+//    CHARGER_STATE_LIST
+//#undef X
+//};
 
 #pragma pack(push, 1)
 
@@ -376,7 +376,7 @@ public:
     void RunStateMachine(void);
     void Run();
   	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
-    void SetState(ChargerState newState, int delay_ms = 0);
+    void SetState(ChargerState newState, int delayCycles = 0);
     void OpenAdapterContactor();
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
@@ -389,14 +389,7 @@ public:
         return _powerOffOk;
     }
 
-    void LockChargingPlug(bool lock)
-    {
-        if (lock)
-            _powerOffOk = false;
-    };
-
     void CloseAdapterContactor();
-    void PerformInsulationTest() { /* NOP */ }
     
     void Log(bool force = false);
     const char* GetStateName();
