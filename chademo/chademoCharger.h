@@ -179,20 +179,18 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
-    X(Idle, 0) \
-    X(PreStart_AutoDetectCompleted_WaitForPreChargeStarted, 0) \
-    X(Start, 0) \
+    X(WaitForPreChargeStart, 0) \
     X(WaitForCarReadyToCharge, 0) \
-    X(CarReadyToCharge, 0) \
-    X(WaitForCurrentDemandStart, 0) \
+    X(WaitForPreChangeDone, 0) \
     X(WaitForCarContactorsClosed, 8) \
     X(WaitForCarAskingAmps, 0) \
     X(ChargingLoop, 0) \
+    X(Stopping_Start, 0) \
     X(Stopping_WaitForLowAmps, 0) \
     X(Stopping_WaitForCarContactorsOpen, 0) \
     X(Stopping_WaitForLowVolts, 0) \
-    X(Stopping_StopCan, 0) \
-    X(End, 0)
+    X(Stopping_End, 0) \
+    X(Stopped, 0)
 
 enum ChargerState {
 #define X(name, timeout) name,
@@ -312,16 +310,17 @@ struct CarData
     uint16_t MaxChargingTimeSec;
 
     // Valid after kSwitch
-    uint16_t TargetBatteryVoltage;
+    uint16_t TargetBatteryVoltage = 410;
     uint16_t EstimatedBatteryVoltage;
 
-    uint16_t CyclesSinceLastAskingAmps;
+    uint16_t CyclesSinceCarLastAskingAmps;
 
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
     // PS: unstable before switch (k)
-    uint8_t SocPercent;
+    // fake initial 10 perc.
+    uint8_t SocPercent = 20;
 
     CarStatus Status;
     CarFaults Faults;
@@ -376,7 +375,6 @@ public:
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
-    bool IsAutoDetectCompleted();
   	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, int delay_ms = 0);
     void NotifyCarContactorsOpen();
@@ -400,17 +398,10 @@ public:
     void NotifyCarContactorsClosed();
     void PerformInsulationTest() { /* NOP */ }
     
-    void EnableAutoDetect(bool enable);
-    void NotifyCarAskingForAmps()
-    {
-        // NOP
-    };
-
     void Log(bool force = false);
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t max_sec);
-    bool IsTimeoutAndStopSec(uint16_t max_sec);
-
+    
     StopReason GetStopReason()
     {
         return _stopReason;
@@ -435,8 +426,6 @@ public:
 
         bool _msg102_recieved = false;
 
-        bool _autoDetect = false;
-
         bool _stop_delivering_amps = false;
         bool _stop_delivering_volts = false;
 
@@ -444,7 +433,7 @@ public:
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
-        ChargerState _state = ChargerState::Idle;
+        ChargerState _state = ChargerState::WaitForPreChargeStart;
         CarData _carData = {};
         ChargerData _chargerData = {};
 

@@ -27,10 +27,10 @@ uint16_t myethreceivebufferLen;
 uint16_t debugCounter_cutted_myethreceivebufferLen;
 
 
-//inline void small_delay()
-//{
-//    __asm__ volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop");       // Small delay
-//}
+inline void small_delay()
+{
+    __asm__ volatile ("nop\nnop\nnop\nnop\nnop\nnop\nnop");       // Small delay
+}
 
 
 /// <summary>
@@ -42,7 +42,7 @@ uint16_t debugCounter_cutted_myethreceivebufferLen;
 /// 3 small_delay() calls per bit:
 /// after setting clock high at start, after clock low,
 /// after clock high before reading MISO
-/// This roughly adds up to around 80 - 90 ns per clock period, matching QCA7000 spec (The SPI CLK period should not be less than 83.3 ns)
+/// This roughly adds up to around 80 - 90 ns per clock period, matching QCA7000 spec (The SPI CLK period should not be less than 83.3 ns, ca. 12MHz)
 /// </summary>
 /// <param name="param"></param>
 /// <returns></returns>
@@ -53,14 +53,14 @@ uint8_t read_write_byte(uint8_t param)
     // Set Clock high
     DigIo::spi_clock_out.Set();
 
-//    small_delay();
+    small_delay();
 
     for (int bit = 7; bit >= 0; --bit) {
 
         // Clock low
         DigIo::spi_clock_out.Clear();
 
-//        small_delay();
+        small_delay();
 
         // Send bit
         if ((param >> bit) & 1)
@@ -71,7 +71,7 @@ uint8_t read_write_byte(uint8_t param)
         // Clock high
         DigIo::spi_clock_out.Set();
 
-//        small_delay();
+        small_delay();
 
         // Read bit
         bool read = DigIo::spi_miso_in.Get();
@@ -94,7 +94,7 @@ static void mySpiTransmitReceive()
     //while (SPI_SR(SPI1) & SPI_SR_BSY);
     DigIo::spi_cs_out.Clear();
 
-//    small_delay();
+    small_delay();
 
     for (uint32_t i = 0; i < mySpiDataSize; i++) 
     {
@@ -104,21 +104,6 @@ static void mySpiTransmitReceive()
     DigIo::spi_cs_out.Set();
 
     cm_enable_interrupts();
-}
-
-// signature reads 0 the first time, second time it reads ok, for unknown and weird reason...
-// writing one dummy byte seems to fix it....but I don't like it (ugly hack)
-void dummy_warmup_rw_one_byte(void) {
-    uint8_t i;
-    i = 0;
-    mySpiTxBuffer[i++] = 0x00;
-    mySpiDataSize = i;
-    mySpiTransmitReceive();
-}
-
-void qca7000setup() 
-{
-    dummy_warmup_rw_one_byte();
 }
 
 static void spiQCA7000DemoReadSignature(void) {
@@ -137,6 +122,12 @@ static void spiQCA7000DemoReadSignature(void) {
   sig <<= 8;
   sig += mySpiRxBuffer[3];
   printf("QCA7000 sig is 0x%X\r\n", sig); /* should be AA 55  */
+}
+
+void qca7000setup()
+{
+    // dummy read sig once to get things going. The first read always seem to return 0's.
+    spiQCA7000DemoReadSignature();
 }
 
 static void spiQCA7000DemoWriteBFR_SIZE(uint16_t n) {

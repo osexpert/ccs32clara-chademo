@@ -45,7 +45,6 @@ extern "C" {
     struct global_data
     {
         int stopButtonCounter = 0;
-        bool ccsKickoff = false;
         bool powerOffPending = false;
 
         // ccs delivered 1 amps or more
@@ -54,6 +53,8 @@ extern "C" {
         bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
         bool ccsPreChargeDoneKickoff = false;
+        bool ccSlacDoneEvent = false;
+        bool ccsPevStateMachineStartedEvent = false;
        // bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;

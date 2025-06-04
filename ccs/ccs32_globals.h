@@ -41,7 +41,7 @@
 
 /* temporary stubs */
 #define publishStatus(x, y)
-#define log_v(x, ...) printf(x, __VA_ARGS__)
+//#define log_v(x, ...) printf(x, __VA_ARGS__)
 
 
 

@@ -72,8 +72,7 @@ volatile uint32_t system_millis;
 enum LedState
 {
     Init,
-    WaitForCcsStarted,
-    WaitForSDPStart,
+    WaitForSlacDone,
     WaitForPevStateMachineStarted,
     WaitForCurrentDemandLoop,
     WaitForDeliveringAmps,
@@ -93,29 +92,21 @@ void RunLedStateMachine()
     if (_state == Init)
     {
         ledBlinker->setPattern(blink_one);
-        _state = WaitForCcsStarted;
+        _state = WaitForSlacDone;
     }
-    else if (_state == WaitForCcsStarted)
+    else if (_state == WaitForSlacDone)
     {
-        if (_global.ccsKickoff)
+        if (_global.ccSlacDoneEvent)
         {
             ledBlinker->setPattern(blink_two);
-            _state = WaitForSDPStart;
-        }
-    }
-    else if (_state == WaitForSDPStart)
-    {
-        if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
-        {
-            ledBlinker->setPattern(blink_three);
-            _state = WaitForCurrentDemandLoop;
+            _state = WaitForPevStateMachineStarted;
         }
     }
     else if (_state == WaitForPevStateMachineStarted)
     {
-        if (Param::GetInt(Param::checkpoint) >= 400)
+        if (_global.ccsPevStateMachineStartedEvent)
         {
-            ledBlinker->setPattern(blink_four);
+            ledBlinker->setPattern(blink_three);
             _state = WaitForCurrentDemandLoop;
         }
     }
@@ -123,7 +114,7 @@ void RunLedStateMachine()
     {
         if (_global.ccsCurrentDemandStartedEvent)
         {
-            ledBlinker->setPattern(blink_five);
+            ledBlinker->setPattern(blink_four);
             _state = WaitForDeliveringAmps;
         }
     }
@@ -215,11 +206,11 @@ void power_off_check()
         bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
 
-        // after _global.ccsKickoff, a short press no longer stops, to allow unplug\plug...fiddling...
-        if (buttonPressedBriefly && !_global.ccsKickoff)
+        // allow instant power off before Slac is done (adapter not connected or never entered Slac)
+        if (buttonPressedBriefly && !_global.ccSlacDoneEvent)
         {
             _global.powerOffPending = true; // one way street
-            printf("Stop button pressed briefly (before ccsKickoff). Power off pending...\r\n");
+            printf("Stop button pressed briefly (before SLAC). Power off pending...\r\n");
         }
         if (buttonPressed5Seconds)
         {
@@ -252,6 +243,8 @@ void power_off_check()
     {
         bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
+        // fixme: this does not work. started precharge, then tcp died, and it hang forever. guessing lock was never opened again.
 
         if (powerOffOkCcs && powerOffOkCha)
         {
@@ -312,15 +305,21 @@ void print_sysinfo()
 
         float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
 
+        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
         // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
+        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d pwr_off:%d/%d/%d\r\n",
             system_millis / 1000,
             FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
             FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
             FP_FROMFLT(vdd_voltage),
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
-            _global.ccsDeliveredAmpsEvent
+            _global.ccsDeliveredAmpsEvent,
+            _global.powerOffPending,
+            powerOffOkCcs,
+            powerOffOkCha
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
@@ -380,8 +379,15 @@ static void Ms100Task(void)
         _global.stopButtonCounter = 0;
     }
 
+    // events
     if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) {
         _global.ccsDeliveredAmpsEvent = true;
+    }
+    if (!_global.ccSlacDoneEvent && Param::GetInt(Param::checkpoint) >= 200) { // in reality SDP (service discovery), but slac is done too
+        _global.ccSlacDoneEvent = true;
+    }
+    if (!_global.ccsPevStateMachineStartedEvent && Param::GetInt(Param::checkpoint) >= 400) {
+        _global.ccsPevStateMachineStartedEvent = true;
     }
 
     power_off_check();
@@ -393,21 +399,6 @@ static void Ms100Task(void)
 
 static void Ms30Task()
 {
-    if (!_global.ccsKickoff)
-    {
-        // chademo will set these and then ccs can start
-        _global.ccsKickoff = chademoCharger->IsAutoDetectCompleted();
-
-        if (_global.ccsKickoff)
-        {
-            printf("ccs kickoff, cha autodetect completed\r\n");
-        }
-    }
-
-
-    if (!_global.ccsKickoff)
-        return; 
-
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
@@ -520,7 +511,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.9\r\n");
+    printf("ccs32clara-chademo v0.10\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -543,8 +534,6 @@ extern "C" int main(void)
 
     ChademoCharger cc;
     chademoCharger = &cc;
-    chademoCharger->EnableAutoDetect(true);
-    chademoCharger->SetState(ChargerState::Start);
 
     LedBlinker lb;
     ledBlinker = &lb;
