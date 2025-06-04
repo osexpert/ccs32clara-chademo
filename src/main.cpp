@@ -67,7 +67,9 @@ global_data _global;
  */
 volatile uint32_t system_millis;
 
-#define AUTO_POWER_OFF_LIMIT_SEC (60 * 2)
+#define AUTO_POWER_OFF_LIMIT_SEC (60 * 3) // Tesla v2 took 2 minutes from boot to CurrentDemandReq, so I think we need 3 minutes...
+#define SYSINFO_EVERY_MS 2000 // 2 sec
+#define CCS_TRACE_EVERY_MS 1000 // 1 sec
 
 enum LedState
 {
@@ -79,46 +81,46 @@ enum LedState
     Stop
 };
 
-LedState _state = Init;
-
 void RunLedStateMachine()
 {
-    if (_state != Stop && _global.powerOffPending)
+    static LedState state = Init;
+
+    if (_global.powerOffPending && state != Stop)
     {
         ledBlinker->setPattern(blink_stop);
-        _state = Stop;
+        state = Stop;
     }
 
-    if (_state == Init)
+    if (state == Init)
     {
         ledBlinker->setPattern(blink_one);
-        _state = WaitForSlacDone;
+        state = WaitForSlacDone;
     }
-    else if (_state == WaitForSlacDone)
+    else if (state == WaitForSlacDone)
     {
         if (_global.ccSlacDoneEvent)
         {
             ledBlinker->setPattern(blink_two);
-            _state = WaitForPevStateMachineStarted;
+            state = WaitForPevStateMachineStarted;
         }
     }
-    else if (_state == WaitForPevStateMachineStarted)
+    else if (state == WaitForPevStateMachineStarted)
     {
         if (_global.ccsPevStateMachineStartedEvent)
         {
             ledBlinker->setPattern(blink_three);
-            _state = WaitForCurrentDemandLoop;
+            state = WaitForCurrentDemandLoop;
         }
     }
-    else if (_state == WaitForCurrentDemandLoop)
+    else if (state == WaitForCurrentDemandLoop)
     {
         if (_global.ccsCurrentDemandStartedEvent)
         {
             ledBlinker->setPattern(blink_four);
-            _state = WaitForDeliveringAmps;
+            state = WaitForDeliveringAmps;
         }
     }
-    else if (_state == WaitForDeliveringAmps)
+    else if (state == WaitForDeliveringAmps)
     {
         if (_global.ccsDeliveredAmpsEvent)
         {
@@ -133,8 +135,6 @@ extern "C" void __cxa_pure_virtual()
 {
     while (1);
 }
-
-
 
 void LedBlinker::applyLed(bool set)
 {
@@ -157,9 +157,18 @@ static void msleep(uint32_t delay)
     while (wake > system_millis);
 }
 
+extern bool tcp_isConnected(void);
+extern void tcp_disconnect(void);
+
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
+
+    if (tcp_isConnected())
+    {
+        tcp_disconnect();
+        msleep(100);
+    }
 
     // weird...i dont think this has any effect (here)
     // commented it
@@ -199,7 +208,7 @@ void power_off_check()
         power_off_no_return("Stop pressed for 30sec -> force off");
     }
 
-
+    // Power off pending detector
     if (!_global.powerOffPending)
     {
         bool buttonPressedBriefly = _global.stopButtonCounter > 0;
@@ -237,7 +246,6 @@ void power_off_check()
             printf("Chademo stop reason %d. Power off pending...\r\n", chaStopReason);
         }
     }
-
 
     if (_global.powerOffPending)
     {
@@ -294,8 +302,6 @@ float adc_to_voltage(uint16_t adc, float gain) {
     return adc * (3.3f / 4095.0f) * gain;
 }
 
-#define SYSINFO_EVERY_MS 2000 // 2 sec
-
 void print_sysinfo()
 {
     static uint32_t nextPrint = 0;
@@ -326,8 +332,6 @@ void print_sysinfo()
     }
     // Min values seen and working: 3.78V 11.56V 3.4V
 }
-
-#define CCS_TRACE_EVERY_MS 1000 // 1 sec
 
 static void print_ccs_trace()
 {
@@ -379,7 +383,7 @@ static void Ms100Task(void)
         _global.stopButtonCounter = 0;
     }
 
-    // events
+    // Set events
     if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) {
         _global.ccsDeliveredAmpsEvent = true;
     }
@@ -394,7 +398,6 @@ static void Ms100Task(void)
 
     print_sysinfo();
     print_ccs_trace();
-    
 }
 
 static void Ms30Task()
@@ -511,7 +514,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.10\r\n");
+    printf("ccs32clara-chademo v0.11\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -548,8 +551,7 @@ extern "C" int main(void)
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-    // TODO: set Param::MaxCurrent to 200?? does it matter? can it hurt? could choose from battery size...
-
+    
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
     

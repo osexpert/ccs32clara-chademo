@@ -289,6 +289,10 @@ void ChademoCharger::RunStateMachine()
 
             set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_PLUG_LOCKED); // aka. energizing state
 
+            // car probably want to compare that output voltage we claim matches what it can measure (it can probably measure volts before its contactors)
+            // FIXME: maybe it should be a different place...
+            CloseAdapterContactor();
+
             // increase volts to 500V. make sure they do not drop (it would be eg. because a leakage or grounding problem)
             PerformInsulationTest();
 
@@ -301,26 +305,24 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChangeDone)
     {
-        // do we need to wait for this?
-        //if (IsCurrentDemandStarted())
-
         // New idea: since ccs closes relays at end of precharge, this matches well with chademo car closing them soon(?) after we set D2=true.
         // Sometimes the car does not close contactors after d2=true but instead fails...don't know why....
-        // Max 20sec from CarReadyToCharge to D2=true (should be plenty?)
-        //if (IsPreChargeStarted())
 
         // prevent precharge from completing before we get here.
         _global.ccsPreChargeDoneKickoff = true;
 
-        // FIXME: we can hang here forever....if ccs never get here....
         if (_global.ccsPreChargeDoneEvent)
         {
+            // the car need live volts so it can measure and compare what we say we have is what it sees, specially when we say volts are not 0.
+            // not sure if this is the right place, maybe we could close it even earlier, right after LockChargingPlug
+//            CloseAdapterContactor();
+
             // give car power for its contactors (it need both d1 and d2)
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
-        else if (IsTimeoutSec(20))
+        else if (IsTimeoutSec(20)) // spec: Max 20sec from CarReadyToCharge to D2=true (should be plenty?)
         {
             SetState(ChargerState::Stopping_Start);
         }
@@ -331,9 +333,6 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) == false)
         {
             // AFTER CAR OPEN CONTACTOR, it will start asking for amps pretty fast. and if it dont get it, it will fail pretty fast too.....
-
-            NotifyCarContactorsClosed();
-
             SetState(ChargerState::WaitForCarAskingAmps);
         }
         else if (IsTimeoutSec(20))
@@ -405,14 +404,17 @@ void ChademoCharger::RunStateMachine()
         // Got stuck here once... with ProtocolNumber = 1, i got hanging here. It seems it did then never get to set CAR_STATUS_CONTACTOR_OPEN in the first place....
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) || IsTimeoutSec(10))
         {
-            // welding detection done
+            // welding detection done, car no longer need live volts
 
-            NotifyCarContactorsOpen();
+            //OpenAdapterContactor();
 
             // we now revoke the cars contactor power (it need both d1+d2), but it alreadyt said they were opened, so fine
             SetSwitchD2(false);
             // now also stop volts and charger completely.
             _stop_delivering_volts = true;
+
+            // Not sure if this fits best before or after D2 = false. I guess its more transparent to the car to have it here.
+            OpenAdapterContactor();
 
             // spec says, after setting D2:false wait 0.5sec (500ms) before setting D1:false. We have 2 states after, so we already have 2 * 200ms and 300ms left.
             SetState(ChargerState::Stopping_WaitForLowVolts, 300);

@@ -62,7 +62,7 @@ bool ChademoCharger::GetSwitchK()
 /// BUT to get the same protection when opening, the adapter contactor should open FIRST. And it currently does not, not in original FW nor here.
 /// Thou...its hard to open them BEFORE the car, logically we would mess with the cars logic and the welding check.
 /// </summary>
-void ChademoCharger::NotifyCarContactorsClosed()
+void ChademoCharger::CloseAdapterContactor()
 {
     printf("[cha] Adapter contactor closing\r\n");
 
@@ -71,7 +71,7 @@ void ChademoCharger::NotifyCarContactorsClosed()
     // DigIo::external_led_out.Clear(); led on. pointless?
 };
 
-void ChademoCharger::NotifyCarContactorsOpen()
+void ChademoCharger::OpenAdapterContactor()
 {
     printf("[cha] Adapter contactor opening\r\n");
 

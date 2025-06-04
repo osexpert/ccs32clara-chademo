@@ -14,7 +14,6 @@
 //#define TCP_ACK_TIMEOUT_MS 100 /* if for 100ms no ACK is received, we retry the transmission */
 //A safer setting is TCP_ACK_TIMEOUT_MS 1000 with 3–5 retries using exponential backoff, aligning with CCS’s ISO 15118 requirements and typical network conditions.
 #define TCP_ACK_TIMEOUT_MS 500
-
 //Total timeout : ~7.5 seconds(0.5s + 1s + 2s + 4s), suitable for ISO 15118.
 //todo: exponential backoff?
 #define TCP_MAX_NUMBER_OF_RETRANSMISSIONS 8 //40 /* allow 40 retries with 100ms cycle, to bridge 4 seconds of broken line. */
@@ -54,7 +53,7 @@ static void tcp_packRequestIntoIp(void);
 static void tcp_prepareTcpHeader(uint8_t tcpFlag);
 static void tcp_sendAck(void);
 static void tcp_sendFirstAck(void);
-static void tcp_sendReset_reply(void);
+//static void tcp_sendReset_reply(void);
 
 /*** functions *********************************************************************/
 uint32_t tcp_getTotalNumberOfRetries(void) {
@@ -90,15 +89,16 @@ void evaluateTcpPacket(void)
    {
        // At my Tesla v2, when coming back days later after a previous (failed) attempt, it give we answers to messages I sent way back when, ports higher than I am currently at.
        // Seems they implemented tcp with a q per mac? Anyways...since we reset now, this may help to clear the q.
+       // edit: Yes, it seems to help. I did not get reset of wrong ported packages to work thou, but should be possible too.
        // But also...to reduce overlapping/conflicting/reuse of ports, use higher ports than the one we got.
 
        if (destinationPort > highestWrongPort)
            highestWrongPort = destinationPort;
 
       //addToTrace(MOD_TCP, "[TCP] wrong port.");
-      printf("[TCP] wrong port src:%d/%d dst:%d/%d highest_wrong:%d. Sending RST reply.\r\n", sourcePort, seccTcpPort, destinationPort, evccPort, highestWrongPort);
+      printf("[TCP] wrong port src:%d/%d dst:%d/%d highest_wrong:%d\r\n", sourcePort, seccTcpPort, destinationPort, evccPort, highestWrongPort);
 
-      tcp_sendReset_reply();
+//      tcp_sendReset_reply();
 
       return; /* wrong port */
    }
@@ -117,7 +117,7 @@ void evaluateTcpPacket(void)
    flags = myethreceivebuffer[67];
 
    // Handle SYN+ACK (connection setup)
-   if (flags == TCP_FLAG_SYN+TCP_FLAG_ACK)   /* This is the connection setup response from the server. */
+   if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK))   /* This is the connection setup response from the server. */
    {
       if (tcpState == TCP_STATE_SYN_SENT)
       {
@@ -385,12 +385,12 @@ static void tcp_packRequestIntoEthernet(void)
 //   //if (evccPort>65000) evccPort=60000;
 //}
 
-uint8_t tcp_isClosed(void)
+bool tcp_isClosed(void)
 {
    return (tcpState == TCP_STATE_CLOSED);
 }
 
-uint8_t tcp_isConnected(void)
+bool tcp_isConnected(void)
 {
    return (tcpState == TCP_STATE_ESTABLISHED);
 }
@@ -411,16 +411,17 @@ static void tcp_sendReset(void)
 
 void tcp_disconnect(void)
 {
-    if (tcpState == TCP_STATE_ESTABLISHED)
-    {
-        addToTrace(MOD_TCP, "[TCP] sending FIN");
-        tcpHeaderLen = 20;
-        tcpPayloadLen = 0;
-        tcp_prepareTcpHeader(TCP_FLAG_FIN | TCP_FLAG_ACK);
-        tcp_packRequestIntoIp();
-        TcpSeqNr++; // FIN consumes one sequence number
-        tcpState = TCP_STATE_CLOSED;
-    }
+    tcp_sendReset();
+    //if (tcpState == TCP_STATE_ESTABLISHED)
+    //{
+    //    addToTrace(MOD_TCP, "[TCP] sending FIN");
+    //    tcpHeaderLen = 20;
+    //    tcpPayloadLen = 0;
+    //    tcp_prepareTcpHeader(TCP_FLAG_FIN | TCP_FLAG_ACK);
+    //    tcp_packRequestIntoIp();
+    //    TcpSeqNr++; // FIN consumes one sequence number
+    //    tcpState = TCP_STATE_CLOSED;
+    //}
 }
 
 void tcp_Mainfunction(void)
@@ -464,41 +465,45 @@ void tcp_Mainfunction(void)
    }
 }
 
-
-static void tcp_sendReset_reply(void)
-{
-    // Swap ports
-    TcpTransmitPacket[0] = myethreceivebuffer[36]; // dest port -> src
-    TcpTransmitPacket[1] = myethreceivebuffer[37];
-    TcpTransmitPacket[2] = myethreceivebuffer[34]; // src port -> dest
-    TcpTransmitPacket[3] = myethreceivebuffer[35];
-
-    // Sequence number = incoming packet's ACK number
-    TcpTransmitPacket[4] = myethreceivebuffer[42];
-    TcpTransmitPacket[5] = myethreceivebuffer[43];
-    TcpTransmitPacket[6] = myethreceivebuffer[44];
-    TcpTransmitPacket[7] = myethreceivebuffer[45];
-
-    // No ACK number (zeros)
-    TcpTransmitPacket[8] = 0x00;
-    TcpTransmitPacket[9] = 0x00;
-    TcpTransmitPacket[10] = 0x00;
-    TcpTransmitPacket[11] = 0x00;
-
-    TcpTransmitPacket[12] = 0x50; // Data offset = 5 (20 bytes), no options
-    TcpTransmitPacket[13] = TCP_FLAG_RST; // RST flag only, no ACK
-
-    TcpTransmitPacket[14] = 0x00; // Window size
-    TcpTransmitPacket[15] = 0x00;
-
-    TcpTransmitPacket[16] = 0x00; // checksum (calculated later)
-    TcpTransmitPacket[17] = 0x00;
-    TcpTransmitPacket[18] = 0x00; // urgent pointer
-    TcpTransmitPacket[19] = 0x00;
-
-    tcpHeaderLen = 20;
-    tcpPayloadLen = 0;
-
-    tcp_packRequestIntoIp();
-}
-
+// need to swap ips etc. for this to work..
+//static void tcp_sendReset_reply(void)
+//{
+//    // Swap ports
+//    TcpTransmitPacket[0] = myethreceivebuffer[36]; // dest port -> src
+//    TcpTransmitPacket[1] = myethreceivebuffer[37];
+//    TcpTransmitPacket[2] = myethreceivebuffer[34]; // src port -> dest
+//    TcpTransmitPacket[3] = myethreceivebuffer[35];
+//
+//    // Sequence number = incoming packet's ACK number
+//    TcpTransmitPacket[4] = myethreceivebuffer[42];
+//    TcpTransmitPacket[5] = myethreceivebuffer[43];
+//    TcpTransmitPacket[6] = myethreceivebuffer[44];
+//    TcpTransmitPacket[7] = myethreceivebuffer[45];
+//
+//    // No ACK number (zeros)
+//    TcpTransmitPacket[8] = 0x00;
+//    TcpTransmitPacket[9] = 0x00;
+//    TcpTransmitPacket[10] = 0x00;
+//    TcpTransmitPacket[11] = 0x00;
+//
+//    TcpTransmitPacket[12] = 0x50; // Data offset = 5 (20 bytes), no options
+//    TcpTransmitPacket[13] = TCP_FLAG_RST; // RST flag only, no ACK
+//
+//    TcpTransmitPacket[14] = 0x00; // Window size
+//    TcpTransmitPacket[15] = 0x00;
+//
+//    TcpTransmitPacket[16] = 0x00; // checksum (calculated later)
+//    TcpTransmitPacket[17] = 0x00;
+//
+//    TcpTransmitPacket[18] = 0x00; // urgent pointer
+//    TcpTransmitPacket[19] = 0x00;
+//
+//    checksum = calculateUdpAndTcpChecksumForIPv6(TcpTransmitPacket, TcpTransmitPacketLen, EvccIp, SeccIp, NEXT_TCP);
+//    TcpTransmitPacket[16] = (uint8_t)(checksum >> 8);
+//    TcpTransmitPacket[17] = (uint8_t)(checksum);
+//
+//    tcpHeaderLen = 20;
+//    tcpPayloadLen = 0;
+//    tcp_packRequestIntoIp();
+//}
+//

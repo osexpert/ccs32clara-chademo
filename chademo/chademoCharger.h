@@ -320,7 +320,7 @@ struct CarData
 
     // PS: unstable before switch (k)
     // fake initial 10 perc.
-    uint8_t SocPercent = 20;
+    uint8_t SocPercent = 10;
 
     CarStatus Status;
     CarFaults Faults;
@@ -377,7 +377,7 @@ public:
     void Run();
   	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, int delay_ms = 0);
-    void NotifyCarContactorsOpen();
+    void OpenAdapterContactor();
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
@@ -395,7 +395,7 @@ public:
             _powerOffOk = false;
     };
 
-    void NotifyCarContactorsClosed();
+    void CloseAdapterContactor();
     void PerformInsulationTest() { /* NOP */ }
     
     void Log(bool force = false);

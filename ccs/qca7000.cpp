@@ -43,6 +43,7 @@ inline void small_delay()
 /// after setting clock high at start, after clock low,
 /// after clock high before reading MISO
 /// This roughly adds up to around 80 - 90 ns per clock period, matching QCA7000 spec (The SPI CLK period should not be less than 83.3 ns, ca. 12MHz)
+/// ccs2clara stm32f1 _seem_ to use only 4.5MHz hardware spi, but I may be wrong.
 /// </summary>
 /// <param name="param"></param>
 /// <returns></returns>
