@@ -52,10 +52,9 @@ extern "C" {
         bool ccsPreChargeDoneEvent = false;
         bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
-        bool ccsPreChargeDoneKickoff = false;
         bool ccSlacDoneEvent = false;
         bool ccsPevStateMachineStartedEvent = false;
-       // bool ccsPowerRelayOnTrigger_prechargeDone = false;
+        bool tcpConnectedEvent = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
     };

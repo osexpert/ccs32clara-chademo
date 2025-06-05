@@ -144,7 +144,7 @@ enum ChargerStatus
     /// 109.5.2
     /// connector is currently locked (electromagnetic lock, plug locked into the car)??? Or is it related to locking at all????
     /// </summary>
-    CHARGER_STATUS_ENERGIZING = 0x4,
+    CHARGER_STATUS_ENERGIZING_CONNECTOR_LOCKED = 0x4,
 
     /// <summary>
     /// 109.5.3
@@ -181,7 +181,7 @@ enum StopReason
 #define CHARGER_STATE_LIST \
     X(WaitForPreChargeStart) \
     X(WaitForCarReadyToCharge) \
-    X(WaitForPreChangeDone) \
+    X(SetSwitchD2) \
     X(WaitForCarContactorsClosed) \
     X(WaitForCarAskingAmps) \
     X(ChargingLoop) \
@@ -315,6 +315,8 @@ struct CarData
 
     uint16_t CyclesSinceCarLastAskingAmps;
 
+    uint16_t EstimatedNominalVoltage;
+
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
@@ -375,6 +377,7 @@ public:
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
+    bool PreChargeCompleted(uint16_t batt);
   	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, int delayCycles = 0);
     void OpenAdapterContactor();
@@ -421,6 +424,9 @@ public:
 
         bool _stop_delivering_amps = false;
         bool _stop_delivering_volts = false;
+
+        bool _nominalVoltsInPreChargeEvent = false;
+        
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};

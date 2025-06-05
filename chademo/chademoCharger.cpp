@@ -72,6 +72,25 @@ float GetEstimatedBatteryVoltage(float target, float soc)
     }
 }
 
+// Function to compute nominal voltage based on input voltage
+static uint16_t get_estimated_nominal_voltage(uint16_t targetVolt)
+{
+    // Linear mapping, target to nominal for leaf and imiev
+    // (410, 355) or 350 - 360....
+    // (360, 330)
+
+    float x1 = 410.0, y1 = 350.0;
+    float x2 = 360.0, y2 = 330.0;
+
+    // Compute slope (m) and intercept (b)
+    float m = (y2 - y1) / (x2 - x1); // slope
+    float b = y1 - m * x1;           // intercept
+
+    // Compute and return nominal voltage
+    return (uint16_t)(m * targetVolt + b);
+}
+
+
 void ChademoCharger::HandlePendingCarMessages()
 {
     static msg100 _msg100 = {};
@@ -133,6 +152,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         _carData.CyclesSinceCarLastAskingAmps = 0; // for timeout
         _carData.TargetBatteryVoltage = _msg102.m.TargetBatteryVoltage;
+        _carData.EstimatedNominalVoltage = get_estimated_nominal_voltage(_carData.TargetBatteryVoltage);
         _carData.Faults = (CarFaults)_msg102.m.Faults;
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
@@ -179,8 +199,20 @@ void ChademoCharger::SetCcsParamsFromCarData()
     // from can logs it seems...chademo do not give a damn about the battery voltage, so just use target
     // I guess it make sense, because battery voltage is not part of chademo, so how could it possibly use it for any logic, at least before contactors are closed :-D
     // After contactors close, the car battery will initially drive the voltage down anyways (I assume).
-    Param::SetInt(Param::BatteryVoltage, _carData.TargetBatteryVoltage);// _carData.EstimatedBatteryVoltage);
+
+    if (_state > ChargerState::WaitForCarContactorsClosed)
+    {
+        // after contactor closed we continue rising to target
+        Param::SetInt(Param::BatteryVoltage, _carData.TargetBatteryVoltage);
+    }
+    else
+    {
+        // it seems car will only close contactors on a lower voltage? but why? Logs shows it closing on much higher voltates too.
+        // And the spec is just silly, it says < 20 volts after insulation test, but this does match logs at all.
+        Param::SetInt(Param::BatteryVoltage, _carData.EstimatedNominalVoltage);
+    }
     
+   
     if (_stop_delivering_volts)
     {
         Param::SetInt(Param::TargetVoltage, 0);
@@ -254,14 +286,10 @@ void ChademoCharger::RunStateMachine()
         }
     }
 
-    //if (_state >= ChargerState::WaitForCarReadyToCharge && _state < ChargerState::ChargingLoop)
-    //{
-    //    IsTimeoutSec(20)
-    //}
-
     if (_state == ChargerState::WaitForPreChargeStart)
     {
-        if (_global.ccsPreChargeStartedEvent)
+        //if (_global.ccsPreChargeStartedEvent)
+        if (_nominalVoltsInPreChargeEvent)
         {
             SetSwitchD1(true); // will trigger car sending can
 
@@ -276,40 +304,24 @@ void ChademoCharger::RunStateMachine()
 
             // car probably want to compare that output voltage we claim matches what it can measure (it can probably measure volts before its contactors)
             // FIXME: maybe it should be a different place...
-//            CloseAdapterContactor();
+            //CloseAdapterContactor(); it make sense to do it here, but it does not work???
 
-            SetState(ChargerState::WaitForPreChangeDone);
+            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_CONNECTOR_LOCKED);
+
+            // Do insulation test, increase volts to 500 and down again to < 20v. as fast as possible (2sec). BUT WHAT IS THE POINT?
+
+            SetState(ChargerState::SetSwitchD2, 1);
         }
         else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start);
         }
     }
-    else if (_state == ChargerState::WaitForPreChangeDone)
+    else if (_state == ChargerState::SetSwitchD2) // own state, so we can create a delay between flag CHARGER_STATUS_ENERGIZING and D2 = true
     {
-        // New idea: since ccs closes relays at end of precharge, this matches well with chademo car closing them soon(?) after we set D2=true.
-        // Sometimes the car does not close contactors after d2=true but instead fails...don't know why....
+        SetSwitchD2(true);
 
-        // prevent precharge from completing before we get here.
-        _global.ccsPreChargeDoneKickoff = true;
-
-        if (_global.ccsPreChargeDoneEvent)
-        {
-            // the car need live volts so it can measure and compare what we say we have is what it sees, specially when we say volts are not 0.
-            // not sure if this is the right place, maybe we could close it even earlier, right after LockChargingPlug
-            CloseAdapterContactor();
-
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING);
-
-            // give car power for its contactors (it need both d1 and d2)
-            SetSwitchD2(true);
-
-            SetState(ChargerState::WaitForCarContactorsClosed);
-        }
-        else if (IsTimeoutSec(20)) // spec: Max 20sec from CarReadyToCharge to D2=true (should be plenty?)
-        {
-            SetState(ChargerState::Stopping_Start);
-        }
+        SetState(ChargerState::WaitForCarContactorsClosed);
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
@@ -317,7 +329,8 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) == false)
         {
             // hard to tell where it make sense to do this....it depends totally on if the car uses voltage measurements _before_ the contactors, in its logic
-//            CloseAdapterContactor();
+            // it does not make any sense to do it here...but it did work on xtra.....
+            CloseAdapterContactor();
 
             // AFTER CAR OPEN CONTACTOR, it will start asking for amps pretty fast. and if it dont get it, it will fail pretty fast too.....
             SetState(ChargerState::WaitForCarAskingAmps);
@@ -411,7 +424,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_chargerData.OutputVoltage <= 10 || IsTimeoutSec(10))
         {
-            clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING);
+            clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_CONNECTOR_LOCKED);
 
             // do stop can in own state to make sure we send this message to car before we kill can
             SetState(ChargerState::Stopping_End);
@@ -429,6 +442,24 @@ void ChademoCharger::RunStateMachine()
         // NOTE: must have time to tell the car via can that plug is unlocked....so auto off when LockChargingPlug(false) is a bit too soon.
         _powerOffOk = true;
     }
+}
+
+bool ChademoCharger::PreChargeCompleted(uint16_t batt)
+{
+    if (batt == _carData.EstimatedNominalVoltage)
+    {
+        printf("[cha] PreChargeCompleted halted: batt == nominal\r\n");
+        _nominalVoltsInPreChargeEvent = true;
+        return false;
+    }
+
+    // batt is target, target is reached, contactors are closed (because _state > ChargerState::WaitForCarContactorsClosed trigger batt = target)
+    return true;
+}
+
+extern "C" bool hardwareInterface_preChargeCompleted(uint16_t batt)
+{
+    return chademoCharger->PreChargeCompleted(batt);
 }
 
 void ChademoCharger::SetState(ChargerState newState, int delayCycles)

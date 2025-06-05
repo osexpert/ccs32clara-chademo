@@ -727,7 +727,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
          if (Param::GetInt(Param::logging) & MOD_PEV) {
              printf("PreCharge aknowledge received. Inlet %dV, accu %dV, uMin %dV\r\n", inletVtg, batVtg, EVSEMinimumVoltage);
          }
-         if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && hardwareInterface_prechargeDoneKickoff())
+         if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && hardwareInterface_preChargeCompleted(batVtg))
          {
             addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
             publishStatus("PreCharge done", "");

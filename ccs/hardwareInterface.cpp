@@ -52,12 +52,7 @@ int16_t hardwareInterface_getChargingTargetCurrent(void)
     // only called in CurrentDemand, so abuse it as trigger
     _global.ccsCurrentDemandStartedEvent = true;
 
-    // we are in the charging loop here, this is probably reason enough to be powered, amps or not.
-    //if (Param::GetInt(Param::EvseCurrent) > 0)
-  //  {
-    // still delivering amps, reset countUp timer
     _global.auto_power_off_timer_count_up_ms = 0;
-//    }
 
     return Param::GetInt(Param::ChargeCurrent);
 }
@@ -161,14 +156,3 @@ void hardwareInterface_LogTheCpPpPhysicalData(void)
 //      addToTrace(MOD_HWIF, "HardwareVariant ", (int16_t)Param::GetInt(Param::HardwareVariant));
 }
 
-bool hardwareInterface_prechargeDoneKickoff()
-{
-    bool canComplete = _global.ccsPreChargeDoneKickoff;
-
-    if (canComplete)
-        printf("[cha] ccs precharge is done and can continue\r\n");
-    else
-        printf("[cha] ccs precharge is done, but we hold it back until chademo is ready\r\n");
-
-    return canComplete;
-}

@@ -71,18 +71,20 @@ volatile uint32_t system_millis;
 #define SYSINFO_EVERY_MS 2000 // 2 sec
 #define CCS_TRACE_EVERY_MS 1000 // 1 sec
 
-enum LedState
-{
-    Init,
-    WaitForSlacDone,
-    WaitForPevStateMachineStarted,
-    WaitForCurrentDemandLoop,
-    WaitForDeliveringAmps,
-    Stop
-};
 
 void RunLedStateMachine()
 {
+    enum LedState
+    {
+        Init,
+        WaitForSlacDone,
+        WaitForTcpConnected,
+        WaitForPreChargeStart,
+        WaitForCurrentDemandLoop,
+        WaitForDeliveringAmps,
+        Stop
+    };
+
     static LedState state = Init;
 
     if (_global.powerOffPending && state != Stop)
@@ -93,20 +95,28 @@ void RunLedStateMachine()
 
     if (state == Init)
     {
-        ledBlinker->setPattern(blink_one);
+        ledBlinker->setPattern(blink_start);
         state = WaitForSlacDone;
     }
     else if (state == WaitForSlacDone)
     {
         if (_global.ccSlacDoneEvent)
         {
-            ledBlinker->setPattern(blink_two);
-            state = WaitForPevStateMachineStarted;
+            ledBlinker->setPattern(blink_one);
+            state = WaitForTcpConnected;
         }
     }
-    else if (state == WaitForPevStateMachineStarted)
+    else if (state == WaitForTcpConnected)
     {
-        if (_global.ccsPevStateMachineStartedEvent)
+        if (_global.tcpConnectedEvent)
+        {
+            ledBlinker->setPattern(blink_two);
+            state = WaitForPreChargeStart;
+        }
+    }
+    else if (state == WaitForPreChargeStart)
+    {
+        if (_global.ccsPreChargeStartedEvent)
         {
             ledBlinker->setPattern(blink_three);
             state = WaitForCurrentDemandLoop;
@@ -387,10 +397,14 @@ static void Ms100Task(void)
     if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) {
         _global.ccsDeliveredAmpsEvent = true;
     }
-    if (!_global.ccSlacDoneEvent && Param::GetInt(Param::checkpoint) >= 200) { // in reality SDP (service discovery), but slac is done too
+    int cp = Param::GetInt(Param::checkpoint);
+    if (!_global.ccSlacDoneEvent && cp >= 200) { // in reality SDP (service discovery), but slac is done too
         _global.ccSlacDoneEvent = true;
     }
-    if (!_global.ccsPevStateMachineStartedEvent && Param::GetInt(Param::checkpoint) >= 400) {
+    if (!_global.tcpConnectedEvent && cp >= 303) { // tcp connected
+        _global.tcpConnectedEvent = true;
+    }
+    if (!_global.ccsPevStateMachineStartedEvent && cp >= 400) {
         _global.ccsPevStateMachineStartedEvent = true;
     }
 
@@ -514,7 +528,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.12\r\n");
+    printf("ccs32clara-chademo v0.13\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
