@@ -3,13 +3,14 @@
 #include <stdint.h>
 
 
-static const  uint8_t blink_five[] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0 }; // 3x short ONs, 1s OFF
-static const  uint8_t blink_four[] = { 3, 3, 3, 3, 3, 3, 3, 9, 0, 0, 0 }; // 3x short ONs, 1s OFF
-static const  uint8_t blink_three[] = { 3, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
-static const  uint8_t blink_two[] = { 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
-static const  uint8_t blink_one[] = { 3, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
-static const  uint8_t blink_working[] = { 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
-static const  uint8_t blink_stop[] = { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // 3x short ONs, 1s OFF
+static const  uint8_t blink_five[] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0 };
+static const  uint8_t blink_four[] = { 3, 3, 3, 3, 3, 3, 3, 9, 0, 0, 0 };
+static const  uint8_t blink_three[] = { 3, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_two[] = { 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_one[] = { 3, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_working[] = { 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_start[] = { 15, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_stop[] = { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 class LedBlinker
 {

@@ -37,11 +37,6 @@ void ChademoCharger::SetSwitchD1(bool set)
 //    return _global.ccsCurrentDemandStartedEvent;
 //};
 
-//bool ChademoCharger::IsPreChargeStarted()
-//{
-//    //return _global.ccsPowerRelayOnTrigger_prechargeDone;
-//    return _global.ccsPreChargeStartedEvent;
-//};
 
 bool ChademoCharger::GetSwitchK()
 {
