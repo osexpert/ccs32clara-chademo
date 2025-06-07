@@ -303,12 +303,26 @@ void ChademoCharger::RunStateMachine()
 
                 //PerformInsulationTest();
 
-                SetState(ChargerState::SetSwitchD2, 1);
+                SetState(ChargerState::InsulationTestSimulation);
             }
         }
         else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start);
+        }
+    }
+    else if (_state == ChargerState::InsulationTestSimulation)
+    {
+        const uint16_t insulationTestSimulateVolts[] = {250, 500, 500, 250, 0};
+        constexpr size_t numElements = sizeof(insulationTestSimulateVolts) / sizeof(insulationTestSimulateVolts[0]);
+        if (_cyclesInState <= numElements)
+        {
+            // TODO: if this does not work, try to fake with contactor closed, but then maybe using a lower fake voltage too?
+            _simulatedVolt = insulationTestSimulateVolts[_cyclesInState - 1];
+        }
+        else
+        {
+            SetState(ChargerState::SetSwitchD2);
         }
     }
     else if (_state == ChargerState::SetSwitchD2) // set d2 in own state to make sure we send locked message first

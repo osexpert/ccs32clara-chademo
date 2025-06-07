@@ -186,6 +186,7 @@ enum StopReason
     X(PreStart_AutoDetectCompleted_WaitForPreChargeDone, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
+    X(InsulationTestSimulation, 0) \
     X(SetSwitchD2, 0) \
     X(WaitForCarContactorsClosed, 8) \
     X(WaitForCarAskingAmps, 0) \
