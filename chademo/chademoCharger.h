@@ -110,7 +110,7 @@ enum CarStatus
     /// and set as 1 after the termination of welding detection (end)
     /// main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
     /// </summary>
-    CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 0x8,
+    CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
@@ -144,7 +144,7 @@ enum ChargerStatus
     /// 109.5.2
     /// connector is currently locked (electromagnetic lock, plug locked into the car)
     /// </summary>
-    CHARGER_STATUS_PLUG_LOCKED = 0x4,
+    CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED = 0x4,
 
     /// <summary>
     /// 109.5.3
@@ -183,15 +183,14 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
-    X(Idle, 0) \
     X(PreStart_AutoDetectCompleted_WaitForPreChargeDone, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
-    X(CarReadyToCharge, 0) \
-    X(WaitForCurrentDemandStart, 0) \
+    X(SetSwitchD2, 0) \
     X(WaitForCarContactorsClosed, 8) \
     X(WaitForCarAskingAmps, 0) \
     X(ChargingLoop, 0) \
+    X(Stopping_Start, 0) \
     X(Stopping_WaitForLowAmps, 0) \
     X(Stopping_WaitForCarContactorsOpen, 0) \
     X(Stopping_WaitForLowVolts, 0) \
@@ -373,9 +372,10 @@ struct ChargerData
 class ChademoCharger
 {
 public:
+    bool PreChargeCompleted(uint16_t inlet, uint16_t batt);
     void UpdateChargerMessages();
     bool IsCurrentDemandStarted();
-    bool IsPreChargeDone();
+    //bool IsPreChargeDone();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
     void SendChargerMessages();
@@ -387,7 +387,7 @@ public:
     
     void SetState(ChargerState newState, int delay_ms = 0);
 
-    void NotifyCarContactorsOpen();
+    void OpenAdapterContactors();
 
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
@@ -404,20 +404,14 @@ public:
         return _powerOffOk;
     }
 
-    void LockChargingPlug(bool lock)
-    {
-        if (lock)
-            _powerOffOk = false;
-    };
-
-    void NotifyCarContactorsClosed();
-    void PerformInsulationTest() { /* NOP */ }
+    void CloseAdapterContactor();
+   // void PerformInsulationTest() { /* NOP */ }
     
-        void EnableAutoDetect(bool enable);
-    void NotifyCarAskingForAmps()
+
+    StopReason GetStopReason()
     {
-        // NOP
-    };
+        return _stopReason;
+    }
 
     bool IsChargingStoppedByCharger();
     
@@ -426,7 +420,6 @@ public:
 
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t max_sec);
-    bool IsTimeoutAndStopSec(uint16_t max_sec);
 
     int _delayCycles = 0;
 
@@ -449,17 +442,25 @@ public:
 //        bool _sendMessages = false;
         bool _msg102_recieved = false;
 
-        bool _autoDetect = false;
+        bool _autoDetect = true;
 
         bool _stop_delivering_amps = false;
         bool _stop_delivering_volts = false;
+
+        bool _preChargeCompletedButStalled = false;
+        //uint16_t _preChargeSweepVoltage = 300; // consider using 280v?
+
+        uint16_t _simulatedVolt = 0;
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
+        
 
-        ChargerState _state = ChargerState::Idle;
+        StopReason _stopReason = StopReason::NONE;
+        
+        ChargerState _state = ChargerState::Start;
         CarData _carData = {};
         ChargerData _chargerData = {};
 };

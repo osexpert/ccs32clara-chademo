@@ -168,9 +168,18 @@ static void msleep(uint32_t delay)
     while (wake > system_millis);
 }
 
+extern bool tcp_isClosed(void);
+extern void tcp_reset(void);
+
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
+
+    if (!tcp_isClosed())
+    {
+        tcp_reset();
+        msleep(100);
+    }
 
     // weird...i dont think this has any effect (here)
     // commented it
@@ -546,7 +555,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.7\r\n");
+    printf("ccs32clara-chademo 2025.6.7.1\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -569,11 +578,6 @@ extern "C" int main(void)
 
     ChademoCharger cc;
     chademoCharger = &cc;
-    chademoCharger->EnableAutoDetect(true);
-    chademoCharger->SetState(ChargerState::Start);
-
-    // !hack
-//    chademoCharger->_delayCycles = CHA_CYCLES_PER_SEC * 5; // 5 sec delay initial hack
 
     StatusIndicator lb;
     ledBlinker = &lb;
@@ -586,16 +590,8 @@ extern "C" int main(void)
     nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
     nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
 
-
-    // temp hack
-//    Param::SetInt(Param::EvseMaxVoltage, 464);
-    // I see that sometimes...this changes after car tell its target voltage etc.
-//    Param::SetInt(Param::EvseMaxCurrent, 100);
-    //Param::SetInt(Param::EvseVoltage, 350); // FAKE IT HARD
-
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-    // TODO: set Param::MaxCurrent to 200?? does it matter? can it hurt? could choose from battery size...
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);

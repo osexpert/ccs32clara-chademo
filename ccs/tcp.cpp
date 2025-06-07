@@ -5,6 +5,7 @@
 #define NEXT_TCP 0x06 /* the next protocol is TCP */
 
 #define TCP_FLAG_SYN 0x02
+#define TCP_FLAG_RST 0x04
 #define TCP_FLAG_PSH 0x08
 #define TCP_FLAG_ACK 0x10
 #define TCP_TRANSMIT_PACKET_LEN 200
@@ -319,25 +320,37 @@ static void tcp_packRequestIntoEthernet(void)
    myethtransmitbuffer[13] = 0xdd;
    myEthTransmit();
 }
+//
+//void tcp_disconnect(void)
+//{
+//   /* we should normally use the FIN handshake, to tell the charger that we closed the connection.
+//   But for the moment, just go away silently, and use an other port for the next connection. The
+//   server will detect our absense sooner or later by timeout, this should be good enough. */
+//}
 
-void tcp_Disconnect(void)
+void tcp_reset()
 {
-   /* we should normally use the FIN handshake, to tell the charger that we closed the connection.
-   But for the moment, just go away silently, and use an other port for the next connection. The
-   server will detect our absense sooner or later by timeout, this should be good enough. */
-   tcpState = TCP_STATE_CLOSED;
-   /* use a new port */
-   /* But: This causes multiple open connections and the Win10 messes-up them. */
-   //evccPort++;
-   //if (evccPort>65000) evccPort=60000;
+    /* My Tesla v2 seem to run tcp over a queue that never times out,
+    at least it delivers messages to (currently) wrong ports, several days after my last visit.
+    But a brutal RST seems to do the trick. No more wrong port packages after this. */
+
+    if (tcpState != TCP_STATE_CLOSED)
+    {
+        tcpHeaderLen = 20;  // no options
+        tcpPayloadLen = 0;  // no payload
+        TcpAckNr = 0; // not acknowledging any data
+        tcp_prepareTcpHeader(TCP_FLAG_RST);
+        tcp_packRequestIntoIp();
+        tcpState = TCP_STATE_CLOSED;  // close connection state
+    }
 }
 
-uint8_t tcp_isClosed(void)
+bool tcp_isClosed(void)
 {
    return (tcpState == TCP_STATE_CLOSED);
 }
 
-uint8_t tcp_isConnected(void)
+bool tcp_isConnected(void)
 {
    return (tcpState == TCP_STATE_ESTABLISHED);
 }
@@ -363,7 +376,7 @@ void tcp_Mainfunction(void)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
       lastUnackTransmissionTime = 0;
-      tcpState = TCP_STATE_CLOSED;
+      tcp_reset();
       return;
    }
    if ((connMgr_getConnectionLevel()==50) && (tcpState == TCP_STATE_CLOSED))

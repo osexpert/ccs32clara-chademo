@@ -37,10 +37,10 @@ bool ChademoCharger::IsCurrentDemandStarted()
     return _global.ccsCurrentDemandStartedEvent;
 };
 
-bool ChademoCharger::IsPreChargeDone()
-{
-    return _global.ccsPowerRelayOnTrigger_prechargeDone;
-};
+//bool ChademoCharger::IsPreChargeDone()
+//{
+//    return _global.ccsPowerRelayOnTrigger_prechargeDone;
+//};
 
 
 bool ChademoCharger::GetSwitchK()
@@ -67,20 +67,16 @@ bool ChademoCharger::IsChargingStoppedByAdapter()
 /// BUT to get the same protection when opening, the adapter contactor should open FIRST. And it currently does not, not in original FW nor here.
 /// Thou...its hard to open them BEFORE the car, logically we would mess with the cars logic and the welding check.
 /// </summary>
-void ChademoCharger::NotifyCarContactorsClosed()
+void ChademoCharger::CloseAdapterContactor()
 {
     printf("[cha] Adapter contactor closing\r\n");
 
-    // close our contactor too. it is not opened until power off
     DigIo::contactor_out.Set();
-    // DigIo::external_led_out.Clear(); led on. pointless?
 };
 
-void ChademoCharger::NotifyCarContactorsOpen()
+void ChademoCharger::OpenAdapterContactors()
 {
     printf("[cha] Adapter contactor opening\r\n");
 
-    // close our contactor too. it is not opened until power off (it is now)
     DigIo::contactor_out.Clear();
-    // DigIo::external_led_out.Clear(); led on. pointless?
 };

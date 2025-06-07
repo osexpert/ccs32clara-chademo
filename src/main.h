@@ -55,7 +55,7 @@ extern "C" {
        // bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
 
-        bool ccsPowerRelayOnTrigger_prechargeDone = false;
+       // bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
 

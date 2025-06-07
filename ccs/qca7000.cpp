@@ -106,21 +106,6 @@ static void mySpiTransmitReceive()
     cm_enable_interrupts();
 }
 
-// signature reads 0 the first time, second time it reads ok, for unknown and weird reason...
-// writing one dummy byte seems to fix it....but I don't like it (ugly hack)
-void dummy_warmup_rw_one_byte(void) {
-    uint8_t i;
-    i = 0;
-    mySpiTxBuffer[i++] = 0x00;
-    mySpiDataSize = i;
-    mySpiTransmitReceive();
-}
-
-void qca7000setup() 
-{
-    dummy_warmup_rw_one_byte();
-}
-
 static void spiQCA7000DemoReadSignature(void) {
   /* Demo for reading the signature of the QCA7000. This should show AA55. */
   uint16_t sig;
@@ -137,6 +122,12 @@ static void spiQCA7000DemoReadSignature(void) {
   sig <<= 8;
   sig += mySpiRxBuffer[3];
   printf("QCA7000 sig is 0x%X\r\n", sig); /* should be AA 55  */
+}
+
+void qca7000setup()
+{
+    // signature reads 0 the first time, second time it reads ok.
+    spiQCA7000DemoReadSignature();
 }
 
 static void spiQCA7000DemoWriteBFR_SIZE(uint16_t n) {

@@ -77,7 +77,7 @@ void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
 
-    _global.ccsPowerRelayOnTrigger_prechargeDone = true;
+   // _global.ccsPowerRelayOnTrigger_prechargeDone = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
