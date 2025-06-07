@@ -340,9 +340,10 @@ void ChademoCharger::RunStateMachine()
         else
         {
             // simulate increasing voltage from 0 to batt.
-            _simulatedVolt += 20;
+            // simulate always at 0
+            /*_simulatedVolt += 20;
             if (_simulatedVolt > _carData.EstimatedBatteryVoltage)
-                _simulatedVolt = _carData.EstimatedBatteryVoltage;
+                _simulatedVolt = _carData.EstimatedBatteryVoltage;*/
         }
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
@@ -542,10 +543,11 @@ void ChademoCharger::Log(bool force)
     if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second or when forced
-        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
+        printf("[cha] state:%d/%s cycles:%d charger: sim:%dV out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
             _state,
             GetStateName(),
             _cyclesInState,
+            _simulatedVolt,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
