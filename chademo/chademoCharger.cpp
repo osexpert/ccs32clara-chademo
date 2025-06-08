@@ -266,8 +266,8 @@ void ChademoCharger::RunStateMachine()
         // not sure if precharge done is the best kickOff.
         // It may be that PowerDelivery is a better place (this is after PreCharge).
 
-        // this trigger når PreChargeCompleted called. then precharge is at battVolt. But we keep it hanging i preCharge until car contactors close.
-        if (_preChargeCompletedButStalled)
+        // this trigger when PreChargeCompleted called. then precharge is at battVolt. But we keep it hanging i preCharge until car contactors close.
+        if (_cyclesInState > 200)// _preChargeCompletedButStalled) HACK continue anyways
         {
             SetState(ChargerState::Start);
         }
@@ -529,7 +529,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_autoDetect)
+    if (true)//_autoDetect) HACK fake all the time
     {
         // fake it for autodetect
         SetChargerData(450, 100, 0, 0);
