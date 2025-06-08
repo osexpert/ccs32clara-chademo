@@ -48,6 +48,8 @@ extern "C" {
 
         bool ccsKickoff = false;
 
+        bool relayUnweldingAttempt = false;
+
         bool stopButtonEvent = false;
 
         // ccs delivered 1 amps or more

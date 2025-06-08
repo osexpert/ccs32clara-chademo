@@ -364,6 +364,11 @@ static void print_ccs_trace()
 
 static void Ms100Task(void)
 {
+    if (_global.relayUnweldingAttempt)
+    {
+        DigIo::contactor_out.Toggle();
+    }
+
     chademoCharger->Run();
 
     _global.auto_power_off_timer_count_up_ms += 100;
@@ -562,7 +567,11 @@ extern "C" int main(void)
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        power_off_no_return("Stop button pressed during startup");
+        _global.relayUnweldingAttempt = true;
+        DigIo::contactor_out.Toggle();
+        printf("Relay unwelding attempt\r\n");
+        //power_off_no_return("Stop button pressed during startup");
+        msleep(1000);
     }
 
     systick_setup();

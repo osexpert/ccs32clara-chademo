@@ -268,8 +268,8 @@ void ChademoCharger::RunStateMachine()
 
         // this trigger when PreChargeCompleted called. then precharge is at battVolt. But we keep it hanging i preCharge until car contactors close.
         // _preChargeCompletedButStalled) HACK continue anyways
-        if (_cyclesInState > 200) // HACK
-        //if (_global.ccsPreChargeStartedEvent)
+        //if (_cyclesInState > 200) // HACK
+        if (_global.ccsPreChargeStartedEvent)
         {
             SetState(ChargerState::Start);
         }
@@ -322,18 +322,23 @@ void ChademoCharger::RunStateMachine()
         // Variations of climbing or decending can trigger it, but not always, it also depend on the voltages.
         // Anyways...taking change and ccs outputVoltage during precharge (varies a lot) out of the equation, just fake it completely and hope this is stable and reproducable.
         // TODO: try to make it shorter? Maybe 250v stages are not needed.
-        const uint16_t insulationTestSimulateVolts[] = {250, 500, 500, 250, 0};
-        constexpr size_t numElements = sizeof(insulationTestSimulateVolts) / sizeof(insulationTestSimulateVolts[0]);
-        if (_cyclesInState <= numElements)
-        {
-            _simulatedVolt = insulationTestSimulateVolts[_cyclesInState - 1];
-        }
-        else
+        //const uint16_t insulationTestSimulateVolts[] = {250, 500, 500, 250, 0};
+        //const uint16_t insulationTestSimulateVolts[] = { 0, 0, 0, 0, 0 };
+        //constexpr size_t numElements = sizeof(insulationTestSimulateVolts) / sizeof(insulationTestSimulateVolts[0]);
+        //if (_cyclesInState <= numElements)
+        //{
+        //    _simulatedVolt = insulationTestSimulateVolts[_cyclesInState - 1];
+        //}
+        //else
+        //{
+
+        if (_preChargeCompletedButStalled)
         {
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
+//        }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
@@ -543,21 +548,21 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     if (_autoDetect)
     {
         // fake it for autodetect
-        //SetChargerData(450, 100, 0, 0);
-        SetChargerData(500, 200, 0, 0);
+        SetChargerData(450, 100, 0, 0);
+        //SetChargerData(500, 200, 0, 0);
     }
     else
     {
         // hack, fake tesla
-        SetChargerData(464, 200, 0, 0);
+        //SetChargerData(464, 200, 0, 0);
 
         // mirror these values (Change method is only called for some params...)
-       /* SetChargerData(
+       SetChargerData(
             Param::GetInt(Param::EvseMaxVoltage),
             Param::GetInt(Param::EvseMaxCurrent),
             Param::GetInt(Param::EvseVoltage),
             Param::GetInt(Param::EvseCurrent)
-        );*/
+        );
     }
 }
 
