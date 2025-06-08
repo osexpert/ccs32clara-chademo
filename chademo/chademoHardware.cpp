@@ -54,18 +54,13 @@ bool ChademoCharger::IsChargingStoppedByAdapter()
 };
 
 /// <summary>
-/// We are just mirroring the car contactors, so the adapter contactor pointless,
-/// unless the software allows ccs to go live before adapter is connected to the car:-)
-/// And yes, yhe manual says to connect ccs first and then power on, and after ccs is live, connect to car.
-/// In this case, the adapter contactor has meaning. But this is not the sensible way to use the adapter,
-/// but it is probably how they developed it, without plugged into a car. So it made sense to them,
-/// not having a liv adapter in their lap. And the original software still works like this, it make ccs live
-/// regardless of chademo state.
-/// This software require car/chademo before ccs starts, so then adapter contactor is a NOOP.
-/// 
-/// OTOH: if any arching _should_ happen during close, it will all be on the adapters contactor, and this is good.
-/// BUT to get the same protection when opening, the adapter contactor should open FIRST. And it currently does not, not in original FW nor here.
-/// Thou...its hard to open them BEFORE the car, logically we would mess with the cars logic and the welding check.
+/// We are just mirroring the car contactors, so the adapter contactor is pointless?
+/// Yes...it may seem so...
+/// BUT it seems it is needed, to adapt the speeds of the 2 protocols.
+/// ccs2 is very slow, chademo very fast. So if we were not able to isolate us from the potentionally very slow rising voltage during
+/// precharge, it could perhaps be tricky to fool the car to close the contactors? Not sure.
+/// At least with this contactor, we have ability to simulate/present 0 voltage to the car while ccs is busy precharging and we are busy simulating insulation test.
+/// When all done and car close contactors, thinking it is 0 volt, adapter contactor is closed and hey, here is battery voltage for you, both in can-msg and inlet.
 /// </summary>
 void ChademoCharger::CloseAdapterContactor()
 {

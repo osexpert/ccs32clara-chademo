@@ -183,11 +183,10 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
-    X(PreStart_AutoDetectCompleted_WaitForPreChargeDone, 0) \
+    X(PreStart_AutoDetectCompleted_WaitForPreChargeStart, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
-    X(InsulationTestSimulation, 0) \
-    X(SetSwitchD2, 0) \
+    X(SimulateInsulationTest, 0) \
     X(WaitForCarContactorsClosed, 8) \
     X(WaitForCarAskingAmps, 0) \
     X(ChargingLoop, 0) \
@@ -334,6 +333,11 @@ struct CarData
     // PS: unstable before switch (k)
     float BatteryCapacityKwh;
 
+    /// <summary>
+    /// 0: before 0.9
+    /// 1: 0.9, 0.9.1
+    /// 2: 1.0.0, 1.0.1
+    /// </summary>
     uint8_t ProtocolNumber;
 
     uint8_t EstimatedChargingTimeMins;
@@ -386,7 +390,7 @@ public:
   
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     
-    void SetState(ChargerState newState, int delay_ms = 0);
+    void SetState(ChargerState newState);// , int delay_ms = 0);
 
     void OpenAdapterContactors();
 

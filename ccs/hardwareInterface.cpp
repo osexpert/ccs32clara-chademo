@@ -31,7 +31,7 @@ void hardwareInterface_simulateCharging(void)
 int16_t hardwareInterface_getInletVoltage(void)
 {
     // only called in precharge, so we can abuse it as trigger
-   // _global.ccsPreChargeStartedEvent = true;
+    _global.ccsPreChargeStartedEvent = true;
 
     // we have no inlet voltage sensor. 
     return Param::GetInt(Param::EvseVoltage);
