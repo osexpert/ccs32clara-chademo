@@ -268,8 +268,8 @@ void ChademoCharger::RunStateMachine()
 
         // this trigger when PreChargeCompleted called. then precharge is at battVolt. But we keep it hanging i preCharge until car contactors close.
         // _preChargeCompletedButStalled) HACK continue anyways
-        //if (_cyclesInState > 200)
-        if (_global.ccsPreChargeStartedEvent)
+        if (_cyclesInState > 200) // HACK
+        //if (_global.ccsPreChargeStartedEvent)
         {
             SetState(ChargerState::Start);
         }
@@ -537,20 +537,27 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
+    // hack
+    //if (_autoDetect)
+    //if (true)
     if (_autoDetect)
     {
         // fake it for autodetect
-        SetChargerData(450, 100, 0, 0);
+        //SetChargerData(450, 100, 0, 0);
+        SetChargerData(500, 200, 0, 0);
     }
     else
     {
+        // hack, fake tesla
+        SetChargerData(464, 200, 0, 0);
+
         // mirror these values (Change method is only called for some params...)
-        SetChargerData(
+       /* SetChargerData(
             Param::GetInt(Param::EvseMaxVoltage),
             Param::GetInt(Param::EvseMaxCurrent),
             Param::GetInt(Param::EvseVoltage),
             Param::GetInt(Param::EvseCurrent)
-        );
+        );*/
     }
 }
 
