@@ -330,10 +330,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        // for ProtocolNumber 1 it seems this flag is never set? I guess...could have a || _carData.ProtocolNumber < 2 here then...but no car to test on.
-        // And since no flag, I assume it need a delay too...but how long? I guess it could be possible to use adc 12v to detect when car close its contactors,
-        // we should then get > 12v....
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false || (_carData.ProtocolNumber < 2 && IsTimeoutSec(2)))
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
@@ -409,9 +406,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        // Got stuck here once... with ProtocolNumber = 1, i got hanging here. It seems it did then never get to set CAR_STATUS_CONTACTOR_OPEN in the first place....
-        // Yes...for ProtocolNumber < 2 it seems it only has "car must do welding detection withing 4seconds after OutputCurrent <= 5 and D2=false. Meaning...the changer should wait 4 seconds here...
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || (_carData.ProtocolNumber < 2 && IsTimeoutSec(4)) || IsTimeoutSec(10))
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || IsTimeoutSec(10))
         {
             // welding detection done
 

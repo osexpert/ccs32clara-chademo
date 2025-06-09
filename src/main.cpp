@@ -316,7 +316,7 @@ void print_sysinfo()
         adc_read_all();
 
         // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
+        printf("[sysinfo] uptime:%dsec %fV (nom:4.0) %fV (nom:12.0) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
             system_millis / 1000,
             FP_FROMFLT(_global.adc_4_volt),
             FP_FROMFLT(_global.adc_12_volt),
@@ -324,17 +324,6 @@ void print_sysinfo()
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.ccsDeliveredAmpsEvent
-            //_global.cha100,
-            //_global.cha101,
-            //_global.cha102,
-            //_global.cha108,
-            //_global.cha109,
-
-            //_global.cha108last,
-            //_global.cha108dur,
-            //_global.cha109last,
-            //_global.cha109dur
-
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;

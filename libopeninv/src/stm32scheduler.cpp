@@ -91,7 +91,7 @@ void Stm32Scheduler::Run()
 
             TIM_CCR(timer, i) += periods[i];
             functions[i]();
-            execTicks[i] = timer_get_counter(timer) - start;
+            execTicks += (timer_get_counter(timer) - start);
             timer_clear_flag(timer, TIM_SR_CC1IF << i);
         }
         else if (i >= nextTask)
@@ -102,14 +102,26 @@ void Stm32Scheduler::Run()
     }
 }
 
+extern volatile uint32_t system_millis;
 
 int Stm32Scheduler::GetCpuLoad()
 {
+    static uint32_t last_ms = 0;
     int totalLoad = 0;
-    for (int i = 0; i < nextTask; i++)
+
+    uint32_t now_ms = system_millis;
+
+    if (last_ms != 0)
     {
-        int load = (1000 * execTicks[i]) / periods[i];
-        totalLoad += load;
+        uint32_t elapsed_ms = now_ms - last_ms;  // ms elapsed
+        if (elapsed_ms > 0)
+        {
+            totalLoad = execTicks / elapsed_ms; // since execTicks * 10us, dividing by ms gives percent
+        }
     }
+
+    execTicks = 0;
+    last_ms = now_ms;
+
     return totalLoad;
 }
