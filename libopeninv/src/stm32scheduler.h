@@ -52,7 +52,7 @@ private:
     static const enum tim_oc_id ocMap[MAX_TASKS];
     void (*functions[MAX_TASKS]) (void);
     uint16_t periods[MAX_TASKS];
-    uint16_t execTicks[MAX_TASKS];
+    uint32_t execTicks;// uint16_t [MAX_TASKS] ;
     uint32_t timer;
     int nextTask;
 };

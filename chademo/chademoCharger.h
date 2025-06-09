@@ -110,7 +110,7 @@ enum CarStatus
     /// and set as 1 after the termination of welding detection (end)
     /// main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
     /// </summary>
-    CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE = 0x8,
+    CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
@@ -142,9 +142,9 @@ enum ChargerStatus
 
     /// <summary>
     /// 109.5.2
-    /// connector is currently locked (electromagnetic lock, plug locked into the car)??? Or is it related to locking at all????
+    /// connector is currently locked (electromagnetic lock, plug locked into the car)
     /// </summary>
-    CHARGER_STATUS_ENERGIZING_CONNECTOR_LOCKED = 0x4,
+    CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED = 0x4,
 
     /// <summary>
     /// 109.5.3
@@ -179,36 +179,31 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
-    X(WaitForPreChargeStart) \
-    X(WaitForCarReadyToCharge) \
-    X(SetSwitchD2) \
-    X(WaitForCarContactorsClosed) \
-    X(WaitForCarAskingAmps) \
-    X(ChargingLoop) \
-    X(Stopping_Start) \
-    X(Stopping_WaitForLowAmps) \
-    X(Stopping_WaitForCarContactorsOpen) \
-    X(Stopping_WaitForLowVolts) \
-    X(Stopping_End) \
-    X(Stopped)
+    CHARGER_STATE(PreStart_AutoDetectCompleted_WaitForPreChargeStart) \
+    CHARGER_STATE(Start) \
+    CHARGER_STATE(WaitForCarReadyToCharge) \
+    CHARGER_STATE(WaitForPreChargeDone) \
+    CHARGER_STATE(WaitForCarContactorsClosed) \
+    CHARGER_STATE(WaitForCarAskingAmps) \
+    CHARGER_STATE(ChargingLoop) \
+    CHARGER_STATE(Stopping_Start) \
+    CHARGER_STATE(Stopping_WaitForLowAmps) \
+    CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
+    CHARGER_STATE(Stopping_WaitForLowVolts) \
+    CHARGER_STATE(Stopping_End) \
+    CHARGER_STATE(Stopped)
 
 enum ChargerState {
-#define X(name) name,
+#define CHARGER_STATE(name) name,
     CHARGER_STATE_LIST
-#undef X
+#undef CHARGER_STATE
 };
 
 const char* const _stateNames[] = {
-#define X(name) #name,
+#define CHARGER_STATE(name) #name,
     CHARGER_STATE_LIST
-#undef X
+#undef CHARGER_STATE
 };
-
-//const uint16_t _stateTimeoutsSec[] = {
-//#define X(name, timeout) timeout,
-//    CHARGER_STATE_LIST
-//#undef X
-//};
 
 #pragma pack(push, 1)
 
@@ -310,19 +305,17 @@ struct CarData
     uint16_t MaxChargingTimeSec;
 
     // Valid after kSwitch
-    uint16_t TargetBatteryVoltage = 410;
+    uint16_t TargetBatteryVoltage;
     uint16_t EstimatedBatteryVoltage;
 
     uint16_t CyclesSinceCarLastAskingAmps;
 
-    uint16_t EstimatedNominalVoltage;
-
+    //ushort BattNominalVoltage = > (ushort)Program.get_estimated_nominal_voltage(TargetVoltage);
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
     // PS: unstable before switch (k)
-    // fake initial 10 perc.
-    uint8_t SocPercent = 10;
+    uint8_t SocPercent;
 
     CarStatus Status;
     CarFaults Faults;
@@ -330,6 +323,11 @@ struct CarData
     // PS: unstable before switch (k)
     float BatteryCapacityKwh;
 
+    /// <summary>
+    /// 0: before 0.9
+    /// 1: 0.9, 0.9.1
+    /// 2: 1.0.0, 1.0.1
+    /// </summary>
     uint8_t ProtocolNumber;
 
     uint8_t EstimatedChargingTimeMins;
@@ -369,22 +367,31 @@ struct ChargerData
 class ChademoCharger
 {
 public:
+    bool PreChargeCompleted();
     void UpdateChargerMessages();
-  //  bool IsCurrentDemandStarted();
-//    bool IsPreChargeStarted();
+    //bool IsCurrentDemandStarted();
+    //bool IsPreChargeDone();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
-    bool PreChargeCompleted(uint16_t batt);
-  	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
-    void SetState(ChargerState newState, int delayCycles = 0);
+    bool IsAutoDetectCompleted();
+  
+	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
+    
+    void SetState(ChargerState newState);// , int delay_ms = 0);
+
     void OpenAdapterContactor();
+
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
+  
+    //bool IsChargingStoppedByAdapter();
+    
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
+
     bool GetSwitchK();
 
     bool IsPowerOffOk()
@@ -393,18 +400,24 @@ public:
     }
 
     void CloseAdapterContactor();
-    
-    void Log(bool force = false);
-    const char* GetStateName();
-    bool IsTimeoutSec(uint16_t max_sec);
-    
+      
+
     StopReason GetStopReason()
     {
         return _stopReason;
     }
 
+    //bool IsChargingStoppedByCharger();
+    
+   
+    void Log(bool force = false);
+
+    const char* GetStateName();
+    bool IsTimeoutSec(uint16_t max_sec);
+
+    int _delayCycles = 0;
+
     private:
-        int _delayCycles = 0;
         int _logCycleCounter = 0;
         bool _powerOffOk = true;
         int _cyclesInState = 0;
@@ -422,19 +435,24 @@ public:
 
         bool _msg102_recieved = false;
 
+        bool _autoDetect = true;
+
         bool _stop_delivering_amps = false;
         bool _stop_delivering_volts = false;
 
-        bool _nominalVoltsInPreChargeEvent = false;
-        
+        bool _preChargeCompletedButStalled = false;
+
+        uint16_t _simulatedVolt = 0;
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
-        ChargerState _state = ChargerState::WaitForPreChargeStart;
-        CarData _carData = {};
-        ChargerData _chargerData = {};
+        
 
         StopReason _stopReason = StopReason::NONE;
+        
+        ChargerState _state = ChargerState::Start;
+        CarData _carData = {};
+        ChargerData _chargerData = {};
 };

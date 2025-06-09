@@ -42,6 +42,3 @@ cd /d/git/ccs32clara_my407ccs2chademo
 export PATH="/c//Program Files/Python313:/c/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/14.2 rel1/bin:/c/mingw64/bin:/usr/local/bin:/usr/bin:/bin"
 mingw32-make.exe
 profit!
-
-
-

@@ -73,7 +73,7 @@ void hardwareInterface_setPowerRelayOn(void)
     printf("hardwareInterface_setPowerRelayOn\r\n");
 
     // abuse the fact that this is called at end of preCharge
-    _global.ccsPreChargeDoneEvent = true;
+    //_global.ccsPreChargeDoneEvent = true;
 
     // D1 does not belong here??? or possibly...this will kick of the can...
     // even so....i would have used a different signaling
@@ -133,14 +133,14 @@ bool hardwareInterface_stopChargeRequested()
         addToTrace(MOD_HWIF, "Power off pending.");
     }
 
-    if (!Param::GetBool(Param::enable)) 
+    if (!Param::GetBool(Param::enable))
     {
         stopReason = STOP_REASON_MISSING_ENABLE;
         Param::SetInt(Param::StopReason, stopReason);
         addToTrace(MOD_HWIF, "Got enable=false.");
     }
 
-    return (stopReason!=STOP_REASON_NONE);
+    return (stopReason != STOP_REASON_NONE);
 }
 
 void hardwareInterface_resetSimulation(void)
@@ -155,4 +155,3 @@ void hardwareInterface_LogTheCpPpPhysicalData(void)
 //      addToTrace(MOD_HWIF, "ResistanceProxPilot [ohm] ", (int16_t)Param::GetInt(Param::ResistanceProxPilot));
 //      addToTrace(MOD_HWIF, "HardwareVariant ", (int16_t)Param::GetInt(Param::HardwareVariant));
 }
-

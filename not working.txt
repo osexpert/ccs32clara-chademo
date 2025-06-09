@@ -1,0 +1,19 @@
+tesla v2
+0 volt
+d2 = true
+simluate += 20V tils estimatedBatt
+120V
+CAR nogo, 0x88 > 0x8c | err
+
+---
+
+next: 0 volts all the time.
+
+no...still not working
+
+
+---
+
+idea: fake insulationtest by turning contactor on and off....
+idea: have the sweep from 0 to target in addition. after fake insul.
+idea: continue precharge to target after carContactorClose

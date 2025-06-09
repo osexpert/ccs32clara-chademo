@@ -66,78 +66,90 @@ global_data _global;
  * overflows every 49 days if you're wondering
  */
 volatile uint32_t system_millis;
-
-#define AUTO_POWER_OFF_LIMIT_SEC (60 * 3) // Tesla v2 took 2 minutes from boot to CurrentDemandReq, so I think we need 3 minutes...
-#define SYSINFO_EVERY_MS 2000 // 2 sec
-#define CCS_TRACE_EVERY_MS 1000 // 1 sec
+// volatile?
 
 
-void RunLedStateMachine()
+#define AUTO_POWER_OFF_LIMIT_SEC (60 * 3)
+
+enum MainState
 {
-    enum LedState
-    {
-        Init,
-        WaitForSlacDone,
-        WaitForTcpConnected,
-        WaitForPreChargeStart,
-        WaitForCurrentDemandLoop,
-        WaitForDeliveringAmps,
-        Stop
-    };
+    Init,
+    WaitForCcsStarted,
+    WaitForSlacDone,
+    WaitForTcpConnected,
+    WaitForPreChargeStart,
+    WaitForCurrentDemandLoop,
+    WaitForDeliveringAmps,
+    Charging,
+    Stop
+};
 
-    static LedState state = Init;
+MainState _state = MainState::Init;
 
-    if (_global.powerOffPending && state != Stop)
+void RunMainStateMachine()
+{
+    if (_global.powerOffPending && _state != MainState::Stop)
     {
         ledBlinker->setPattern(blink_stop);
-        state = Stop;
+        _state = MainState::Stop;
     }
 
-    if (state == Init)
+    if (_state == MainState::Init)
     {
         ledBlinker->setPattern(blink_start);
-        state = WaitForSlacDone;
+        _state = MainState::WaitForCcsStarted;
     }
-    else if (state == WaitForSlacDone)
+    else if (_state == MainState::WaitForCcsStarted)
     {
-        if (_global.ccSlacDoneEvent)
+        if (_global.ccsKickoff)
         {
-            ledBlinker->setPattern(blink_one);
-            state = WaitForTcpConnected;
+            _state = MainState::WaitForSlacDone;
         }
     }
-    else if (state == WaitForTcpConnected)
+    else if (_state == MainState::WaitForSlacDone)
     {
-        if (_global.tcpConnectedEvent)
+        if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
         {
-            ledBlinker->setPattern(blink_two);
-            state = WaitForPreChargeStart;
+            ledBlinker->setPattern(blink_1);
+            _state = MainState::WaitForTcpConnected;
         }
     }
-    else if (state == WaitForPreChargeStart)
+    else if (_state == MainState::WaitForTcpConnected)
+    {
+        if (Param::GetInt(Param::checkpoint) >= 303) // tcp connected
+        {
+            ledBlinker->setPattern(blink_2);
+            _state = MainState::WaitForPreChargeStart;
+        }
+    }
+    else if (_state == MainState::WaitForPreChargeStart)
     {
         if (_global.ccsPreChargeStartedEvent)
         {
-            ledBlinker->setPattern(blink_three);
-            state = WaitForCurrentDemandLoop;
+            ledBlinker->setPattern(blink_3);
+            _state = MainState::WaitForCurrentDemandLoop;
         }
     }
-    else if (state == WaitForCurrentDemandLoop)
+    else if (_state == MainState::WaitForCurrentDemandLoop)
     {
         if (_global.ccsCurrentDemandStartedEvent)
         {
-            ledBlinker->setPattern(blink_four);
-            state = WaitForDeliveringAmps;
+            ledBlinker->setPattern(blink_4);
+            _state = MainState::WaitForDeliveringAmps;
         }
     }
-    else if (state == WaitForDeliveringAmps)
+    else if (_state == MainState::WaitForDeliveringAmps)
     {
-        if (_global.ccsDeliveredAmpsEvent)
+        if (Param::GetInt(Param::EvseCurrent) > 0)
         {
             ledBlinker->setPattern(blink_working);
+            _state = MainState::Charging;
         }
     }
+    else if (_state == MainState::Charging)
+    {
 
+    }
 }
 
 /* to solve linker warning, see https://openinverter.org/forum/viewtopic.php?p=64546#p64546 */
@@ -145,6 +157,8 @@ extern "C" void __cxa_pure_virtual()
 {
     while (1);
 }
+
+
 
 void LedBlinker::applyLed(bool set)
 {
@@ -167,17 +181,22 @@ static void msleep(uint32_t delay)
     while (wake > system_millis);
 }
 
-extern bool tcp_isConnected(void);
-extern void tcp_disconnect(void);
+extern bool tcp_isClosed(void);
+extern void tcp_reset(void);
 
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
-    if (tcp_isConnected())
+    if (!tcp_isClosed())
     {
-        tcp_disconnect();
+        tcp_reset();
         msleep(100);
+    }
+
+    if (_global.relayProbablyWeldedEvent)
+    {
+        printf("!!! WARNING: Contactor may be welded. Use a multimeter to verify. May try the unwelding function (hold stop while power on). !!!\r\n");
     }
 
     // weird...i dont think this has any effect (here)
@@ -193,7 +212,7 @@ void power_off_no_return(const char* reason)
     // Its better that adapter contactor take the hit than the car, so power it off explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
     {
-		printf("Contactor was closed! This may be bad...\r\n");
+        printf("Contactor was closed! This may be bad...\r\n");
         DigIo::contactor_out.Clear();
         msleep(100);
     }
@@ -225,16 +244,16 @@ void power_off_check()
         bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
 
-        // allow instant power off before Slac is done (adapter not connected or never entered Slac)
-        if (buttonPressedBriefly && !_global.ccSlacDoneEvent)
+        // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
+        if (buttonPressedBriefly && _state != MainState::WaitForSlacDone)
         {
             _global.powerOffPending = true; // one way street
-            printf("Stop button pressed briefly (before SLAC). Power off pending...\r\n");
+            printf("Stop button pressed briefly and slac not pending. Power off pending...\r\n");
         }
         if (buttonPressed5Seconds)
         {
             _global.powerOffPending = true; // one way street
-            printf("Stop button pressed for 5 seconds (after ccsKickoff). Power off pending...\r\n");
+            printf("Stop button pressed for 5 seconds. Power off pending...\r\n");
         }
         if (inactivity)
         {
@@ -250,7 +269,7 @@ void power_off_check()
         }
 
         StopReason chaStopReason = chademoCharger->GetStopReason(); // do we need one for success? eg. accu full?
-        if (chaStopReason != StopReason::NONE )
+        if (chaStopReason != StopReason::NONE)
         {
             _global.powerOffPending = true; // one way street
             printf("Chademo stop reason %d. Power off pending...\r\n", chaStopReason);
@@ -262,7 +281,7 @@ void power_off_check()
         bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
-        // fixme: this does not work. started precharge, then tcp died, and it hang forever. guessing lock was never opened again.
+
 
         if (powerOffOkCcs && powerOffOkCha)
         {
@@ -271,10 +290,7 @@ void power_off_check()
     }
 }
 
-// Buffer to store ADC results (PA8, VREFINT, VBAT)
-#define ADC_CHANNEL_COUNT 3
-uint16_t adc_results[ADC_CHANNEL_COUNT];
-static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+
 
 void adc_battery_init(void)
 {
@@ -299,18 +315,34 @@ void adc_battery_init(void)
     adc_power_on(ADC1);
 }
 
-static void adc_read_all(void) {
+float adc_to_voltage(uint16_t adc, float gain) {
+    return adc * (3.3f / 4095.0f) * gain;
+}
+
+#define ADC_CHANNEL_COUNT 3
+void adc_read_all(void)
+{
+    // Buffer to store ADC results (PA8, VREFINT, VBAT)
+    uint16_t adc_results[ADC_CHANNEL_COUNT];
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
         adc_start_conversion_regular(ADC1);
         while (!adc_eoc(ADC1));
         adc_results[i] = adc_read_regular(ADC1);
     }
+
+    float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
+    
+    _global.adc_3_3_volt = vdd_voltage;
+    _global.adc_4_volt = adc_to_voltage(adc_results[1], 2.0f);
+    _global.adc_12_volt = adc_to_voltage(adc_results[0], 11.0f);
 }
 
-float adc_to_voltage(uint16_t adc, float gain) {
-    return adc * (3.3f / 4095.0f) * gain;
-}
+
+
+#define SYSINFO_EVERY_MS 2000 // 2 sec
 
 void print_sysinfo()
 {
@@ -319,29 +351,29 @@ void print_sysinfo()
     {
         adc_read_all();
 
-        float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
-
         bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
         // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d pwr_off:%d/%d/%d\r\n",
+        printf("[sysinfo] uptime:%dsec %fV (nom:4.0) %fV (nom:12.0) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
-            FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
-            FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
-            FP_FROMFLT(vdd_voltage),
+            FP_FROMFLT(_global.adc_4_volt),
+            FP_FROMFLT(_global.adc_12_volt),
+            FP_FROMFLT(_global.adc_3_3_volt),
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
-            _global.ccsDeliveredAmpsEvent,
             _global.powerOffPending,
             powerOffOkCcs,
-            powerOffOkCha
+            powerOffOkCha,
+			_state
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
     }
     // Min values seen and working: 3.78V 11.56V 3.4V
 }
+
+#define CCS_TRACE_EVERY_MS 1000 // 1 sec
 
 static void print_ccs_trace()
 {
@@ -377,11 +409,14 @@ static void print_ccs_trace()
 
 static void Ms100Task(void)
 {
-    chademoCharger->Run();
+    if (_global.relayUnweldingAttempt)
+        DigIo::contactor_out.Toggle();
+	else
+	    chademoCharger->Run();
 
     _global.auto_power_off_timer_count_up_ms += 100;
 
-    RunLedStateMachine();
+    RunMainStateMachine();
     ledBlinker->tick(); // 100 ms tick
 
     iwdg_reset();
@@ -393,20 +428,6 @@ static void Ms100Task(void)
         _global.stopButtonCounter = 0;
     }
 
-    // Set events
-    if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) {
-        _global.ccsDeliveredAmpsEvent = true;
-    }
-    int cp = Param::GetInt(Param::checkpoint);
-    if (!_global.ccSlacDoneEvent && cp >= 200) { // in reality SDP (service discovery), but slac is done too
-        _global.ccSlacDoneEvent = true;
-    }
-    if (!_global.tcpConnectedEvent && cp >= 303) { // tcp connected
-        _global.tcpConnectedEvent = true;
-    }
-    if (!_global.ccsPevStateMachineStartedEvent && cp >= 400) {
-        _global.ccsPevStateMachineStartedEvent = true;
-    }
 
     power_off_check();
 
@@ -416,6 +437,19 @@ static void Ms100Task(void)
 
 static void Ms30Task()
 {
+    if (_global.relayUnweldingAttempt)
+		return;
+
+    if (!_global.ccsKickoff)
+    {
+        // chademo will set these and then ccs can start
+        _global.ccsKickoff = chademoCharger->IsAutoDetectCompleted();
+        if (!_global.ccsKickoff)
+			return;
+
+        printf("ccs kickoff, cha autodetect completed\r\n");
+    }
+
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
@@ -528,14 +562,17 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo v0.13\r\n");
+    printf("ccs32clara-chademo v0.20\r\n");
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
     if (DigIo::stop_button_in_inverted.Get() == false)
     {
-        power_off_no_return("Stop button pressed during startup");
+        _global.relayUnweldingAttempt = true;
+        DigIo::contactor_out.Toggle();
+        printf("Relay unwelding attempt: hold stop while power on. When you hear contactor close, release stop (before 1sec has passed)\r\n");
+        msleep(1000);
     }
 
     systick_setup();
@@ -565,7 +602,7 @@ extern "C" int main(void)
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-    
+
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
     

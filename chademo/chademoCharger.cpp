@@ -72,6 +72,7 @@ float GetEstimatedBatteryVoltage(float target, float soc)
     }
 }
 
+#if false
 // Function to compute nominal voltage based on input voltage
 static uint16_t get_estimated_nominal_voltage(uint16_t targetVolt)
 {
@@ -89,7 +90,7 @@ static uint16_t get_estimated_nominal_voltage(uint16_t targetVolt)
     // Compute and return nominal voltage
     return (uint16_t)(m * targetVolt + b);
 }
-
+#endif
 
 void ChademoCharger::HandlePendingCarMessages()
 {
@@ -152,7 +153,6 @@ void ChademoCharger::HandlePendingCarMessages()
 
         _carData.CyclesSinceCarLastAskingAmps = 0; // for timeout
         _carData.TargetBatteryVoltage = _msg102.m.TargetBatteryVoltage;
-        _carData.EstimatedNominalVoltage = get_estimated_nominal_voltage(_carData.TargetBatteryVoltage);
         _carData.Faults = (CarFaults)_msg102.m.Faults;
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
@@ -163,7 +163,7 @@ void ChademoCharger::HandlePendingCarMessages()
         else
             _carData.AskingAmps = _msg102.m.ChargingCurrentRequest;
 
-        // soc and the constant both unstable before switch(k) (and also capacity, but don't care about that)
+        // soc and the constant both unstable before switch(k) (and also capacity, but  dont care about that)
         if (_switch_k)
         {
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
@@ -176,6 +176,12 @@ void ChademoCharger::HandlePendingCarMessages()
 
         _msg102_recieved = true;
     }
+}
+
+bool ChademoCharger::IsAutoDetectCompleted()
+{
+    // if autodetect, we go here when done
+    return _state == PreStart_AutoDetectCompleted_WaitForPreChargeStart;
 }
 
 void ChademoCharger::Run()
@@ -194,25 +200,13 @@ void ChademoCharger::Run()
 
 void ChademoCharger::SetCcsParamsFromCarData()
 {
+    // target +1 to silence warning in pev_sendCurrentDemandReq
+    // TODO: use _carData.MaxBatteryVoltage? But what is the point? We always just ask for target voltage anyways...
+    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
     Param::SetInt(Param::soc, _carData.SocPercent);
+    Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
+    Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
 
-    // from can logs it seems...chademo do not give a damn about the battery voltage, so just use target
-    // I guess it make sense, because battery voltage is not part of chademo, so how could it possibly use it for any logic, at least before contactors are closed :-D
-    // After contactors close, the car battery will initially drive the voltage down anyways (I assume).
-
-    if (_state > ChargerState::WaitForCarContactorsClosed)
-    {
-        // after contactor closed we continue rising to target
-        Param::SetInt(Param::BatteryVoltage, _carData.TargetBatteryVoltage);
-    }
-    else
-    {
-        // it seems car will only close contactors on a lower voltage? but why? Logs shows it closing on much higher voltates too.
-        // And the spec is just silly, it says < 20 volts after insulation test, but this does match logs at all.
-        Param::SetInt(Param::BatteryVoltage, _carData.EstimatedNominalVoltage);
-    }
-    
-   
     if (_stop_delivering_volts)
     {
         Param::SetInt(Param::TargetVoltage, 0);
@@ -231,9 +225,6 @@ void ChademoCharger::SetCcsParamsFromCarData()
     {
         Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
     }
-
-    // target +1 to silence warning in pev_sendCurrentDemandReq
-    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
@@ -246,6 +237,8 @@ bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
     return false;
 }
 
+extern void adc_read_all(void);
+
 /// <summary>
 /// PS: Do not care about timeout before the charging loop (power off is allowed).
 /// But after we have been inside the charging loop, we must get to the end somehow...
@@ -253,12 +246,6 @@ bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
-
-    if (_delayCycles > 0)
-    {
-        _delayCycles--;
-        return;
-    }
 
     if (_state < ChargerState::ChargingLoop)
     {
@@ -286,53 +273,87 @@ void ChademoCharger::RunStateMachine()
         }
     }
 
-    if (_state == ChargerState::WaitForPreChargeStart)
+    if (_state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart)
     {
-        //if (_global.ccsPreChargeStartedEvent)
-        if (_nominalVoltsInPreChargeEvent)
+        if (_global.ccsPreChargeStartedEvent)
         {
-            SetSwitchD1(true); // will trigger car sending can
-
-            SetState(ChargerState::WaitForCarReadyToCharge);
+            SetState(ChargerState::Start);
         }
+    }
+    else if (_state == ChargerState::Start)
+    {
+        // reset in case set during autoDetect
+        _msg102_recieved = false;
+        _carData.Faults = (CarFaults)0;
+        _carData.Status = (CarStatus)0;
+        _chargerData.Status = ChargerStatus::CHARGER_STATUS_STOPPED;
+        _stopReason = StopReason::NONE;
+
+        SetSwitchD1(true); // will trigger car sending can
+
+        SetState(ChargerState::WaitForCarReadyToCharge);
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::CAR_STATUS_READY_TO_CHARGE))
         {
-            _powerOffOk = false;
+            if (_autoDetect)
+            {
+                SetSwitchD1(false); // PS: even if we set to false, car can continue to send 102 for a short time
+                _autoDetect = false;
 
-            // car probably want to compare that output voltage we claim matches what it can measure (it can probably measure volts before its contactors)
-            // FIXME: maybe it should be a different place...
-            //CloseAdapterContactor(); it make sense to do it here, but it does not work???
+                SetState(ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart);
+            }
+            else if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
+            {
+                printf("[cha] Battery incompatible\r\n");
+                set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_INCOMPAT);
+                SetState(ChargerState::Stopping_Start);
+            }
+            else
+            {
+                //LockChargingPlug();
+                _powerOffOk = false;
+                set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED);
 
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_CONNECTOR_LOCKED);
+                //PerformInsulationTest();
 
-            // Do insulation test, increase volts to 500 and down again to < 20v. as fast as possible (2sec). BUT WHAT IS THE POINT?
-
-            SetState(ChargerState::SetSwitchD2, 1);
+                SetState(ChargerState::WaitForPreChargeDone);
+            }
         }
         else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start);
         }
     }
-    else if (_state == ChargerState::SetSwitchD2) // own state, so we can create a delay between flag CHARGER_STATUS_ENERGIZING and D2 = true
+    else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        SetSwitchD2(true);
+        if (_preChargeCompletedButStalled)
+        {
+            // check if we have > 12V here. In case, we are probably welded.
+            adc_read_all();
+            printf("Voltage before closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+            if (_global.adc_12_volt > 12.0f)
+            {
+                _global.relayProbablyWeldedEvent = true;
+                printf("!!! WARNING: Contactor may be welded (> 12v) !!!\r\n");
+            }
 
-        SetState(ChargerState::WaitForCarContactorsClosed);
+            SetSwitchD2(true);
+
+            SetState(ChargerState::WaitForCarContactorsClosed);
+        }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        // for cha 0.9 this is always 0?
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) == false)
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
         {
-            // hard to tell where it make sense to do this....it depends totally on if the car uses voltage measurements _before_ the contactors, in its logic
-            // it does not make any sense to do it here...but it did work on xtra.....
+            // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
 
-            // AFTER CAR OPEN CONTACTOR, it will start asking for amps pretty fast. and if it dont get it, it will fail pretty fast too.....
+            adc_read_all();
+            printf("Voltage after closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+
             SetState(ChargerState::WaitForCarAskingAmps);
         }
         else if (IsTimeoutSec(20))
@@ -342,7 +363,6 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
     {
-        // normally happens 3sec after we set D2=true
         if (_carData.AskingAmps > 0)
         {
             // At this point (car asked for amps), CAR_STATUS_STOP_BEFORE_CHARGING is no longer valid (State >= ChargingLoop)
@@ -401,30 +421,24 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        // Got stuck here once... with ProtocolNumber = 1, i got hanging here. It seems it did then never get to set CAR_STATUS_CONTACTOR_OPEN in the first place....
-        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_WELDING_DETECTION_DONE) || IsTimeoutSec(10))
+        if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || IsTimeoutSec(10))
         {
-            // welding detection done, car no longer need live volts
+            // welding detection done
 
-            //OpenAdapterContactor();
-
-            // we now revoke the cars contactor power (it need both d1+d2), but it alreadyt said they were opened, so fine
-            SetSwitchD2(false);
-            // now also stop volts and charger completely.
-            _stop_delivering_volts = true;
-
-            // Not sure if this fits best before or after D2 = false. I guess its more transparent to the car to have it here.
             OpenAdapterContactor();
 
-            // spec says, after setting D2:false wait 0.5sec (500ms) before setting D1:false. We have 2 states after, so we already have 2 * 200ms and 300ms left.
-            SetState(ChargerState::Stopping_WaitForLowVolts, 3);
+            SetSwitchD2(false);
+            _stop_delivering_volts = true;
+
+            SetState(ChargerState::Stopping_WaitForLowVolts);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
         if (_chargerData.OutputVoltage <= 10 || IsTimeoutSec(10))
         {
-            clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_CONNECTOR_LOCKED);
+            //UnlockChargingPlug();
+            clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED);
 
             // do stop can in own state to make sure we send this message to car before we kill can
             SetState(ChargerState::Stopping_End);
@@ -432,10 +446,14 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_End)
     {
-        // this stops can (allthou not necesarely immediately, I have recieved messages after setting d1=false)
-        SetSwitchD1(false);
+        // spec says, after setting D2:false wait 500ms before setting D1:false. We have passed 2 state changes already, so we have 300ms left.
+        if (_cyclesInState > 3)
+        {
+            // this stops can
+            SetSwitchD1(false);
 
-        SetState(ChargerState::Stopped);
+            SetState(ChargerState::Stopped);
+        }
     }
     else if (_state == ChargerState::Stopped)
     {
@@ -444,44 +462,92 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
-bool ChademoCharger::PreChargeCompleted(uint16_t batt)
+bool ChademoCharger::PreChargeCompleted()
 {
-    if (batt == _carData.EstimatedNominalVoltage)
-    {
-        printf("[cha] PreChargeCompleted halted: batt == nominal\r\n");
-        _nominalVoltsInPreChargeEvent = true;
-        return false;
-    }
+    _preChargeCompletedButStalled = true;
 
-    // batt is target, target is reached, contactors are closed (because _state > ChargerState::WaitForCarContactorsClosed trigger batt = target)
-    return true;
+    // keep it hanging until car contactors closed
+    bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
+    if (!carContactorsClosed)
+        printf("[cha] PreCharge stalled until car contactors closed\r\n");
+    return carContactorsClosed;
 }
 
-extern "C" bool hardwareInterface_preChargeCompleted(uint16_t batt)
+extern "C" bool hardwareInterface_preChargeCompleted()
 {
-    return chademoCharger->PreChargeCompleted(batt);
+    return chademoCharger->PreChargeCompleted();
 }
 
-void ChademoCharger::SetState(ChargerState newState, int delayCycles)
+void ChademoCharger::SetState(ChargerState newState)
 {
-    printf("[cha] enter state %d/%s\r\n", newState, _stateNames[newState]);
+    printf("[cha] enter state %d/%s (autodetect:%d)\r\n", newState, _stateNames[newState], _autoDetect);
     _state = newState;
     _cyclesInState = 0;
-    _delayCycles = delayCycles;
 
     // force log on state change
     Log(true);
 };
+
+const char* ChademoCharger::GetStateName()
+{
+    return _stateNames[_state];
+};
+
+void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
+{
+    _chargerData.AvailableOutputVoltage = maxV;
+
+    _chargerData.AvailableOutputCurrent = clampToUint8(maxA);
+    if (_chargerData.AvailableOutputCurrent > ADAPTER_MAX_AMPS)
+        _chargerData.AvailableOutputCurrent = ADAPTER_MAX_AMPS;
+
+    _chargerData.OutputVoltage = outV;
+
+    _chargerData.OutputCurrent = clampToUint8(outA);
+};
+
+void ChademoCharger::SetChargerDataFromCcsParams()
+{
+    // hack
+    //if (_autoDetect)
+    //if (true)
+    if (_autoDetect)
+    {
+        // fake it for autodetect
+        SetChargerData(450, 100, 0, 0);
+        //SetChargerData(500, 200, 0, 0);
+    }
+    else
+    {
+        // hack, fake tesla
+        //SetChargerData(464, 200, 0, 0);
+
+        // mirror these values (Change method is only called for some params...)
+       SetChargerData(
+            Param::GetInt(Param::EvseMaxVoltage),
+            Param::GetInt(Param::EvseMaxCurrent),
+            Param::GetInt(Param::EvseVoltage),
+            Param::GetInt(Param::EvseCurrent)
+        );
+    }
+}
+
+//bool ChademoCharger::IsChargingStoppedByCharger()
+//{
+//    // TODO: any reason to not use ::Enabled? Yes...ccs never set this. It only reads it.
+//    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
+//}
 
 void ChademoCharger::Log(bool force)
 {
     if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second or when forced
-        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
+        printf("[cha] state:%d/%s cycles:%d charger: sim:%dV out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
             _state,
             GetStateName(),
             _cyclesInState,
+            _simulatedVolt,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
@@ -508,7 +574,6 @@ void ChademoCharger::Log(bool force)
     }
 }
 
-
 void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
 {
     if (id == 0x100)
@@ -530,6 +595,7 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg102_isr.pair[1] = data[1];
     }
 }
+
 
 /* Interrupt service routines */
 extern "C" void can1_rx0_isr(void)
@@ -598,7 +664,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
         // failure or abort
     }
 
-    // Always clear request complete flag RQCPx
+    // Always clear  request complete flag RQCPx
     CAN_TSR(canport) |= rqcp_mask;
 }
 
@@ -613,6 +679,7 @@ void ChademoCharger::SendChargerMessages()
     }
 }
 
+
 void ChademoCharger::UpdateChargerMessages()
 {
     COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "[cha] 108.WeldingDetection changed %d -> %d\r\n");
@@ -622,7 +689,10 @@ void ChademoCharger::UpdateChargerMessages()
 
     COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent changed %d -> %d\r\n");
-    COMPARE_SET(_msg109.m.PresentVoltage, _chargerData.OutputVoltage, "[cha] 109.OutputVoltage changed %d -> %d\r\n");
+
+    // real outVolt after car contactors close. Before this, use the simulated volt.
+    uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : _simulatedVolt;
+    COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "[cha] 109.OutputVoltage changed %d -> %d\r\n");
 
     uint8_t remainingChargingTime10s = 0;
     uint8_t remainingChargingTimeMins = 0;
@@ -642,30 +712,4 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.Status, _chargerData.Status, "[cha] 109.Status changed 0x%x -> 0x%x\r\n");
 }
 
-const char* ChademoCharger::GetStateName()
-{
-    return _stateNames[_state];
-};
-
-void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
-{
-    _chargerData.AvailableOutputVoltage = maxV;
-
-    _chargerData.AvailableOutputCurrent = clampToUint8(maxA);
-    if (_chargerData.AvailableOutputCurrent > ADAPTER_MAX_AMPS)
-        _chargerData.AvailableOutputCurrent = ADAPTER_MAX_AMPS;
-
-    _chargerData.OutputVoltage = outV;
-    _chargerData.OutputCurrent = clampToUint8(outA);
-};
-
-void ChademoCharger::SetChargerDataFromCcsParams()
-{
-    SetChargerData(
-        Param::GetInt(Param::EvseMaxVoltage),
-        Param::GetInt(Param::EvseMaxCurrent),
-        Param::GetInt(Param::EvseVoltage),
-        Param::GetInt(Param::EvseCurrent)
-    );
-}
 

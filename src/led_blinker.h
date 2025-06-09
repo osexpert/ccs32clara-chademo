@@ -3,11 +3,11 @@
 #include <stdint.h>
 
 
-static const  uint8_t blink_five[] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0 };
-static const  uint8_t blink_four[] = { 3, 3, 3, 3, 3, 3, 3, 9, 0, 0, 0 };
-static const  uint8_t blink_three[] = { 3, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0 };
-static const  uint8_t blink_two[] = { 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 0 };
-static const  uint8_t blink_one[] = { 3, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_5[] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 0 };
+static const  uint8_t blink_4[] = { 3, 3, 3, 3, 3, 3, 3, 9, 0, 0, 0 };
+static const  uint8_t blink_3[] = { 3, 3, 3, 3, 3, 9, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_2[] = { 3, 3, 3, 9, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_1[] = { 3, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_working[] = { 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_start[] = { 15, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_stop[] = { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };

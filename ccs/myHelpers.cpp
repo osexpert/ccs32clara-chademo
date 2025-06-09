@@ -2,9 +2,6 @@
 
 #include "ccs32_globals.h"
 
-//#include <cstdarg>
-
-
 uint16_t checkpointNumber;
 
 /* Helper functions */
@@ -14,22 +11,11 @@ void setCheckpoint(uint16_t newcheckpoint) {
     Param::SetInt(Param::checkpoint, newcheckpoint);
 }
 
-void addToTrace(enum Module module, const char* s) {
-       if (Param::GetInt(Param::logging) & module)
-           printf("[%u] %s\r\n", rtc_get_ms(), s);
+void addToTrace(enum Module module, const char * s) {
+   if (Param::GetInt(Param::logging) & module)
+      printf("[%u] %s\r\n", rtc_get_ms(), s);
+   // canbus_addStringToTextTransmitBuffer(mySerialPrintOutputBuffer); /* print to the CAN */
 }
-//void addToTrace(enum Module module, const char* format, ...) {
-//   if (Param::GetInt(Param::logging) & module)
-//       printf("[%u] ", rtc_get_ms());
-//
-//   va_list args;
-//   va_start(args, format);
-//   printf(format, args);
-//   va_end(args);
-//
-//       printf("\r\n");
-//   // canbus_addStringToTextTransmitBuffer(mySerialPrintOutputBuffer); /* print to the CAN */
-//}
 
 void addToTrace(enum Module module, const char * s, uint8_t* data, uint16_t len) {
    if (Param::GetInt(Param::logging) & module) {
