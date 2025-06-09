@@ -56,7 +56,7 @@
 //#define __enable_irq()  __asm__ volatile ("cpsie i")
 
 ChademoCharger* chademoCharger;
-StatusIndicator* ledBlinker;
+LedBlinker* ledBlinker;
 
 Stm32Scheduler* scheduler;
 
@@ -69,74 +69,87 @@ volatile uint32_t system_millis;
 // volatile?
 
 
-#define AUTO_POWER_OFF_LIMIT_SEC (60 * 5)
+#define AUTO_POWER_OFF_LIMIT_SEC (60 * 3)
 
-enum LedState
+enum MainState
 {
     Init,
     WaitForCcsStarted,
-    WaitForSDPStart,
-    WaitForPevStateMachineStarted,
+    WaitForSlacDone,
+    WaitForTcpConnected,
+    WaitForPreChargeStart,
     WaitForCurrentDemandLoop,
     WaitForDeliveringAmps,
+    Charging,
     Stop
 };
 
-LedState _state = Init;
+MainState _state = MainState::Init;
 
-void RunLedStateMachine()
+void RunMainStateMachine()
 {
-    if (_state != Stop && _global.stopButtonEvent)
+    if (_global.powerOffPending && _state != MainState::Stop)
     {
         ledBlinker->setPattern(blink_stop);
-        _state = Stop;
+        _state = MainState::Stop;
     }
 
-    if (_state == Init)
+    if (_state == MainState::Init)
     {
-        ledBlinker->setPattern(blink_one);
-        _state = WaitForCcsStarted;
+        ledBlinker->setPattern(blink_start);
+        _state = MainState::WaitForCcsStarted;
     }
-    else if (_state == WaitForCcsStarted)
+    else if (_state == MainState::WaitForCcsStarted)
     {
         if (_global.ccsKickoff)
         {
-            ledBlinker->setPattern(blink_two);
-            _state = WaitForSDPStart;
+            _state = MainState::WaitForSlacDone;
         }
     }
-    else if (_state == WaitForSDPStart)
+    else if (_state == MainState::WaitForSlacDone)
     {
         if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
         {
-            ledBlinker->setPattern(blink_three);
-            _state = WaitForCurrentDemandLoop;
+            ledBlinker->setPattern(blink_1);
+            _state = MainState::WaitForTcpConnected;
         }
     }
-    else if (_state == WaitForPevStateMachineStarted)
+    else if (_state == MainState::WaitForTcpConnected)
     {
-        if (Param::GetInt(Param::checkpoint) >= 400)
+        if (Param::GetInt(Param::checkpoint) >= 303) // tcp connected
         {
-            ledBlinker->setPattern(blink_four);
-            _state = WaitForCurrentDemandLoop;
+            ledBlinker->setPattern(blink_2);
+            _state = MainState::WaitForPreChargeStart;
         }
     }
-    else if (_state == WaitForCurrentDemandLoop)
+    else if (_state == MainState::WaitForPreChargeStart)
+    {
+        if (_global.ccsPreChargeStartedEvent)
+        {
+            ledBlinker->setPattern(blink_3);
+            _state = MainState::WaitForCurrentDemandLoop;
+        }
+    }
+    else if (_state == MainState::WaitForCurrentDemandLoop)
     {
         if (_global.ccsCurrentDemandStartedEvent)
         {
-            ledBlinker->setPattern(blink_five);
-            _state = WaitForDeliveringAmps;
+            ledBlinker->setPattern(blink_4);
+            _state = MainState::WaitForDeliveringAmps;
         }
     }
-    else if (_state == WaitForDeliveringAmps)
+    else if (_state == MainState::WaitForDeliveringAmps)
     {
-        if (_global.ccsDeliveredAmpsEvent)
+        if (Param::GetInt(Param::EvseCurrent) > 0)
         {
             ledBlinker->setPattern(blink_working);
+            _state = MainState::Charging;
         }
     }
+    else if (_state == MainState::Charging)
+    {
 
+    }
 }
 
 /* to solve linker warning, see https://openinverter.org/forum/viewtopic.php?p=64546#p64546 */
@@ -147,7 +160,7 @@ extern "C" void __cxa_pure_virtual()
 
 
 
-void StatusIndicator::applyLed(bool set)
+void LedBlinker::applyLed(bool set)
 {
     if (set)
     {
@@ -181,7 +194,7 @@ void power_off_no_return(const char* reason)
         msleep(100);
     }
 
-    if (_global.probablyWeldedEvent)
+    if (_global.relayProbablyWeldedEvent)
     {
         printf("!!! WARNING: Contactor may be welded. Use a multimeter to verify. May try the unwelding function (hold stop while power on). !!!\r\n");
     }
@@ -199,6 +212,7 @@ void power_off_no_return(const char* reason)
     // Its better that adapter contactor take the hit than the car, so power it off explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
     {
+        printf("Contactor was closed! This may be bad...\r\n");
         DigIo::contactor_out.Clear();
         msleep(100);
     }
@@ -223,34 +237,56 @@ void power_off_check()
         power_off_no_return("Stop pressed for 30sec -> force off");
     }
 
-    // fixme: power off after charging?
-
-    bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
-
-    bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
-    bool powerOffOkCha = chademoCharger->IsPowerOffOk();
-
-//    bool autoOffImmediatelyAfterCharging = _global.ccsDeliveredAmpsEvent && not_anymore;
-
-    if ((_global.stopButtonEvent || inactivity || _global.ccsDeliveredAmpsEvent) && powerOffOkCcs && powerOffOkCha)// || _cyclesWaitingForCcsStart > 3000 /* 5 min*/)
+    // Power off pending detector
+    if (!_global.powerOffPending)
     {
-        if (_global.stopButtonEvent)
-            printf("power off: stopButtonEvent (and plugs unlocked)\r\n");
+        bool buttonPressedBriefly = _global.stopButtonCounter > 0;
+        bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
+        bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
+
+        // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
+        if (buttonPressedBriefly && _state != MainState::WaitForSlacDone)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Stop button pressed briefly and slac not pending. Power off pending...\r\n");
+        }
+        if (buttonPressed5Seconds)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Stop button pressed for 5 seconds. Power off pending...\r\n");
+        }
         if (inactivity)
-            printf("power off: inactivity (and plugs unlocked)\r\n");
-        if (_global.ccsDeliveredAmpsEvent)
-            printf("power off: amps delivered (but now plugs are unlocked)\r\n");
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Inactivity. Power off pending...\r\n");
+        }
 
-        power_off_no_return("Plugs unlocked");
+        int ccsStopReason = Param::GetInt(Param::StopReason);
+        if (ccsStopReason != STOP_REASON_NONE)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Ccs stop reason %d. Power off pending...\r\n", ccsStopReason);
+        }
 
-        // I Think it only need to check ccs here, i trust it more. If ccs is not delivering amps, it should not matter what chademo says.
-        //if (lockedCha || lockedCcs)
-        //    //Param::Get(Param::EvseCurrent) > 5 || Param::Get(Param::EVTargetCurrent) > 5)
-        //{
-        //    //printf("Power off request denied, connector is (logically) locked. pending stop charging. press for 30sec for emergency shutdown.\r\n");
-        //    return;
-        //}
+        StopReason chaStopReason = chademoCharger->GetStopReason(); // do we need one for success? eg. accu full?
+        if (chaStopReason != StopReason::NONE)
+        {
+            _global.powerOffPending = true; // one way street
+            printf("Chademo stop reason %d. Power off pending...\r\n", chaStopReason);
+        }
+    }
 
+    if (_global.powerOffPending)
+    {
+        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
+
+
+        if (powerOffOkCcs && powerOffOkCha)
+        {
+            power_off_no_return("powerOffPending and both ccs and chademo says plugs are unlocked");
+        }
     }
 }
 
@@ -315,15 +351,21 @@ void print_sysinfo()
     {
         adc_read_all();
 
+        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCha = chademoCharger->IsPowerOffOk();
+
         // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("[sysinfo] uptime:%dsec %fV (nom:4.0) %fV (nom:12.0) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
+        printf("[sysinfo] uptime:%dsec %fV (nom:4.0) %fV (nom:12.0) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
             FP_FROMFLT(_global.adc_4_volt),
             FP_FROMFLT(_global.adc_12_volt),
             FP_FROMFLT(_global.adc_3_3_volt),
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
-            _global.ccsDeliveredAmpsEvent
+            _global.powerOffPending,
+            powerOffOkCcs,
+            powerOffOkCha,
+			_state
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
@@ -368,88 +410,45 @@ static void print_ccs_trace()
 static void Ms100Task(void)
 {
     if (_global.relayUnweldingAttempt)
-    {
         DigIo::contactor_out.Toggle();
-    }
-
-    chademoCharger->Run();
+	else
+	    chademoCharger->Run();
 
     _global.auto_power_off_timer_count_up_ms += 100;
 
-    RunLedStateMachine();
+    RunMainStateMachine();
     ledBlinker->tick(); // 100 ms tick
 
     iwdg_reset();
 
-    if (DigIo::stop_button_in_inverted.Get() == false)
-    {
-        // after _global.ccsKickoff, a short press no longer stop, to allow unplug\plug...to make it kick in...
-        if (!_global.stopButtonEvent)
-        {
-            bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
-            if (!_global.ccsKickoff)
-            {
-                _global.stopButtonEvent = true; // one way street
-                printf("Stop button pressed briefly (before ccsKickoff). Stop pending...\r\n");
-
-                //ledBlinker->setPattern(blink_sff); // short blinking
-            }
-            else if (buttonPressed5Seconds)
-            {
-                _global.stopButtonEvent = true; // one way street
-                printf("Stop button pressed for 5 seconds (after ccsKickoff). Stop pending...\r\n");
-
-                //ledBlinker->setPattern(blink_off); // short blinking
-            }
-        }
-
+    if (DigIo::stop_button_in_inverted.Get() == false) {
         _global.stopButtonCounter++;
     }
-    else
-    {
+    else {
         _global.stopButtonCounter = 0;
     }
 
-    // TODO: maybe simply use Locked state? When locked, we assume chargingAccomplished. Then when unlocked, we power off.
-    // Becuse of we locked and unlocked, it does not matter if we delivered amps or not (for most cases)
-    if (!_global.ccsDeliveredAmpsEvent && Param::GetInt(Param::EvseCurrent) > 0) // or 5 amps? Or > 1? But I guess 1 amp should suffice...
-    {
-        // dont care about chademo, if amps delivered it has to go somewhere:-)
-        _global.ccsDeliveredAmpsEvent = true; // triggered
-    }
-
-    // todo: use plug locked trigger instead?
-    //if (!_global.stopButtonEvent && _global.ccsDeliveredAmpsEvent)
-    //{
-    //    ledBlinker->setPattern(blink_working); // long blinking
-    //}
 
     power_off_check();
 
     print_sysinfo();
     print_ccs_trace();
-    
 }
 
 static void Ms30Task()
 {
+    if (_global.relayUnweldingAttempt)
+		return;
+
     if (!_global.ccsKickoff)
     {
         // chademo will set these and then ccs can start
         _global.ccsKickoff = chademoCharger->IsAutoDetectCompleted();
+        if (!_global.ccsKickoff)
+			return;
 
-        if (_global.ccsKickoff)
-        {
-            printf("ccs kickoff, cha autodetect completed\r\n");
-            //ledBlinker->setPattern(blink_two);
-        }
-        //        else
-          //          _cyclesWaitingForCcsStart++; auto power off attempt...
+        printf("ccs kickoff, cha autodetect completed\r\n");
     }
-
-    // !hack
-    if (!_global.ccsKickoff)
-        return; 
 
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
@@ -590,7 +589,7 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
-    StatusIndicator lb;
+    LedBlinker lb;
     ledBlinker = &lb;
 
     // scheduler and TIM4 stuff

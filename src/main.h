@@ -50,14 +50,16 @@ extern "C" {
 
         bool relayUnweldingAttempt = false;
 
-        bool stopButtonEvent = false;
+        bool powerOffPending = false;
 
         // ccs delivered 1 amps or more
-        bool ccsDeliveredAmpsEvent = false;
+        //bool ccsDeliveredAmpsEvent = false;
         bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
-        bool probablyWeldedEvent = false;
-
+        bool relayProbablyWeldedEvent = false;
+        //bool ccSlacDoneEvent = false;
+        //bool tcpConnectedEvent = false;
+        //bool ccsPevStateMachineStartedEvent = false;
        // bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;

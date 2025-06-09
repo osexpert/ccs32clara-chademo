@@ -181,6 +181,7 @@ void ChademoCharger::Run()
 void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
+    // TODO: use _carData.MaxBatteryVoltage? But what is the point? We always just ask for target voltage anyways...
     Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
@@ -238,14 +239,9 @@ void ChademoCharger::RunStateMachine()
             printf("[cha] Car status error before starting\r\n");
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
-        if (IsChargingStoppedByCharger())
+        if (_global.powerOffPending)
         {
-            printf("[cha] Charger stopped before starting\r\n");
-            SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
-        }
-        if (IsChargingStoppedByAdapter())
-        {
-            printf("[cha] Adapter stopped before starting\r\n");
+            printf("[cha] Power off pending before starting\r\n");
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
 
@@ -319,7 +315,7 @@ void ChademoCharger::RunStateMachine()
             printf("Voltage before closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
             if (_global.adc_12_volt > 12.0f)
             {
-                _global.probablyWeldedEvent = true;
+                _global.relayProbablyWeldedEvent = true;
                 printf("!!! WARNING: Contactor may be welded (> 12v) !!!\r\n");
             }
 
@@ -374,8 +370,7 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_NOT_IN_PARK)) set_flag(&_stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_ERROR)) set_flag(&_stopReason, StopReason::CAR_ERROR);
         if (_switch_k == false) set_flag(&_stopReason, StopReason::CAR_SWITCH_K_OFF);
-        if (IsChargingStoppedByCharger()) set_flag(&_stopReason, StopReason::CHARGER);
-        if (IsChargingStoppedByAdapter()) set_flag(&_stopReason, StopReason::ADAPTER_STOP_BUTTON);
+        if (_global.powerOffPending) set_flag(&_stopReason, StopReason::POWER_OFF_PENDING);
         if (_carData.CyclesSinceLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&_stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&_stopReason, StopReason::CHARGING_TIME);
 
@@ -517,11 +512,11 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     }
 }
 
-bool ChademoCharger::IsChargingStoppedByCharger()
-{
-    // TODO: any reason to not use ::Enabled? Yes...ccs never set this. It only reads it.
-    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
-}
+//bool ChademoCharger::IsChargingStoppedByCharger()
+//{
+//    // TODO: any reason to not use ::Enabled? Yes...ccs never set this. It only reads it.
+//    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
+//}
 
 void ChademoCharger::Log(bool force)
 {

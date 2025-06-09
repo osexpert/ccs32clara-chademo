@@ -173,12 +173,8 @@ enum StopReason
     CAR_NOT_READY_TO_CHARGE = 0x4,
     CAR_NOT_IN_PARK = 0x8,
     CAR_SWITCH_K_OFF = 0x10,
-    /// <summary>
-    /// Typically the ccs charger want us to stop
-    /// </summary>
-    CHARGER = 0x20,
-    ADAPTER_STOP_BUTTON = 0x40,
-    CAR_ERROR = 0x80,
+    POWER_OFF_PENDING = 0x20,
+    CAR_ERROR = 0x40
 };
 
 
@@ -373,7 +369,7 @@ class ChademoCharger
 public:
     bool PreChargeCompleted();
     void UpdateChargerMessages();
-    bool IsCurrentDemandStarted();
+    //bool IsCurrentDemandStarted();
     //bool IsPreChargeDone();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
@@ -392,7 +388,7 @@ public:
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
   
-    bool IsChargingStoppedByAdapter();
+    //bool IsChargingStoppedByAdapter();
     
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
 
@@ -411,7 +407,7 @@ public:
         return _stopReason;
     }
 
-    bool IsChargingStoppedByCharger();
+    //bool IsChargingStoppedByCharger();
     
    
     void Log(bool force = false);
