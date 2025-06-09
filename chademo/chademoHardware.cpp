@@ -54,13 +54,15 @@ bool ChademoCharger::IsChargingStoppedByAdapter()
 };
 
 /// <summary>
-/// We are just mirroring the car contactors, so the adapter contactor is pointless?
-/// Yes...it may seem so...
-/// BUT it seems it is needed, to adapt the speeds of the 2 protocols.
-/// ccs2 is very slow, chademo very fast. So if we were not able to isolate us from the potentionally very slow rising voltage during
-/// precharge, it could perhaps be tricky to fool the car to close the contactors? Not sure.
-/// At least with this contactor, we have ability to simulate/present 0 voltage to the car while ccs is busy precharging and we are busy simulating insulation test.
-/// When all done and car close contactors, thinking it is 0 volt, adapter contactor is closed and hey, here is battery voltage for you, both in can-msg and inlet.
+/// We are just mirroring the car contactors, so the adapter contactor is pointless? It may seem so...
+/// But its seems hard or impossible to make the car close its contactors after D2=true otherwise.
+/// Having 0 volt on the wire  seems to always work (regardless of what volt you tell it over can-msg).
+/// Having a voltage here, the car complains, go into turtle mode, and require clearing of DTC!
+/// It is possible it can work without ensuring 0 volt using a contactor, but not sure how.
+/// 
+/// Looking at can-logs it seem car often close contactor (CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = false)
+/// at high voltages, BUT chargers may use similar tricks...and actually presenting 0 volt on the wire when they set D2=true.
+/// We can not know since we do not have D2 in the can-log, nor the real voltage.
 /// </summary>
 void ChademoCharger::CloseAdapterContactor()
 {
