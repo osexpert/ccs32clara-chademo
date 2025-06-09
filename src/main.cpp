@@ -63,11 +63,8 @@ Stm32Scheduler* scheduler;
 global_data _global;
 
 /* monotonically increasing number of milliseconds from reset
- * overflows every 49 days if you're wondering
- */
+ * overflows every 49 days if you're wondering */
 volatile uint32_t system_millis;
-// volatile?
-
 
 #define AUTO_POWER_OFF_LIMIT_SEC (60 * 3)
 
@@ -281,8 +278,6 @@ void power_off_check()
         bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
-
-
         if (powerOffOkCcs && powerOffOkCha)
         {
             power_off_no_return("powerOffPending and both ccs and chademo says plugs are unlocked");
@@ -427,7 +422,6 @@ static void Ms100Task(void)
     else {
         _global.stopButtonCounter = 0;
     }
-
 
     power_off_check();
 
@@ -602,6 +596,7 @@ extern "C" int main(void)
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
+    // TODO: increase to 200amps?
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);

@@ -508,20 +508,13 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    // hack
-    //if (_autoDetect)
-    //if (true)
     if (_autoDetect)
     {
         // fake it for autodetect
         SetChargerData(450, 100, 0, 0);
-        //SetChargerData(500, 200, 0, 0);
     }
     else
     {
-        // hack, fake tesla
-        //SetChargerData(464, 200, 0, 0);
-
         // mirror these values (Change method is only called for some params...)
        SetChargerData(
             Param::GetInt(Param::EvseMaxVoltage),
@@ -531,12 +524,6 @@ void ChademoCharger::SetChargerDataFromCcsParams()
         );
     }
 }
-
-//bool ChademoCharger::IsChargingStoppedByCharger()
-//{
-//    // TODO: any reason to not use ::Enabled? Yes...ccs never set this. It only reads it.
-//    return Param::GetInt(Param::StopReason) != _stopreasons::STOP_REASON_NONE;
-//}
 
 void ChademoCharger::Log(bool force)
 {

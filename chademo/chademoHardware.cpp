@@ -32,26 +32,11 @@ void ChademoCharger::SetSwitchD1(bool set)
     _switch_d1 = set;
 };
 
-//bool ChademoCharger::IsCurrentDemandStarted()
-//{
-//    return _global.ccsCurrentDemandStartedEvent;
-//};
-
-//bool ChademoCharger::IsPreChargeDone()
-//{
-//    return _global.ccsPowerRelayOnTrigger_prechargeDone;
-//};
-
-
 bool ChademoCharger::GetSwitchK()
 {
     return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
 };
 
-//bool ChademoCharger::IsChargingStoppedByAdapter()
-//{
-//    return _global.stopButtonEvent;
-//};
 
 /// <summary>
 /// We are just mirroring the car contactors, so the adapter contactor is pointless? It may seem so...

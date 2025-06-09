@@ -369,29 +369,19 @@ class ChademoCharger
 public:
     bool PreChargeCompleted();
     void UpdateChargerMessages();
-    //bool IsCurrentDemandStarted();
-    //bool IsPreChargeDone();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
     bool IsAutoDetectCompleted();
-  
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
-    
-    void SetState(ChargerState newState);// , int delay_ms = 0);
-
+    void SetState(ChargerState newState);
     void OpenAdapterContactor();
-
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
-  
-    //bool IsChargingStoppedByAdapter();
-    
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
-
     bool GetSwitchK();
 
     bool IsPowerOffOk()
@@ -407,9 +397,6 @@ public:
         return _stopReason;
     }
 
-    //bool IsChargingStoppedByCharger();
-    
-   
     void Log(bool force = false);
 
     const char* GetStateName();
