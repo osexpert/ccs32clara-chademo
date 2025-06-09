@@ -181,6 +181,11 @@ void power_off_no_return(const char* reason)
         msleep(100);
     }
 
+    if (_global.probablyWeldedEvent)
+    {
+        printf("!!! WARNING: Contactor may be welded. Use a multimeter to verify. May try the unwelding function (hold stop while power on). !!!\r\n");
+    }
+
     // weird...i dont think this has any effect (here)
     // commented it
 //    DigIo::switch_d1_out.Clear();
@@ -249,10 +254,7 @@ void power_off_check()
     }
 }
 
-// Buffer to store ADC results (PA8, VREFINT, VBAT)
-#define ADC_CHANNEL_COUNT 3
-uint16_t adc_results[ADC_CHANNEL_COUNT];
-static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+
 
 void adc_battery_init(void)
 {
@@ -277,18 +279,32 @@ void adc_battery_init(void)
     adc_power_on(ADC1);
 }
 
-static void adc_read_all(void) {
+float adc_to_voltage(uint16_t adc, float gain) {
+    return adc * (3.3f / 4095.0f) * gain;
+}
+
+#define ADC_CHANNEL_COUNT 3
+void adc_read_all(void)
+{
+    // Buffer to store ADC results (PA8, VREFINT, VBAT)
+    uint16_t adc_results[ADC_CHANNEL_COUNT];
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
         adc_start_conversion_regular(ADC1);
         while (!adc_eoc(ADC1));
         adc_results[i] = adc_read_regular(ADC1);
     }
+
+    float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
+    
+    _global.adc_3_3_volt = vdd_voltage;
+    _global.adc_4_volt = adc_to_voltage(adc_results[1], 2.0f);
+    _global.adc_12_volt = adc_to_voltage(adc_results[0], 11.0f);
 }
 
-float adc_to_voltage(uint16_t adc, float gain) {
-    return adc * (3.3f / 4095.0f) * gain;
-}
+
 
 #define SYSINFO_EVERY_MS 2000 // 2 sec
 
@@ -299,14 +315,12 @@ void print_sysinfo()
     {
         adc_read_all();
 
-        float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
-
         // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
         printf("[sysinfo] uptime:%dsec %fV (max:4.0) %fV (max:11.56) vdd:%fV (max:3.4) cpu:%d%% pwroff_cnt:%d css_amps_evt:%d\r\n",
             system_millis / 1000,
-            FP_FROMFLT(adc_to_voltage(adc_results[1], 2.0f)),
-            FP_FROMFLT(adc_to_voltage(adc_results[0], 11.0f)),
-            FP_FROMFLT(vdd_voltage),
+            FP_FROMFLT(_global.adc_4_volt),
+            FP_FROMFLT(_global.adc_12_volt),
+            FP_FROMFLT(_global.adc_3_3_volt),
             scheduler->GetCpuLoad(),
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.ccsDeliveredAmpsEvent
@@ -569,8 +583,7 @@ extern "C" int main(void)
     {
         _global.relayUnweldingAttempt = true;
         DigIo::contactor_out.Toggle();
-        printf("Relay unwelding attempt\r\n");
-        //power_off_no_return("Stop button pressed during startup");
+        printf("Relay unwelding attempt: hold stop while power on. When you hear contactor close, release stop (before 1sec has passed)\r\n");
         msleep(1000);
     }
 

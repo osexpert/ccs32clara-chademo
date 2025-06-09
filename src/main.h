@@ -56,22 +56,15 @@ extern "C" {
         bool ccsDeliveredAmpsEvent = false;
         bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
+        bool probablyWeldedEvent = false;
 
        // bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
 
-        //int cha100 = 0;
-        //int cha101 = 0;
-        //int cha102 = 0;
-
-        //int cha108 = 0;
-        //int cha109 = 0;
-
-        //uint32_t cha108last = 0;
-        //uint32_t cha108dur = 0;
-        //uint32_t cha109last = 0;
-        //uint32_t cha109dur = 0;
+        float adc_3_3_volt = 0.0f;
+        float adc_4_volt = 0.0f;
+        float adc_12_volt = 0.0f;
     };
 
 

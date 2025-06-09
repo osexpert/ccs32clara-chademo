@@ -183,36 +183,30 @@ enum StopReason
 
 
 #define CHARGER_STATE_LIST \
-    X(PreStart_AutoDetectCompleted_WaitForPreChargeStart, 0) \
-    X(Start, 0) \
-    X(WaitForCarReadyToCharge, 0) \
-    X(WaitForPreChargeDone, 0) \
-    X(WaitForCarContactorsClosed, 8) \
-    X(WaitForCarAskingAmps, 0) \
-    X(ChargingLoop, 0) \
-    X(Stopping_Start, 0) \
-    X(Stopping_WaitForLowAmps, 0) \
-    X(Stopping_WaitForCarContactorsOpen, 0) \
-    X(Stopping_WaitForLowVolts, 0) \
-    X(Stopping_StopCan, 0) \
-    X(End, 0)
+    CHARGER_STATE(PreStart_AutoDetectCompleted_WaitForPreChargeStart) \
+    CHARGER_STATE(Start) \
+    CHARGER_STATE(WaitForCarReadyToCharge) \
+    CHARGER_STATE(WaitForPreChargeDone) \
+    CHARGER_STATE(WaitForCarContactorsClosed) \
+    CHARGER_STATE(WaitForCarAskingAmps) \
+    CHARGER_STATE(ChargingLoop) \
+    CHARGER_STATE(Stopping_Start) \
+    CHARGER_STATE(Stopping_WaitForLowAmps) \
+    CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
+    CHARGER_STATE(Stopping_WaitForLowVolts) \
+    CHARGER_STATE(Stopping_StopCan) \
+    CHARGER_STATE(End)
 
 enum ChargerState {
-#define X(name, timeout) name,
+#define CHARGER_STATE(name) name,
     CHARGER_STATE_LIST
-#undef X
+#undef CHARGER_STATE
 };
 
 const char* const _stateNames[] = {
-#define X(name, timeout) #name,
+#define CHARGER_STATE(name) #name,
     CHARGER_STATE_LIST
-#undef X
-};
-
-const uint16_t _stateTimeoutsSec[] = {
-#define X(name, timeout) timeout,
-    CHARGER_STATE_LIST
-#undef X
+#undef CHARGER_STATE
 };
 
 #pragma pack(push, 1)

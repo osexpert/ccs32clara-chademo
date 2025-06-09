@@ -216,6 +216,8 @@ bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
     return false;
 }
 
+extern void adc_read_all(void);
+
 /// <summary>
 /// PS: Do not care about timeout before the charging loop (power off is allowed).
 /// But after we have been inside the charging loop, we must get to the end somehow...
@@ -286,6 +288,12 @@ void ChademoCharger::RunStateMachine()
 
                 SetState(ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart);
             }
+            else if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
+            {
+                printf("[cha] Battery incompatible\r\n");
+                set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_INCOMPAT);
+                SetState(ChargerState::Stopping_Start);
+            }
             else
             {
                 //LockChargingPlug();
@@ -306,6 +314,15 @@ void ChademoCharger::RunStateMachine()
     {
         if (_preChargeCompletedButStalled)
         {
+            // check if we have > 12V here. In case, we are probably welded.
+            adc_read_all();
+            printf("Voltage before closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+            if (_global.adc_12_volt > 12.0f)
+            {
+                _global.probablyWeldedEvent = true;
+                printf("!!! WARNING: Contactor may be welded (> 12v) !!!\r\n");
+            }
+
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
@@ -313,11 +330,16 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        // for ProtocolNumber 1 it seems this flag is never set? I guess...could have a || _carData.ProtocolNumber < 2 here then...but no car to test on. And since no flag, I assume it need a delay too.
+        // for ProtocolNumber 1 it seems this flag is never set? I guess...could have a || _carData.ProtocolNumber < 2 here then...but no car to test on.
+        // And since no flag, I assume it need a delay too...but how long? I guess it could be possible to use adc 12v to detect when car close its contactors,
+        // we should then get > 12v....
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false || (_carData.ProtocolNumber < 2 && IsTimeoutSec(2)))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
+
+            adc_read_all();
+            printf("Voltage after closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
 
             SetState(ChargerState::WaitForCarAskingAmps);
         }
