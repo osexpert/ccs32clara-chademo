@@ -224,12 +224,6 @@ void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
 
-    //if (_delayCycles > 0)
-    //{
-    //    _delayCycles--;
-    //    return;
-    //}
-
     if (_state < ChargerState::ChargingLoop)
     {
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_STOP_BEFORE_CHARGING))
@@ -263,12 +257,6 @@ void ChademoCharger::RunStateMachine()
 
     if (_state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart)
     {
-        // not sure if precharge done is the best kickOff.
-        // It may be that PowerDelivery is a better place (this is after PreCharge).
-
-        // this trigger when PreChargeCompleted called. then precharge is at battVolt. But we keep it hanging i preCharge until car contactors close.
-        // _preChargeCompletedButStalled) HACK continue anyways
-        //if (_cyclesInState > 200) // HACK
         if (_global.ccsPreChargeStartedEvent)
         {
             SetState(ChargerState::Start);
@@ -300,12 +288,13 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
+                //LockChargingPlug();
                 _powerOffOk = false;
                 set_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED);
 
                 //PerformInsulationTest();
 
-                SetState(ChargerState::SimulateInsulationTest);
+                SetState(ChargerState::WaitForPreChargeDone);
             }
         }
         else if (IsTimeoutSec(20))
@@ -313,45 +302,21 @@ void ChademoCharger::RunStateMachine()
             SetState(ChargerState::Stopping_Start);
         }
     }
-    else if (_state == ChargerState::SimulateInsulationTest)
+    else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        // Making car think isulation test is done, seems to be make or break. From several logs, its hard to say _exactly_ what satisfies the car needs, to pass this step.
-        // But it seem it has to do with the outputVoltage msg109 says it has (not what the car can measure) and what voltages the car has been told between 
-        // CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED and D2=true.
-        // A steady low (0) or steady high (batt or target) in this period, will not suffice.
-        // Variations of climbing or decending can trigger it, but not always, it also depend on the voltages.
-        // Anyways...taking change and ccs outputVoltage during precharge (varies a lot) out of the equation, just fake it completely and hope this is stable and reproducable.
-        // TODO: try to make it shorter? Maybe 250v stages are not needed.
-        //const uint16_t insulationTestSimulateVolts[] = {250, 500, 500, 250, 0};
-        //const uint16_t insulationTestSimulateVolts[] = { 0, 0, 0, 0, 0 };
-        //constexpr size_t numElements = sizeof(insulationTestSimulateVolts) / sizeof(insulationTestSimulateVolts[0]);
-        //if (_cyclesInState <= numElements)
-        //{
-        //    _simulatedVolt = insulationTestSimulateVolts[_cyclesInState - 1];
-        //}
-        //else
-        //{
-
         if (_preChargeCompletedButStalled)
         {
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
-//        }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         // for ProtocolNumber 1 it seems this flag is never set? I guess...could have a || _carData.ProtocolNumber < 2 here then...but no car to test on. And since no flag, I assume it need a delay too.
-        // YES...seems so....so the adapter will close contactor immediately here....
         if (has_flag(_carData.Status, CarStatus::CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false || (_carData.ProtocolNumber < 2 && IsTimeoutSec(2)))
         {
-            // its not easy to tell if this should be here.
-            // theory: car care most about what it can measure, not what can tells it. So it will measure 0 volts...and this is good.
-            // its not all about measurements thou, as sometimes car will open contactor or not, so it has to care about something in the can too,
-            // but I don't know what. Its not easy to tell from the logs, they are all over the place.
-            // Idea: try to make it reproducable be always faking the volts before car open contactors....
-            // Not sure why it wants 0 volts and not battery voltage, but I have 2 cases where 0 volt did the trick..............
+            // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarAskingAmps);
@@ -359,14 +324,6 @@ void ChademoCharger::RunStateMachine()
         else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start);
-        }
-        else
-        {
-            // simulate increasing voltage from 0 to batt.
-            // simulate always at 0
-            /*_simulatedVolt += 20;
-            if (_simulatedVolt > _carData.EstimatedBatteryVoltage)
-                _simulatedVolt = _carData.EstimatedBatteryVoltage;*/
         }
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
@@ -448,7 +405,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_chargerData.OutputVoltage <= 10 || IsTimeoutSec(10))
         {
-            // safe to unlock plug
+            //UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED);
 
             // do stop can in own state to make sure we send this message to car before we kill can
@@ -462,7 +419,6 @@ void ChademoCharger::RunStateMachine()
         {
             // this stops can
             SetSwitchD1(false);
-            //_sendMessages = false;
 
             SetState(ChargerState::End);
         }
@@ -474,49 +430,27 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
-bool ChademoCharger::PreChargeCompleted(uint16_t inlet, uint16_t batt)
+bool ChademoCharger::PreChargeCompleted()
 {
-    //(vi
-
-// consider using something less than 20v to check for closeness?
-
-    // first time we are at 300v (start sweep)
     _preChargeCompletedButStalled = true;
-
-    // if car waiting to close contactors, start sweep
-    //if (_state == ChargerState::WaitForCarContactorsClosed)
-    //{
-    //  //  if (inlet > _preChargeSweepVoltage)
-    //    {
-    //        _preChargeSweepVoltage += 10; // consider using 5v?
-    //        uint16_t battMax = _carData.TargetBatteryVoltage - 10;
-    //        if (_preChargeSweepVoltage > battMax)
-    //            _preChargeSweepVoltage = battMax;
-
-    //        // SET BatteryVolt directly here, so we dont have to wait for the cha-state machine to run to set it (we save maybe 100ms if we are lucky)
-    //        // Even thou it breaks the clean interface with ccs:-)
-    //        Param::SetInt(Param::BatteryVoltage, _preChargeSweepVoltage);
-    //    }
-    //}
 
     // keep it hanging until car contactors closed
     bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
     if (!carContactorsClosed)
-        printf("[cha] PreCharge stalled until car close contactors\r\n");// .Sweep voltage : % d\r\n", _preChargeSweepVoltage);
+        printf("[cha] PreCharge stalled until car contactors closed\r\n");
     return carContactorsClosed;
 }
 
-extern "C" bool hardwareInterface_preChargeCompleted(uint16_t inlet, uint16_t batt)
+extern "C" bool hardwareInterface_preChargeCompleted()
 {
-    return chademoCharger->PreChargeCompleted(inlet, batt);
+    return chademoCharger->PreChargeCompleted();
 }
 
-void ChademoCharger::SetState(ChargerState newState)//, int delayCycles)
+void ChademoCharger::SetState(ChargerState newState)
 {
     printf("[cha] enter state %d/%s (autodetect:%d)\r\n", newState, _stateNames[newState], _autoDetect);
     _state = newState;
     _cyclesInState = 0;
-    //_delayCycles = delayCycles;
 
     // force log on state change
     Log(true);

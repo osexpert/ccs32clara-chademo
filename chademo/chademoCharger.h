@@ -186,7 +186,7 @@ enum StopReason
     X(PreStart_AutoDetectCompleted_WaitForPreChargeStart, 0) \
     X(Start, 0) \
     X(WaitForCarReadyToCharge, 0) \
-    X(SimulateInsulationTest, 0) \
+    X(WaitForPreChargeDone, 0) \
     X(WaitForCarContactorsClosed, 8) \
     X(WaitForCarAskingAmps, 0) \
     X(ChargingLoop, 0) \
@@ -377,7 +377,7 @@ struct ChargerData
 class ChademoCharger
 {
 public:
-    bool PreChargeCompleted(uint16_t inlet, uint16_t batt);
+    bool PreChargeCompleted();
     void UpdateChargerMessages();
     bool IsCurrentDemandStarted();
     //bool IsPreChargeDone();
@@ -410,8 +410,7 @@ public:
     }
 
     void CloseAdapterContactor();
-   // void PerformInsulationTest() { /* NOP */ }
-    
+      
 
     StopReason GetStopReason()
     {
@@ -444,7 +443,6 @@ public:
         bool _switch_k = false;
         bool _switch_d1 = false;
 
-//        bool _sendMessages = false;
         bool _msg102_recieved = false;
 
         bool _autoDetect = true;
@@ -453,7 +451,6 @@ public:
         bool _stop_delivering_volts = false;
 
         bool _preChargeCompletedButStalled = false;
-        //uint16_t _preChargeSweepVoltage = 300; // consider using 280v?
 
         uint16_t _simulatedVolt = 0;
 
