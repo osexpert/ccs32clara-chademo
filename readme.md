@@ -27,11 +27,11 @@ and try to bring chademo with us on the ride thru Precharge voltage rising, chad
 and if it does not get asked amps within ca. 4 seconds, it will fail. Getting from 0 volt before PreCharge and into CurrentDemand delivering amps on this short time, its only possible on a few chargers.
 Example, Tesla v2 can use well over 10 second in PreCharge alone. So a stable and reproducable solution may not be possible without the hack, but more investigation needed to be 100% sure.
 
-Ccs otoh, works exactly like we simulate it: the PreCharge voltage is set to battery voltage and when voltage is reached, car open its contactors (difference between changer and battery voltage is minimal).
+Ccs otoh, works exactly like we simulate it AFAIK: the PreCharge voltage is set to battery voltage and when voltage is reached, car open its contactors (difference between charger and battery voltage is small).
 The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc...
 So even thou chademo is not made for the charger and car to "meet" on battery voltage, and we do not really know the battery voltage, this _seems_ to work fine, but its hard to say if this has any issues (burnt relays etc.)
 How I describe it is also how the original firmware works, AFAICT, allthou it uses a fixed estimated battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
-(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so have to use a fixed delay instead, I suppose...).
+(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
 
 Stop button/power off:
 Shortly pressing stop button will initiate power off (pending).
@@ -43,7 +43,7 @@ Auto power off after 3 minutes of not being inside ccs CurrentDemand loop (could
 
 Special mode: hold stop button while powering on. You should hear a click from the adapter contactor. Let go of the stop button within 1 second, and you have activated contactor unwelding attempt, where 
 the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
-process, to see if the contactor becomes unstuck again. My relay got stuck for some reason (you have been warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
+process, to see if the contactor becomes unstuck again. My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
 
 Led:
 Initially, slow blinking [***************_______________]
@@ -56,12 +56,14 @@ When stop/power off pending, fast blinking [*_]
 
 Other:
 There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hung.
-There is a welding detection logic that check if supply voltage is 12 volt or more, before adapter contactor is closed, in case, the contactor is probably stuck. You will see this in the log, at the end (or search for "welding").
+There is a welding detection logic that check if supply voltage is 12 volt (or more), _before_ adapter contactor is closed, in case, the contactor is probably stuck. You will see this in the log, at the end (or search for "welding").
+The car will also most likely (at least it did for me), display a warning and say the EV need service, and car was put into turtle mode! I used LeafSpy Pro to clear the DTCs, else I would probably had to go to a garage!
+So yes, it happened to me. Not sure why, if it was by chance or if my firmware has a problem. So I suggest traveling with a CAN BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
 
 Original firmware:
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
 Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower), else I had little problems.
-Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned:-)
+Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned.
 Happy hacking.
 
 
