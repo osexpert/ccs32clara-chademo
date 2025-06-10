@@ -596,7 +596,8 @@ extern "C" int main(void)
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-    // TODO: increase to 200amps?
+    // TODO: increase to 200amps? check if 150A makes a difference, if it can go past 125?
+    Param::SetInt(Param::MaxCurrent, 150);
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);

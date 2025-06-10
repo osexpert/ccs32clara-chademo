@@ -4,7 +4,7 @@
 Alternative firmware for adapter that uses My407ccs2chademo.bin.
 Adapter probably uses a stm32f407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
-It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A).
+It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A). Transformer is connected to the car-side of the adapter.
 It has 2 batteries. One short and one long. The long one seems to drive electronics. Guessing the short one drive contactors (one in the adapter itself + 2 in the car).
 2 stop buttons, but they are the same GPIO for both.
 It has 2 controllable leds, one external and one internal.
@@ -12,22 +12,51 @@ It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw sp
 Some of the voltages are wired up to adc gpios. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
 
 Operation:
-Plug adapter into car. Ccs logic will not start until chademo communication is established and we have maxVoltage, targetVoltage, soc and estimated battery voltage from the car. After this, chademo is shut down and will restart when ccs reach end of ccs PreCharge.
-When ccs reach CurrentDemand, then hopefully chademo is also ready and they will join in their respective charge loops.
+Plug adapter into car. Plug cable into adapter. Power on adapter.
+Adapter will start chademo to fetch targetVoltage, soc and estimated battery voltage (calculated from targetVoltage and soc).
+Chademo will then shut down and ccs logic will start.
+When ccs reach start of PreCharge, chademo is restarted. Estimated battery voltage is used as PreCharge target voltage.
+When PreCharge reach this voltage, chademo d2 is set. We stall PreCharge and prevent it from completing until car closes contactors.
+During this time, 0 volt has been presented to car both via chademo and on the wire (because adapter contactor not closed yet). It is a lie as we are actually on estimated battery voltage at this time.
+After we set d2, car hopefully close contactors. After car close contactors, we close the adapter contactor and voila, we apperantly manifested battery voltage on the wire and via chademo instantly.
+This is _not_ how chademo is supposed to work thou (I _think_ charger is supposed to quickly increase voltage from 0 volts to target voltage, immediately after car closes the contactors).
+
+The problem is that ccs seems way to slow to emulate this kind of behaviour and also PreCharge is not necesarely supported from 0 volt and up, some may jump directly to target.
+At least I was unable to make the car close its contactors without using this trick. If we start chademo before PreCharge, close adapter contactor and set d2, when ccs is 0 volt, before PreCharge,
+and try to bring chademo with us on the ride thru Precharge voltage rising, chademo would time out, because car close contactors ca. 1 second after we set d2, and start to ask for amps shortly after,
+and if it does not get asked amps within ca. 4 seconds, it will fail. Getting from 0 volt before PreCharge and into CurrentDemand delivering amps on this short time, its only possible on a few chargers.
+Example, Tesla v2 can use well over 10 second in PreCharge alone. So a stable and reproducable solution may not be possible without the hack, but more investigation needed to be 100% sure.
+
+Ccs otoh, works exactly like we simulate it: the PreCharge voltage is set to battery voltage and when voltage is reached, car open its contactors (difference between changer and battery voltage is minimal).
+The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc...
+So even thou chademo is not made for the charger and car to "meet" on battery voltage, and we do not really know the battery voltage, this _seems_ to work fine, but its hard to say if this has any issues (burnt relays etc.)
+How I describe it is also how the original firmware works, AFAICT, allthou it uses a fixed estimated battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
+(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so have to use a fixed delay instead, I suppose...).
 
 Stop button/power off:
-When idle, stop button will power off instantly.
-When working (ccs logic started), a 5 sec. press will initiate power off. Led flash 300/300ms. Depending on how far it has progressed, it can power off instantly or after charging has stopped.
-When noting else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
-Auto power off after 5 minutes of not being active inside ccs CurrentDemand loop (WIP/could be smarter).
+Shortly pressing stop button will initiate power off (pending).
+Between ccs has started and Slac is done, stop button must be pressed for 5 seconds to initiate power off (pending). This to allow "fiddle" with the plug or late plug insertion.
+As soon as Slac is done, the logic revert to "shortly pressing".
+When power off is pending, adapter will power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
+When nothing else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
+Auto power off after 3 minutes of not being inside ccs CurrentDemand loop (could be smarter).
+
+Special mode: hold stop button while powering on. You should hear a click from the adapter contactor. Let go of the stop button within 1 second, and you have activated contactor unwelding attempt, where 
+the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
+process, to see if the contactor becomes unstuck again. My relay got stuck for some reason (you have been warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
 
 Led:
-Initially, led flash 600/600ms.
-When charging/after delivered amps, led flash 1200/1200ms.
-When stop/power off pending, led flash 300/300ms.
+Initially, slow blinking [***************_______________]
+When Slac is done, one blink [***_________]
+When tcp connected, two blinks [***___***_________]
+When PreCharge started, three blinks [***___***___***_________]
+When CurrentDemand started, four blinks [***___***___***___***_________]
+When delivering amps, medium blinking [*****_____]
+When stop/power off pending, fast blinking [*_]
 
 Other:
-There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hang.
+There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hung.
+There is a welding detection logic that check if supply voltage is 12 volt or more, before adapter contactor is closed, in case, the contactor is probably stuck. You will see this in the log, at the end (or search for "welding").
 
 Original firmware:
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
@@ -35,8 +64,6 @@ Original firmware generally works well. It it missing several of the ccs shutdow
 Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned:-)
 Happy hacking.
 
-TODO:
-Add more led blibk sequences to track progress.
 
 Download:
 Every commit is built automatically and can be downloaded here, as artifact of the workflow run: https://github.com/osexpert/ccs32clara-chademo/actions

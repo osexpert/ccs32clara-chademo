@@ -20,6 +20,7 @@
 #include "printf.h"
 
 #define ADAPTER_MAX_AMPS 200
+#define ADAPTER_MAX_VOLTS 500
 
 template<typename T>
 constexpr T min(T a, T b) {
@@ -64,23 +65,23 @@ enum CarFaults
     /// <summary>
     /// 102.4.0
     /// </summary>
-    CAR_FAULT_OVER_VOLT = 0x1,
+    OVER_VOLT = 0x1,
     /// <summary>
     /// 102.4.1
     /// </summary>
-    CAR_FAULT_UNDER_VOLT = 0x2,
+    UNDER_VOLT = 0x2,
     /// <summary>
     /// 102.4.2
     /// </summary>
-    CAR_FAULT_DEV_AMPS = 0x4,
+    DEV_AMPS = 0x4,
     /// <summary>
     /// 102.4.3
     /// </summary>
-    CAR_FAULT_OVER_TEMP = 0x8,
+    OVER_TEMP = 0x8,
     /// <summary>
     /// 102.4.4
     /// </summary>
-    CAR_FAULT_DEV_VOLT = 0x10
+    DEV_VOLT = 0x10
 };
 
 
@@ -89,19 +90,19 @@ enum CarStatus
     /// <summary>
     /// 102.5.0 Vehicle charging enabled
     /// </summary>
-    CAR_STATUS_READY_TO_CHARGE = 0x1,
+    READY_TO_CHARGE = 0x1,
 
     /// <summary>
     /// 102.5.1 Vehicle shift position
     /// </summary>
-    CAR_STATUS_NOT_IN_PARK = 0x2,
+    NOT_IN_PARK = 0x2,
 
     /// <summary>
     /// 102.5.2 Charging system fault
     /// Can timeout? Other timeout? Too long/short in state?
-    /// This is analog to ChargerStatus::CHARGER_STATUS_ERROR, only opposite direction
+    /// This is analog to ChargerStatus::ERROR, only opposite direction
     /// </summary>
-    CAR_STATUS_ERROR = 0x4,
+    ERROR = 0x4,
 
     /// <summary>
     /// 102.5.3 Vehicle status
@@ -110,18 +111,18 @@ enum CarStatus
     /// and set as 1 after the termination of welding detection (end)
     /// main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
     /// </summary>
-    CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
+    CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
     /// </summary>
-    CAR_STATUS_STOP_BEFORE_CHARGING = 0x10,
+    STOP_BEFORE_CHARGING = 0x10,
 
     /// <summary>
     /// 102.5.7
     /// car is V2X compatible (can deliver power to grid)
     /// </summary>
-    CAR_STATUS_DISCHARGE_COMPATIBLE = 0x80,
+    DISCHARGE_COMPATIBLE = 0x80,
 };
 
 enum ChargerStatus
@@ -132,40 +133,42 @@ enum ChargerStatus
     /// During startup, CHARGER_STATUS_CHARGING is set and then amps are still 0.
     /// 0: standby 1: charging (power transfer from charger)
     /// </summary>
-    CHARGER_STATUS_CHARGING = 0x1,
+    CHARGING = 0x1,
 
     /// <summary>
     /// 109.5.1
-    /// something went wrong (fault caused by (or inside) the charger)
+    /// Something is wrong with the charger
     /// </summary>
-    CHARGER_STATUS_ERROR = 0x2,
+    CHARGER_ERROR = 0x2,
 
     /// <summary>
     /// 109.5.2
     /// connector is currently locked (electromagnetic lock, plug locked into the car)
     /// </summary>
-    CHARGER_STATUS_ENERGIZING_OR_PLUG_LOCKED = 0x4,
+    ENERGIZING_OR_PLUG_LOCKED = 0x4,
 
     /// <summary>
     /// 109.5.3
     /// parameters between vehicle and charger not compatible (battery incompatible?)
     /// </summary>
-    CHARGER_STATUS_INCOMPAT = 0x8,
+    BATTERY_INCOMPATIBLE = 0x8,
 
     /// <summary>
     /// 109.5.4
-    /// can be CAN timeout, or other timeout (too short/long in state). problem with the car, such as improper connection (or something wrong with the battery?)
+    /// Something is wrong with the car and/or changer.
+    /// Can timeout, car asking for too much volts, car asking for too much amps. So mainly car stuff. But spec say this is for errors both in charger or car.
     /// </summary>
-    CHARGER_STATUS_CAR_ERROR = 0x10,
+    CHARGING_SYSTEM_ERROR = 0x10,
 
     /// <summary>
     /// 109.5.5
     /// charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
     /// </summary>
-    CHARGER_STATUS_STOPPED = 0x20,
+    STOPPED = 0x20,
 };
 
-enum StopReason
+// class make CHARGING_SYSTEM_ERROR not clash with ChargerStatus (insanity)
+enum class StopReason
 {
     NONE = 0x0,
     CAR_CAN_AMPS_TIMEOUT = 0x1,
@@ -174,7 +177,13 @@ enum StopReason
     CAR_NOT_IN_PARK = 0x8,
     CAR_SWITCH_K_OFF = 0x10,
     POWER_OFF_PENDING = 0x20,
-    CAR_ERROR = 0x40
+    CAR_ERROR = 0x40,
+    CHARGING_SYSTEM_ERROR = 0x80,
+    UNKNOWN = 0x100,
+    CHARGER_ERROR = 0x200,
+    CAR_STOP_BEFORE_CHARGING = 0x400,
+    BATTERY_INCOMPATIBLE = 0x800,
+    TIMEOUT = 0x1000
 };
 
 
@@ -286,7 +295,7 @@ struct msg109
             uint16_t PresentVoltage;
             uint8_t PresentChargingCurrent;
             uint8_t Unused4; // discharge compatible
-            uint8_t Status = ChargerStatus::CHARGER_STATUS_STOPPED;
+            uint8_t Status;
             uint8_t RemainingChargingTime10s;
             uint8_t RemainingChargingTimeMinutes;
         } m;
@@ -340,7 +349,7 @@ struct ChargerData
     /// <summary>
     /// Initial status is stopped
     /// </summary>
-    ChargerStatus Status = ChargerStatus::CHARGER_STATUS_STOPPED;
+    ChargerStatus Status = ChargerStatus::STOPPED;
 
     uint16_t AvailableOutputVoltage;
 
