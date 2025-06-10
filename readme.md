@@ -1,15 +1,15 @@
 # ccs32clara-chademo
 
 ![image](doc/ccs2-chademo_adapter.jpg)
-Alternative firmware for adapter that uses My407ccs2chademo.bin.
+Alternative firmware for Dongguan Longood CCS2 to CHAdeMO adapter that uses My407ccs2chademo.bin.
 Adapter probably uses a stm32f407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
 It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A). Transformer is connected to the car-side of the adapter.
 It has 2 batteries. One short and one long. The long one seems to drive electronics. Guessing the short one drive contactors (one in the adapter itself + 2 in the car).
 2 stop buttons, but they are the same GPIO for both.
-It has 2 controllable leds, one external and one internal.
+It has 2 controllable leds, one external and one internal (invisible).
 It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
-Some of the voltages are wired up to adc gpios. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
+Some of the voltages are wired up to adc GPIOs. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
 
 Operation:
 Plug adapter into car. Plug cable into adapter. Power on adapter.
@@ -21,16 +21,16 @@ During this time, 0 volt has been presented to car both via chademo and on the w
 After we set d2, car hopefully close contactors. After car close contactors, we close the adapter contactor and voila, we apperantly manifested battery voltage on the wire and via chademo instantly.
 This is _not_ how chademo is supposed to work thou (I _think_ charger is supposed to quickly increase voltage from 0 volts to target voltage, immediately after car closes the contactors).
 
-The problem is that ccs seems way to slow to emulate this kind of behaviour and also PreCharge is not necesarely supported from 0 volt and up, some may jump directly to target.
+The problem is that ccs seems way to slow to emulate this kind of behaviour and also PreCharge is not necesarely supported from 0 volt and up, some jump directly to target.
 At least I was unable to make the car close its contactors without using this trick. If we start chademo before PreCharge, close adapter contactor and set d2, when ccs is 0 volt, before PreCharge,
 and try to bring chademo with us on the ride thru Precharge voltage rising, chademo would time out, because car close contactors ca. 1 second after we set d2, and start to ask for amps shortly after,
-and if it does not get asked amps within ca. 4 seconds, it will fail. Getting from 0 volt before PreCharge and into CurrentDemand delivering amps on this short time, its only possible on a few chargers.
+and if it does not get asked amps within ca. 4 seconds, it will fail. Getting from 0 volt before PreCharge and into CurrentDemand delivering amps on this short time, its only possible on some chargers.
 Example, Tesla v2 can use well over 10 second in PreCharge alone. So a stable and reproducable solution may not be possible without the hack, but more investigation needed to be 100% sure.
 
 Ccs otoh, works exactly like we simulate it AFAIK: the PreCharge voltage is set to battery voltage and when voltage is reached, car open its contactors (difference between charger and battery voltage is small).
 The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc...
 So even thou chademo is not made for the charger and car to "meet" on battery voltage, and we do not really know the battery voltage, this _seems_ to work fine, but its hard to say if this has any issues (burnt relays etc.)
-How I describe it is also how the original firmware works, AFAICT, allthou it uses a fixed estimated battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
+How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
 (chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
 
 Stop button/power off:
@@ -66,9 +66,8 @@ Original firmware generally works well. It it missing several of the ccs shutdow
 Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned.
 Happy hacking.
 
-
 Download:
-Every commit is built automatically and can be downloaded here, as artifact of the workflow run: https://github.com/osexpert/ccs32clara-chademo/actions
+Every commit is built automatically and can be downloaded here, as artifact of a workflow run: https://github.com/osexpert/ccs32clara-chademo/actions
 
 # ccs32clara
 
