@@ -444,7 +444,7 @@ public:
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
-        
+        float _adc_12_volt_start = 0.0f;
 
         StopReason _stopReason = StopReason::NONE;
         

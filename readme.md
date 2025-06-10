@@ -39,7 +39,7 @@ Between ccs has started and Slac is done, stop button must be pressed for 5 seco
 As soon as Slac is done, the logic revert to "shortly pressing".
 When power off is pending, adapter will power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
 When nothing else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
-Auto power off after 3 minutes of not being inside ccs CurrentDemand loop (could be smarter).
+Auto power off after 3 minutes of not being inside ccs PreCharge or CurrentDemand loop (could be smarter).
 
 Special mode: hold stop button while powering on. You should hear a click from the adapter contactor. Let go of the stop button within 1 second, and you have activated contactor unwelding attempt, where 
 the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
@@ -59,6 +59,7 @@ There is a 5sec. watchdog that will reset (effectively power off) adapter if the
 There is a welding detection logic that check if supply voltage is 12 volt (or more), _before_ adapter contactor is closed, in case, the contactor is probably stuck. You will see this in the log, at the end (or search for "welding").
 The car will also most likely (at least it did for me), display a warning and say the EV need service, and car was put into turtle mode! I used LeafSpy Pro to clear the DTCs, else I would probably had to go to a garage!
 So yes, it happened to me. Not sure why, if it was by chance or if my firmware has a problem. So I suggest traveling with a CAN BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
+Update: charging will now stop if it detect a welded contactor: < 12 volt when starting and > 12 volt before setting d2, before adapter contactor is closed. This can only mean that contactor is welded closed.
 
 Original firmware:
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.

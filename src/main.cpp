@@ -191,10 +191,10 @@ void power_off_no_return(const char* reason)
         msleep(100);
     }
 
-    if (_global.relayProbablyWeldedEvent)
-    {
-        printf("!!! WARNING: Contactor may be welded. Use a multimeter to verify. May try the unwelding function (hold stop while power on). !!!\r\n");
-    }
+    //if (_global.relayProbablyWeldedEvent)
+    //{
+    //    printf("!!! WARNING: Contactor may be welded. Use a multimeter to verify. May try the unwelding function (hold stop while power on). !!!\r\n");
+    //}
 
     // weird...i dont think this has any effect (here)
     // commented it
@@ -596,8 +596,7 @@ extern "C" int main(void)
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
     Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
-    // TODO: increase to 200amps? check if 150A makes a difference, if it can go past 125?
-    Param::SetInt(Param::MaxCurrent, 150);
+    Param::SetInt(Param::MaxCurrent, 200);
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);

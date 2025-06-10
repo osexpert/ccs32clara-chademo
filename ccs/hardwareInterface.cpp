@@ -33,6 +33,8 @@ int16_t hardwareInterface_getInletVoltage(void)
     // only called in precharge, so we can abuse it as trigger
     _global.ccsPreChargeStartedEvent = true;
 
+    _global.auto_power_off_timer_count_up_ms = 0;
+
     // we have no inlet voltage sensor. 
     return Param::GetInt(Param::EvseVoltage);
 }

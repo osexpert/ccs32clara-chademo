@@ -158,7 +158,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         if (_msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
-            printf("Car asking for too much volts. ask:%d max:%d. Stopping.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+            printf("[cha] Car asking for too much volts. ask:%d max:%d. Stopping.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
             // let error handlers deal with it
         }
@@ -169,7 +169,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         if (_msg102.m.ChargingCurrentRequest > _chargerData.AvailableOutputCurrent)
         {
-            printf("Car asking for too much amps. ask:%d max:%d. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.AvailableOutputCurrent);
+            printf("[cha] Car asking for too much amps. ask:%d max:%d. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.AvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
             // let error handlers deal with it
         }
@@ -188,7 +188,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
             if (_carData.SocPercent > 100)
             {
-                printf("Car report soc > 100: %d\r\n", _carData.SocPercent);
+                printf("[cha] Car report soc > 100: %d\r\n", _carData.SocPercent);
                 _carData.SocPercent = 100;
             }
 
@@ -270,6 +270,7 @@ void ChademoCharger::RunStateMachine()
 
     if (_state < ChargerState::ChargingLoop)
     {
+        // TODO: we are printing stop reason value, so all the printf not really needed
         if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING))
         {
             printf("[cha] Car stopped before starting\r\n");
@@ -328,6 +329,10 @@ void ChademoCharger::RunStateMachine()
         _chargerData.Status = ChargerStatus::STOPPED;
         _stopReason = StopReason::NONE;
 
+        adc_read_all();
+        _adc_12_volt_start = _global.adc_12_volt;
+        printf("[cha] Voltage when starting:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+
         SetSwitchD1(true); // will trigger car sending can
 
         SetState(ChargerState::WaitForCarReadyToCharge);
@@ -373,11 +378,11 @@ void ChademoCharger::RunStateMachine()
             // If we continue at this point, it is likely that the car will complain, go into turtle mode, and require clearing DTCs. Or maybe its already too late??
             // SO...it may be an idea to refuse to continue and set ChargerStatus::CHARGER_ERROR! This is possible to test by closing contactor too soon on purpose.
             adc_read_all();
-            printf("Voltage before closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
-            if (_global.adc_12_volt > 12.0f)
+            printf("[cha] Voltage before closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+            if (_adc_12_volt_start < 12.0f && _global.adc_12_volt > 12.0f)
             {
-                _global.relayProbablyWeldedEvent = true;
-                printf("!!! WARNING: Contactor may be welded (> 12v) !!! Stopping.\r\n");
+                //_global.relayProbablyWeldedEvent = true;
+                printf("[cha] Contactor must be welded/stuck: voltage went from < 12 to > 12 volts, but contactor is not closed yet. Stopping.\r\n");
 
                 set_flag(&_chargerData.Status, ChargerStatus::CHARGER_ERROR);
                 // fall thru: let error handler on top deal with it
@@ -398,7 +403,7 @@ void ChademoCharger::RunStateMachine()
             CloseAdapterContactor();
 
             adc_read_all();
-            printf("Voltage after closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+            printf("[cha] Voltage after closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
 
             SetState(ChargerState::WaitForCarAskingAmps);
         }
@@ -687,7 +692,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 
     int mailbox = can_transmit(canport, id, ext, rtr, len, data);
     if (mailbox < 0) {
-        printf("[can] transmit: no mailbox available\r\n");
+        printf("[cha] transmit: no mailbox available\r\n");
         return;// CAN_TX_NO_MAILBOX;
     }
 
@@ -699,7 +704,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
     uint32_t start = system_millis;
     while ((CAN_TSR(canport) & rqcp_mask) == 0) {
         if ((system_millis - start) > CAN_TRANSMIT_TIMEOUT_MS) {
-            printf("[can] transmit timeout for ID 0x%x\r\n", id);
+            printf("[cha] transmit timeout for ID 0x%x\r\n", id);
             break;
         }
     }
