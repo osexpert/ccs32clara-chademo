@@ -75,6 +75,7 @@ enum MainState
     WaitForSlacDone,
     WaitForTcpConnected,
     WaitForPreChargeStart,
+    WaitForPreChargeDoneButStalled,
     WaitForCurrentDemandLoop,
     WaitForDeliveringAmps,
     Charging,
@@ -124,6 +125,14 @@ void RunMainStateMachine()
         if (_global.ccsPreChargeStartedEvent)
         {
             ledBlinker->setPattern(blink_3);
+            _state = MainState::WaitForPreChargeDoneButStalled;
+        }
+    }
+    else if (_state == MainState::WaitForPreChargeDoneButStalled)
+    {
+        if (_global.ccsPreChargeDoneButStalledEvent)
+        {
+            ledBlinker->setPattern(blink_4);
             _state = MainState::WaitForCurrentDemandLoop;
         }
     }
@@ -131,7 +140,7 @@ void RunMainStateMachine()
     {
         if (_global.ccsCurrentDemandStartedEvent)
         {
-            ledBlinker->setPattern(blink_4);
+            // barely noticable, removed blink
             _state = MainState::WaitForDeliveringAmps;
         }
     }

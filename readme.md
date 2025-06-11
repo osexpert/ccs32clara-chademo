@@ -50,7 +50,7 @@ Initially, slow blinking [***************_______________]
 When Slac is done, one blink [***_________]
 When tcp connected, two blinks [***___***_________]
 When PreCharge started, three blinks [***___***___***_________]
-When CurrentDemand started, four blinks [***___***___***___***_________]
+When PreCharge is done, but stalled waiting for chademo, four blinks [***___***___***___***_________]
 When delivering amps, medium blinking [*****_____]
 When stop/power off pending, fast blinking [*_]
 

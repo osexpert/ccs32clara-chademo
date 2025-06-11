@@ -156,9 +156,9 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
-        if (_msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
+        if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
-            printf("[cha] Car asking for too much volts. ask:%d max:%d. Stopping.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+            printf("[cha] Car asking (%d) for more than max (%d) volts. Stopping.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
             // let error handlers deal with it
         }
@@ -167,9 +167,9 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetBatteryVoltage = _msg102.m.TargetBatteryVoltage;
         }
 
-        if (_msg102.m.ChargingCurrentRequest > _chargerData.AvailableOutputCurrent)
+        if (_state == ChargerState::ChargingLoop && _msg102.m.ChargingCurrentRequest > _chargerData.AvailableOutputCurrent)
         {
-            printf("[cha] Car asking for too much amps. ask:%d max:%d. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.AvailableOutputCurrent);
+            printf("[cha] Car asking (%d) for more than max (%d) amps. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.AvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
             // let error handlers deal with it
         }
@@ -330,8 +330,7 @@ void ChademoCharger::RunStateMachine()
         _stopReason = StopReason::NONE;
 
         adc_read_all();
-        _adc_12_volt_start = _global.adc_12_volt;
-        printf("[cha] Voltage when starting:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+        printf("[cha] Voltage before starting: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
 
         SetSwitchD1(true); // will trigger car sending can
 
@@ -372,18 +371,17 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        if (_preChargeCompletedButStalled)
+        if (_preChargeDoneButStalled)
         {
             // Check if we have > 12V here. In case, we are probably welded.
             // If we continue at this point, it is likely that the car will complain, go into turtle mode, and require clearing DTCs. Or maybe its already too late??
             // SO...it may be an idea to refuse to continue and set ChargerStatus::CHARGER_ERROR! This is possible to test by closing contactor too soon on purpose.
+            // But as discovered, this check is not foolproof, as some chargers deliver too little leakage current to power the transformer, at this stage.
             adc_read_all();
-            printf("[cha] Voltage before closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
-            if (_adc_12_volt_start < 12.0f && _global.adc_12_volt > 12.0f)
+            printf("[cha] Voltage before closing contactor: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
+            if (_global.adc_12_volt > 12.0f)
             {
-                //_global.relayProbablyWeldedEvent = true;
-                printf("[cha] Contactor must be welded/stuck: voltage went from < 12 to > 12 volts, but contactor is not closed yet. Stopping.\r\n");
-
+                printf("[cha] !!! WARNING !!! Contactor probably welded: > 12V, but contactor not closed yet. Stopping.\r\n");
                 set_flag(&_chargerData.Status, ChargerStatus::CHARGER_ERROR);
                 // fall thru: let error handler on top deal with it
             }
@@ -402,8 +400,10 @@ void ChademoCharger::RunStateMachine()
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
 
+            // Strangely, I sometimes see < 12v here and 12v comes later (eg. when charger start delivering amps).
+            // I guess...if a charger manage to not deliver any current at all, there is nothing to "power" the transformer, it need some current leaking.
             adc_read_all();
-            printf("[cha] Voltage after closing contactor:%f\r\n", FP_FROMFLT(_global.adc_12_volt));
+            printf("[cha] Voltage after closing contactor: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
 
             SetState(ChargerState::WaitForCarAskingAmps);
         }
@@ -438,20 +438,18 @@ void ChademoCharger::RunStateMachine()
             _chargerData.RemainingChargeTimeCycles--;
         _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
 
-        //        _stopReason = StopReason::NONE;
-        if (_switch_k == false) set_flag(&_stopReason, StopReason::CAR_SWITCH_K_OFF);
+        // global reason
         if (_global.powerOffPending) set_flag(&_stopReason, StopReason::POWER_OFF_PENDING);
+        // car reasons
         if (_carData.CyclesSinceCarLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&_stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
-        if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&_stopReason, StopReason::CHARGING_TIME);
-
-        // TODO: check in more states than this?
+        if (_switch_k == false) set_flag(&_stopReason, StopReason::CAR_SWITCH_K_OFF);
         if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE) == false) set_flag(&_stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&_stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&_stopReason, StopReason::CAR_ERROR);
-
-        // TODO: check in more states than this?
+        // charger reasons
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR)) set_flag(&_stopReason, StopReason::CHARGING_SYSTEM_ERROR);
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&_stopReason, StopReason::CHARGER_ERROR);
+        if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&_stopReason, StopReason::CHARGING_TIME);
 
         // TODO: stop when battery full? No...normally the car will stop when it means it is full.
 
@@ -491,6 +489,12 @@ void ChademoCharger::RunStateMachine()
 
             OpenAdapterContactor();
 
+            // Not sure if thus check works, as capacitors may retain the voltage > 12V for some time.
+            adc_read_all();
+            printf("[cha] Voltage after opening contactor: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
+            if (_global.adc_12_volt > 12.0f)
+                printf("[cha] !!! WARNING !!! Contactor _may_ be welded: contactor opened but voltage still > 12V.\r\n");
+
             SetSwitchD2(false);
             _stop_delivering_volts = true;
 
@@ -528,7 +532,8 @@ void ChademoCharger::RunStateMachine()
 
 bool ChademoCharger::PreChargeCompleted()
 {
-    _preChargeCompletedButStalled = true;
+    _preChargeDoneButStalled = true;
+    _global.ccsPreChargeDoneButStalledEvent = true;
 
     // keep it hanging until car contactors closed
     bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
@@ -544,7 +549,7 @@ extern "C" bool hardwareInterface_preChargeCompleted()
 
 void ChademoCharger::SetState(ChargerState newState)
 {
-    printf("[cha] enter state %d/%s (autodetect:%d)\r\n", newState, _stateNames[newState], _autoDetect);
+    printf("[cha] ====>>>> set state %d/%s (autodetect:%d)\r\n", newState, _stateNames[newState], _autoDetect);
     _state = newState;
     _cyclesInState = 0;
 

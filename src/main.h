@@ -56,6 +56,7 @@ extern "C" {
         //bool ccsDeliveredAmpsEvent = false;
         bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
+        bool ccsPreChargeDoneButStalledEvent = false;
         //bool relayProbablyWeldedEvent = false;
         //bool ccSlacDoneEvent = false;
         //bool tcpConnectedEvent = false;

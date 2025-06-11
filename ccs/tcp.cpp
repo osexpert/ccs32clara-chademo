@@ -195,7 +195,7 @@ static void tcp_sendFirstAck(void)
 
 static void tcp_sendAck(void)
 {
-   addToTrace(MOD_TCP, "[TCP] sending ACK");
+//   addToTrace(MOD_TCP, "[TCP] sending ACK");
    tcpHeaderLen = 20; /* 20 bytes normal header, no options */
    tcpPayloadLen = 0;   /* only the TCP header, no data is in the first ACK message. */
    tcp_prepareTcpHeader(TCP_FLAG_ACK);

@@ -436,7 +436,7 @@ public:
         bool _stop_delivering_amps = false;
         bool _stop_delivering_volts = false;
 
-        bool _preChargeCompletedButStalled = false;
+        bool _preChargeDoneButStalled = false;
 
         uint16_t _simulatedVolt = 0;
 
@@ -444,7 +444,6 @@ public:
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         
-        float _adc_12_volt_start = 0.0f;
 
         StopReason _stopReason = StopReason::NONE;
         
