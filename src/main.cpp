@@ -364,7 +364,7 @@ void print_sysinfo()
             FP_FROMFLT(_global.adc_4_volt),
             FP_FROMFLT(_global.adc_12_volt),
             FP_FROMFLT(_global.adc_3_3_volt),
-            scheduler->GetCpuLoad(),
+            scheduler->GetCpuLoad() / 10,
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.powerOffPending,
             powerOffOkCcs,
