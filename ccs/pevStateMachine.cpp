@@ -727,7 +727,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
          if (Param::GetInt(Param::logging) & MOD_PEV) {
              printf("PreCharge aknowledge received. Inlet %dV, accu %dV, uMin %dV\r\n", inletVtg, batVtg, EVSEMinimumVoltage);
          }
-         if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && hardwareInterface_preChargeCompleted())
+         if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && chademoInterface_preChargeCompleted())
          {
             addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
             publishStatus("PreCharge done", "");
@@ -988,9 +988,18 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
              if (numberOfWeldingDetectionRounds<MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
                  /* max number of rounds not yet reached */
                  addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq.");
+                 numberOfWeldingDetectionRounds++; /* https://github.com/uhi22/ccs32clara/issues/55
+                                                      Count the number of welding detection rounds. To be clarified, whether
+                                                      a certain time or number of rounds make sense to cover all use cases with
+                                                      different chargers etc */
                  pev_sendWeldingDetectionReq();
                  pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
-             } else {
+             }
+             else if (chademoInterface_continueWeldingDetection()) {
+                 // reboot
+                 numberOfWeldingDetectionRounds = 0;
+             }
+             else {
                  /* even after multiple welding detection requests/responses, the voltage did not fall as expected.
                  This may be due to two hanging/welded contactors or an issue of the charging station. We let the state machine
                  run into timeout and safe shutdown sequence, this will at least indicate the red light to the user. */

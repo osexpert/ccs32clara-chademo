@@ -16,6 +16,9 @@ extern "C" {
 extern void pevStateMachine_ReInit(void);
 extern void pevStateMachine_Mainfunction(void);
 
+extern bool chademoInterface_preChargeCompleted();
+extern bool chademoInterface_continueWeldingDetection();
+
 #ifdef __cplusplus
 }
 #endif

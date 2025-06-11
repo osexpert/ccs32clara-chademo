@@ -377,6 +377,7 @@ class ChademoCharger
 {
 public:
     bool PreChargeCompleted();
+    bool ContinueWeldingDetection();
     void UpdateChargerMessages();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();
@@ -433,12 +434,9 @@ public:
 
         bool _autoDetect = true;
 
-        bool _stop_delivering_amps = false;
-        bool _stop_delivering_volts = false;
 
         bool _preChargeDoneButStalled = false;
 
-        uint16_t _simulatedVolt = 0;
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};

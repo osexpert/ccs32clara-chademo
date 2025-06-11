@@ -39,7 +39,6 @@ extern void hardwareInterface_LogTheCpPpPhysicalData();
 //extern uint8_t hardwareInterface_isPpMeasurementInvalid(void);
 //extern void hardwareInterface_cyclic(void);
 //extern void hardwareInterface_init(void);
-extern bool hardwareInterface_preChargeCompleted();
 
 #ifdef __cplusplus
 }

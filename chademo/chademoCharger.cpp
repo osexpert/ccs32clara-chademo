@@ -228,24 +228,9 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
     Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
 
-    if (_stop_delivering_volts)
-    {
-        Param::SetInt(Param::TargetVoltage, 0);
-        Param::SetInt(Param::enable, false); // stop charger completely
-    }
-    else
-    {
-        Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
-    }
+    Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
+    Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
 
-    if (_stop_delivering_amps)
-    {
-        Param::SetInt(Param::ChargeCurrent, 0);
-    }
-    else
-    {
-        Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
-    }
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
@@ -467,9 +452,6 @@ void ChademoCharger::RunStateMachine()
 
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
-        // stop amps, but continue delivering volts so car can do welding detection
-        _stop_delivering_amps = true;
-
         SetState(ChargerState::Stopping_WaitForLowAmps);
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
@@ -496,7 +478,6 @@ void ChademoCharger::RunStateMachine()
                 printf("[cha] !!! WARNING !!! Contactor _may_ be welded: contactor opened but voltage still > 12V.\r\n");
 
             SetSwitchD2(false);
-            _stop_delivering_volts = true;
 
             SetState(ChargerState::Stopping_WaitForLowVolts);
         }
@@ -542,9 +523,21 @@ bool ChademoCharger::PreChargeCompleted()
     return carContactorsClosed;
 }
 
-extern "C" bool hardwareInterface_preChargeCompleted()
+extern "C" bool chademoInterface_preChargeCompleted()
 {
     return chademoCharger->PreChargeCompleted();
+}
+
+bool ChademoCharger::ContinueWeldingDetection()
+{
+    bool contactorsOpened = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
+    // continue rebooting weldingDetection until _our_ contactors are opened
+    return contactorsOpened == false;
+}
+
+extern "C" bool chademoInterface_continueWeldingDetection()
+{
+    return chademoCharger->ContinueWeldingDetection();
 }
 
 void ChademoCharger::SetState(ChargerState newState)
@@ -601,11 +594,10 @@ void ChademoCharger::Log(bool force)
     if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second or when forced
-        printf("[cha] state:%d/%s cycles:%d charger: sim:%dV out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
+        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
             _state,
             GetStateName(),
             _cyclesInState,
-            _simulatedVolt,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
@@ -748,8 +740,8 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent changed %d -> %d\r\n");
 
-    // real outVolt after car contactors close. Before this, use the simulated volt.
-    uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : _simulatedVolt;
+    // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
+    uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
     COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "[cha] 109.OutputVoltage changed %d -> %d\r\n");
 
     uint8_t remainingChargingTime10s = 0;
