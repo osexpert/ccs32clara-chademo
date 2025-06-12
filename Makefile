@@ -38,9 +38,11 @@ CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/inclu
 # Check if the variable GITHUB_RUN_NUMBER exists. When running on the github actions running, this
 # variable is automatically available.
 # Create a compiler define with the content of the variable. Or, if it does not exist, use replacement value 0.
-EXTRACOMPILERFLAGS  = $(shell \
-	 if [ -z "$$GITHUB_RUN_NUMBER" ]; then echo "-DGITHUB_RUN_NUMBER=0"; else echo "-DGITHUB_RUN_NUMBER=$$GITHUB_RUN_NUMBER"; fi \
-	 )
+EXTRACOMPILERFLAGS := $(shell \
+  DATE=$$(date +%Y%m%d); \
+  RUN=$${GITHUB_RUN_NUMBER:-0}; \
+  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\""; \
+)
 
 LDSCRIPT	  = linker.ld
 # -march=armv7e-m did the trick here?? -mcpu=cortex-m4 did nothing. or...
