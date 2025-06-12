@@ -264,18 +264,4 @@ PARAM_TYPE GetType(PARAM_NUM param)
    return (PARAM_TYPE)attribs[param].type;
 }
 
-uint32_t GetIdSum()
-{
-#ifndef PARAM_ID_SUM_START_OFFSET
-#define PARAM_ID_SUM_START_OFFSET 0
-#endif // PARAM_ID_SUM_START_OFFSET
-#define PARAM_ENTRY(category, name, unit, min, max, def, id) id +
-#define TESTP_ENTRY(category, name, unit, min, max, def, id) id +
-#define VALUE_ENTRY(name, unit, id) id +
-   return PARAM_LIST PARAM_ID_SUM_START_OFFSET;
-#undef PARAM_ENTRY
-#undef TESTP_ENTRY
-#undef VALUE_ENTRY
-}
-
 }
