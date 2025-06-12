@@ -24,21 +24,15 @@ jobs:
           echo "Number of processors:" `nproc`
           make get-deps -j `nproc`
 
-      - name: Build CCS32Clara firmware
+      - name: Build ccs2clara-chademo firmware
         run: |
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CCS32Clara firmware binary
-          path: stm32_ccs.bin
+          name: ccs2clara-chademo firmware binary
+          path: my407ccs2chademo.bin
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CCS32Clara firmware hex
-          path: stm32_ccs.hex
-
-  
 # Unit tests are currently broken so don't build and run them for now
 #- name: Build unit tests on host
 #        run: |
