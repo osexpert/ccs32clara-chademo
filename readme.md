@@ -37,6 +37,9 @@ Happy hacking.
 TODO:
 Add more led blibk sequences to track progress.
 
+Download:
+Every commit is built automatically and can be downloaded here, as artifacts of the commit: https://github.com/osexpert/ccs32clara-chademo/actions
+
 # ccs32clara
 
 ![image](doc/clara_logo_colored.jpg) Hi, I'm Clara. I'm a piece of software, which was born in the OpenInverter forum community, https://openinverter.org/forum/viewtopic.php?t=3727, and I'm loving to grow due to the great people there.
