@@ -66,7 +66,7 @@ So yes, it happened to me. Not sure why, if it was by chance or if this firmware
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
-For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0. Chademo 1.0 is better defined and works better IMO, so not supporting it in this firmware.
+For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0. Chademo 1.0 is better defined and works better IMO, so not emulating nor supporting it in this firmware.
 Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower). Also it struggle with Slac some times, 
 specially at Tesla stations, where I may have to unplug and plug the cable (fiddle) to get things started.
 These things are improved in this firmware and this was what kicked off this project. But this firmware may have other problems that the original firmware does not have.
