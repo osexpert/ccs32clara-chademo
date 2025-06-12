@@ -1,5 +1,6 @@
 # ccs32clara-chademo
 
+![image](doc/ccs2-chademo_adapter.jpg)
 Alternative firmware for adapter that uses My407ccs2chademo.bin.
 Adapter probably uses a stm32f407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
