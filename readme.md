@@ -1,6 +1,8 @@
 # ccs32clara-chademo
 
-![image](doc/ccs2-chademo_adapter.jpg) Alternative firmware for Dongguan Longood CCS2 to CHAdeMO adapter that uses My407ccs2chademo.bin.
+![image](doc/ccs2-chademo_adapter.jpg)
+
+Alternative firmware for Dongguan Longood CCS2 to CHAdeMO adapter that uses My407ccs2chademo.bin.
 Adapter probably uses a stm32f407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
 It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A). Transformer is connected to the car-side of the adapter.
@@ -10,7 +12,7 @@ It has 2 controllable leds, one external and one internal (invisible).
 It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
 Some of the voltages are wired up to adc GPIOs. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
 
-Operation:
+## Operation
 Plug adapter into car. Plug cable into adapter. Power on adapter.
 Adapter will start chademo to fetch targetVoltage, soc and estimated battery voltage (calculated from targetVoltage and soc).
 Chademo will then shut down and ccs logic will start.
@@ -32,7 +34,7 @@ So even thou chademo is not made for the charger and car to "meet" on battery vo
 How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
 (chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
 
-Stop button/power off:
+## Stop button/power off
 Shortly pressing stop button will initiate power off (pending).
 Between ccs has started and Slac is done, stop button must be pressed for 5 seconds to initiate power off (pending). This to allow "fiddle" with the plug or late plug insertion.
 As soon as Slac is done, the logic revert to "shortly pressing".
@@ -44,7 +46,8 @@ Special mode: hold stop button while powering on. You should hear a click from t
 the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
 process, to see if the contactor becomes unstuck again. My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
 
-Led:
+## Led
+<pre>
 Initially, slow blinking [***************_______________]
 When Slac is done, one blink [***_________]
 When tcp connected, two blinks [***___***_________]
@@ -52,21 +55,25 @@ When PreCharge started, three blinks [***___***___***_________]
 When PreCharge is done, but stalled waiting for chademo, four blinks [***___***___***___***_________]
 When delivering amps, medium blinking [*****_____]
 When stop/power off pending, fast blinking [*_]
+</pre>
 
-Other:
+## Other
 There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hung.
-There is a welding detection logic that check if supply voltage is 12 volt (or more), _before_ adapter contactor is closed, in case, the contactor is probably stuck. You will see this in the log, at the end (or search for "welding").
-The car will also most likely (at least it did for me), display a warning and say the EV need service, and car was put into turtle mode! I used LeafSpy Pro to clear the DTCs, else I would probably had to go to a garage!
-So yes, it happened to me. Not sure why, if it was by chance or if my firmware has a problem. So I suggest traveling with a CAN BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
-Update: charging will now stop if it detect a welded contactor: < 12 volt when starting and > 12 volt before setting d2, before adapter contactor is closed. This can only mean that contactor is welded closed.
+There is a welding detection logic that check if supply voltage is > 12 volt before adapter contactor is closed, in case, the contactor is probably welded.
+You will see it in the log and the charging is aborted if this is detected. This check is not fool proof as it won't always show > 12 volt before, even if welded (depends on if charger supply the little current needed to drive the transformer).
+If charging is started with welded contactor, the car will most likely (at least it did for me), display a warning and say the EV need service, and car was put into turtle mode! I used LeafSpy Pro to clear the DTCs, else I would probably need to visit a garage!
+So yes, it happened to me. Not sure why, if it was by chance or if this firmware has a problem. So I suggest traveling with a CAN BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
 
-Original firmware:
+## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
-Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower), else I had little problems.
-Even so, I found it very interesting to hack on this adapter so I made this. It is possible it will not work at all or as well as the original firmware. Be warned.
+For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0. Chademo 1.0 is better defined and works better IMO, so not supporting it in this firmware.
+Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower). Also it struggle with Slac some times, 
+specially at Tesla stations, where I may have to unplug and plug the cable (fiddle) to get things started.
+These things are improved in this firmware and this was what kicked off this project. But this firmware may have other problems that the original firmware does not have.
+So it is possible it will not work at all or as well as the original firmware if you try it. Be warned.
 Happy hacking.
 
-Download:
+## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: https://github.com/osexpert/ccs32clara-chademo/actions
 
 # ccs32clara
