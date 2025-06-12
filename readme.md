@@ -32,7 +32,7 @@ Ccs otoh, works exactly like we simulate it AFAIK: the PreCharge voltage is set 
 The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc...
 So even thou chademo is not made for the charger and car to "meet" on battery voltage, and we do not really know the battery voltage, this _seems_ to work fine, but its hard to say if this has any issues (burnt relays etc.)
 How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
-(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
+(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so then have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
 
 ## Stop button/power off
 Shortly pressing stop button will initiate power off (pending).
