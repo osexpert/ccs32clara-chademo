@@ -38,7 +38,7 @@ TODO:
 Add more led blibk sequences to track progress.
 
 Download:
-Every commit is built automatically and can be downloaded here, as artifacts of the commit: https://github.com/osexpert/ccs32clara-chademo/actions
+Every commit is built automatically and can be downloaded here, as artifact of the workflow run: https://github.com/osexpert/ccs32clara-chademo/actions
 
 # ccs32clara
 
