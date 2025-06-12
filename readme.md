@@ -62,7 +62,7 @@ There is a 5sec. watchdog that will reset (effectively power off) adapter if the
 There is a welding detection logic that check if supply voltage is > 12 volt before adapter contactor is closed, in case, the contactor is probably welded.
 You will see it in the log and the charging is aborted if this is detected. This check is not fool proof as it won't always show > 12 volt before, even if welded (depends on if charger supply the little current needed to drive the transformer).
 If charging is started with welded contactor, the car will most likely (at least it did for me), display a warning and say the EV need service, and car was put into turtle mode! I used LeafSpy Pro to clear the DTCs, else I would probably need to visit a garage!
-So yes, it happened to me. Not sure why, if it was by chance or if this firmware has a problem. So I suggest traveling with a CAN BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
+So yes, it happened to me. Not sure why, if it was by chance or if this firmware has a problem. So I suggest traveling with a ODB2 BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
