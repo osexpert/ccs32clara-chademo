@@ -67,6 +67,8 @@ global_data _global;
 volatile uint32_t system_millis;
 
 #define AUTO_POWER_OFF_LIMIT_SEC (60 * 3)
+#define CCS_TRACE_EVERY_MS 1000 // 1 sec
+#define SYSINFO_EVERY_MS 2000 // 2 sec
 
 enum MainState
 {
@@ -345,9 +347,6 @@ void adc_read_all(void)
 }
 
 
-
-#define SYSINFO_EVERY_MS 2000 // 2 sec
-
 void print_sysinfo()
 {
     static uint32_t nextPrint = 0;
@@ -358,8 +357,11 @@ void print_sysinfo()
         bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
-        // after changing for one day... (max:4.0) % fV(max:11.56) vdd:% fV(max : 3.16). But I saw vdd 3.4 earlier.
-        printf("[sysinfo] uptime:%dsec %fV (nom:4.0) %fV (nom:12.0) vdd:%fV (nom:3.3) cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
+        // after charging via usb-c for one day... v4:4v v12:11.56v vdd:3.16v (vdd was low here)
+        // during charging car, seen between v12:12.19V - v12:12.31V
+        // right after charging car, seen max v12:11.59v
+        // Min values seen and working: v4:3.78V v12:11.46V
+        printf("[sysinfo] uptime:%dsec v4:%fV v12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
             FP_FROMFLT(_global.adc_4_volt),
             FP_FROMFLT(_global.adc_12_volt),
@@ -374,10 +376,7 @@ void print_sysinfo()
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
     }
-    // Min values seen and working: 3.78V 11.56V 3.4V
 }
-
-#define CCS_TRACE_EVERY_MS 1000 // 1 sec
 
 static void print_ccs_trace()
 {
@@ -406,10 +405,6 @@ static void print_ccs_trace()
         nextPrint = system_millis + SYSINFO_EVERY_MS;
     }
 }
-
-// FIXME: find a good wad to manage auto power off. By some custom wdog etc.
-// OR maybe...if chargingAccomplished + currently stopped\unlocked (imply 0 amps delivered))?
-//static volatile uint16_t _autoPowerOffCycles100ms = 0; // 100ms. Wait max 5min = 10 * 60 * 5 = 3000
 
 static void Ms100Task(void)
 {
@@ -478,30 +473,6 @@ static void SetMacAddress()
 
     setOurMac(mac);
 }
-
-// Weird stuff...
-//#define FLASH_REFERENCE_ADDR 0x0800C000
-//#define MAGIC_MASK 0x20231212
-//#define WORD_COUNT 3
-//
-//alignas(4) volatile uint32_t runtimeBuffer[WORD_COUNT] = { 0 };
-//alignas(4) volatile uint32_t referenceBuffer[WORD_COUNT] = { 0 };
-//
-//// Called once to initialize referenceBuffer
-//void initializeReferenceBuffer()
-//{
-//    const uint32_t* flash = reinterpret_cast<const uint32_t*>(FLASH_REFERENCE_ADDR);
-//    for (int i = 0; i < WORD_COUNT; ++i)
-//    {
-//        uint32_t val = flash[i];
-//        val ^= MAGIC_MASK;
-//        val |= MAGIC_MASK;
-//        referenceBuffer[i] = val;
-//    }
-//    // magic mask has no effect?
-//    //magic 0: 0x2023123f 0x2023123f magic 1 : 0x32335313 0x32335313 magic 2 : 0x36333a37 0x36333a37
-// TODO: could scan all of memory hunting for these? we have the offsets they should be separated with.
-//}
 
 /* Called when systick fires */
 extern "C" void sys_tick_handler(void)
