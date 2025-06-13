@@ -163,11 +163,11 @@ void can_setup(void) {
         false // silent
         );              
 
-    // Accepts 0x100, 0x101, 0x102, 0x110— standard IDs, data frames
+    // Accepts 0x100, 0x101, 0x102, 0x110 standard IDs, data frames
     can_filter_id_mask_32bit_init(
         0,                  // Filter bank 0
         (0x100 << 21),      // Match ID = 0x100, standard, data frame
-        (0x7B8 << 21),      // Mask to ignore bits 6,2,1,0
+        (0x7EC << 21),      // Mask to ignore bits 4,1,0
         0,                  // Assign to FIFO 0
         true                // Enable filter
     );
