@@ -984,6 +984,11 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
             hardwareInterface_triggerConnectorUnlocking();
             pev_enterState(PEV_STATE_WaitForSessionStopResponse);
          } else {
+
+             if (chademoInterface_continueWeldingDetection()) {
+                 numberOfWeldingDetectionRounds = 0; // reboot and keep running until chademo is ready
+             }
+
              /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
              if (numberOfWeldingDetectionRounds<MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
                  /* max number of rounds not yet reached */
@@ -994,12 +999,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                                                       different chargers etc */
                  pev_sendWeldingDetectionReq();
                  pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
-             }
-             else if (chademoInterface_continueWeldingDetection()) {
-                 // reboot
-                 numberOfWeldingDetectionRounds = 0;
-             }
-             else {
+             } else {
                  /* even after multiple welding detection requests/responses, the voltage did not fall as expected.
                  This may be due to two hanging/welded contactors or an issue of the charging station. We let the state machine
                  run into timeout and safe shutdown sequence, this will at least indicate the red light to the user. */
