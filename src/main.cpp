@@ -361,7 +361,7 @@ void print_sysinfo()
         // during charging car, seen between v12:12.19V - v12:12.31V
         // right after charging car, seen max v12:11.59v
         // Min values seen and working: v4:3.78V v12:11.46V
-        printf("[sysinfo] uptime:%dsec v4:%fV v12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
+        printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
             FP_FROMFLT(_global.adc_4_volt),
             FP_FROMFLT(_global.adc_12_volt),

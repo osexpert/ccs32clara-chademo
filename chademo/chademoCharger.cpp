@@ -97,6 +97,7 @@ void ChademoCharger::HandlePendingCarMessages()
     static msg100 _msg100 = {};
     static msg101 _msg101 = {};
     static msg102 _msg102 = {};
+    static msg110 _msg110 = {};
 
     if (_msg100_pending)
     {
@@ -158,7 +159,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
-            printf("[cha] Car asking (%d) for more than max (%d) volts. Stopping.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+            printf("[cha] Car asking (%d) for more than max (%d) volts.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
             // let error handlers deal with it
         }
@@ -167,9 +168,9 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetBatteryVoltage = _msg102.m.TargetBatteryVoltage;
         }
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.ChargingCurrentRequest > _chargerData.AvailableOutputCurrent)
+        if (_state == ChargerState::ChargingLoop && _msg102.m.ChargingCurrentRequest > _chargerData.MaxAvailableOutputCurrent)
         {
-            printf("[cha] Car asking (%d) for more than max (%d) amps. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.AvailableOutputCurrent);
+            printf("[cha] Car asking (%d) for more than max (%d) amps. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.MaxAvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
             // let error handlers deal with it
         }
@@ -196,6 +197,13 @@ void ChademoCharger::HandlePendingCarMessages()
         }
 
         _msg102_recieved = true;
+    }
+    if (_msg110_pending)
+    {
+        _msg110_pending = false;
+        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "[cha] 110.ExtendedFunction1 changed 0x%d -> 0x%d\r\n");
+
+        _carData.SupportDynamicAvailableOutputCurrent = has_flag((ExtendedFunction1)_msg110.m.ExtendedFunction1, ExtendedFunction1::DYNAMIC_CONTROL);
     }
 }
 
@@ -242,8 +250,6 @@ bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
     }
     return false;
 }
-
-extern void adc_read_all(void);
 
 /// <summary>
 /// PS: Do not care about timeout before the charging loop (power off is allowed).
@@ -314,9 +320,6 @@ void ChademoCharger::RunStateMachine()
         _chargerData.Status = ChargerStatus::STOPPED;
         _stopReason = StopReason::NONE;
 
-        adc_read_all();
-        printf("[cha] Voltage before starting: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
-
         SetSwitchD1(true); // will trigger car sending can
 
         SetState(ChargerState::WaitForCarReadyToCharge);
@@ -329,6 +332,7 @@ void ChademoCharger::RunStateMachine()
             {
                 SetSwitchD1(false); // PS: even if we set to false, car can continue to send 102 for a short time
                 _autoDetect = false;
+                printf("[cha] AutoDetect completed\r\n");
 
                 SetState(ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart);
             }
@@ -358,24 +362,9 @@ void ChademoCharger::RunStateMachine()
     {
         if (_preChargeDoneButStalled)
         {
-            // Check if we have > 12V here. In case, we are probably welded.
-            // If we continue at this point, it is likely that the car will complain, go into turtle mode, and require clearing DTCs. Or maybe its already too late??
-            // SO...it may be an idea to refuse to continue and set ChargerStatus::CHARGER_ERROR! This is possible to test by closing contactor too soon on purpose.
-            // But as discovered, this check is not foolproof, as some chargers deliver too little leakage current to power the transformer, at this stage.
-            adc_read_all();
-            printf("[cha] Voltage before closing contactor: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
-            if (_global.adc_12_volt > 12.0f)
-            {
-                printf("[cha] !!! WARNING !!! Contactor probably welded: > 12V, but contactor not closed yet. Stopping.\r\n");
-                set_flag(&_chargerData.Status, ChargerStatus::CHARGER_ERROR);
-                // fall thru: let error handler on top deal with it
-            }
-            else
-            {
-                SetSwitchD2(true);
+            SetSwitchD2(true);
 
-                SetState(ChargerState::WaitForCarContactorsClosed);
-            }
+            SetState(ChargerState::WaitForCarContactorsClosed);
         }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
@@ -384,11 +373,6 @@ void ChademoCharger::RunStateMachine()
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
-
-            // Strangely, I sometimes see < 12v here and 12v comes later (eg. when charger start delivering amps).
-            // I guess...if a charger manage to not deliver any current at all, there is nothing to "power" the transformer, it need some current leaking.
-            adc_read_all();
-            printf("[cha] Voltage after closing contactor: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
 
             SetState(ChargerState::WaitForCarAskingAmps);
         }
@@ -471,12 +455,6 @@ void ChademoCharger::RunStateMachine()
 
             OpenAdapterContactor();
 
-            // Not sure if thus check works, as capacitors may retain the voltage > 12V for some time.
-            adc_read_all();
-            printf("[cha] Voltage after opening contactor: %fV\r\n", FP_FROMFLT(_global.adc_12_volt));
-            if (_global.adc_12_volt > 12.0f)
-                printf("[cha] !!! WARNING !!! Contactor _may_ be welded: contactor opened but voltage still > 12V.\r\n");
-
             SetSwitchD2(false);
 
             SetState(ChargerState::Stopping_WaitForLowVolts);
@@ -542,7 +520,7 @@ extern "C" bool chademoInterface_continueWeldingDetection()
 
 void ChademoCharger::SetState(ChargerState newState)
 {
-    printf("[cha] ====>>>> set state %d/%s (autodetect:%d)\r\n", newState, _stateNames[newState], _autoDetect);
+    printf("[cha] ====>>>> set state %d/%s\r\n", newState, _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
 
@@ -555,19 +533,28 @@ const char* ChademoCharger::GetStateName()
     return _stateNames[_state];
 };
 
+// may vary between car models, what they allow before they fail? spec. says 10% or 20A, a bit confusing.
+// but staying withing 10A seems reasonable...
+#define MAX_UNDERSUPPLY_AMPS 10
+
 void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
 {
     _chargerData.AvailableOutputVoltage = maxV;
     if (_chargerData.AvailableOutputVoltage > ADAPTER_MAX_VOLTS)
         _chargerData.AvailableOutputVoltage = ADAPTER_MAX_VOLTS;
 
-    _chargerData.AvailableOutputCurrent = clampToUint8(maxA);
-    if (_chargerData.AvailableOutputCurrent > ADAPTER_MAX_AMPS)
-        _chargerData.AvailableOutputCurrent = ADAPTER_MAX_AMPS;
+    _chargerData.MaxAvailableOutputCurrent = clampToUint8(maxA);
+    if (_chargerData.MaxAvailableOutputCurrent > ADAPTER_MAX_AMPS)
+        _chargerData.MaxAvailableOutputCurrent = ADAPTER_MAX_AMPS;
 
     _chargerData.OutputVoltage = outV;
 
     _chargerData.OutputCurrent = clampToUint8(outA);
+
+    if (_carData.AskingAmps > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.SupportDynamicAvailableOutputCurrent)
+        _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+    else
+        _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()
@@ -594,13 +581,14 @@ void ChademoCharger::Log(bool force)
     if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second or when forced
-        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
+        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA/%dA  rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
             _state,
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
-            _chargerData.AvailableOutputVoltage,
+            _chargerData.MaxAvailableOutputCurrent,
+            _chargerData.AvailableOutputCurrent,
             _chargerData.AvailableOutputCurrent,
             _chargerData.RemainingChargeTimeSec,
             _chargerData.ThresholdVoltage,
@@ -643,6 +631,12 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg102_pending = true;
         _msg102_isr.pair[0] = data[0];
         _msg102_isr.pair[1] = data[1];
+    }
+    else if (id == 0x110)
+    {
+        _msg110_pending = true;
+        _msg110_isr.pair[0] = data[0];
+        _msg110_isr.pair[1] = data[1];
     }
 }
 
@@ -726,6 +720,8 @@ void ChademoCharger::SendChargerMessages()
 
         can_transmit_blocking_fifo(CAN1, 0x108, 0x108 > 0x7FF, false, 8, _msg108.bytes);
         can_transmit_blocking_fifo(CAN1, 0x109, 0x109 > 0x7FF, false, 8, _msg109.bytes);
+
+        can_transmit_blocking_fifo(CAN1, 0x118, 0x118 > 0x7FF, false, 8, _msg118.bytes);
     }
 }
 
@@ -760,6 +756,8 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "[cha] 109.RemainingChargingTime10s changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "[cha] 109.RemainingChargingTimeMinutes changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.Status, _chargerData.Status, "[cha] 109.Status changed 0x%x -> 0x%x\r\n");
+
+    _msg118.m.ExtendedFunction1 = ExtendedFunction1::DYNAMIC_CONTROL;
 }
 
 

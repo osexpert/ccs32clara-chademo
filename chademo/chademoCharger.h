@@ -57,6 +57,25 @@ has_flag(E value, E flag) {
     return (static_cast<U>(value) & static_cast<U>(flag)) != 0;
 }
 
+enum ExtendedFunction1
+{
+    /// <summary>
+    /// 110.0.0
+    /// 118.0.0
+    /// </summary>
+    DYNAMIC_CONTROL = 0x1,
+    /// <summary>
+    /// 110.0.1
+    /// 118.0.1
+    /// </summary>
+    HIGH_CURRENT_CONTROL = 0x2,
+    /// <summary>
+    /// 110.0.2
+    /// 118.0.2
+    /// </summary>
+    HIGH_VOLTAGE_CONTROL = 0x4
+};
+
 /// <summary>
 /// errors during charging, related to the battery.
 /// </summary>
@@ -269,6 +288,25 @@ struct msg102
     };
 };
 
+
+// Car extension
+struct msg110
+{
+    union {
+        struct {
+            uint8_t ExtendedFunction1;
+            uint8_t Unused2;
+            uint8_t Unused3;
+            uint8_t Unused4;
+            uint8_t Unused5;
+            uint8_t Unused6;
+            uint8_t Unused7;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
+
 // Charger limits/availability
 struct msg108
 {
@@ -298,6 +336,24 @@ struct msg109
             uint8_t Status;
             uint8_t RemainingChargingTime10s;
             uint8_t RemainingChargingTimeMinutes;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
+
+// Charger extension
+struct msg118
+{
+    union {
+        struct {
+            uint8_t ExtendedFunction1;
+            uint8_t Unused2;
+            uint8_t Unused3;
+            uint8_t Unused4;
+            uint8_t Unused5;
+            uint8_t Unused6;
+            uint8_t Unused7;
         } m;
         uint8_t bytes[8];
         uint32_t pair[2];
@@ -340,6 +396,8 @@ struct CarData
     uint8_t ProtocolNumber;
 
     uint8_t EstimatedChargingTimeMins;
+
+    bool SupportDynamicAvailableOutputCurrent;
 };
 
 struct ChargerData
@@ -360,6 +418,7 @@ struct ChargerData
     /// </summary>
     bool SupportWeldingDetection = 1;
 
+    uint8_t MaxAvailableOutputCurrent;
     uint8_t AvailableOutputCurrent;
 
     uint8_t OutputCurrent;
@@ -426,6 +485,8 @@ public:
         msg101 _msg101_isr = {};
         bool _msg102_pending = false;
         msg102 _msg102_isr = {};
+        bool _msg110_pending = false;
+        msg110 _msg110_isr = {};
 
         bool _switch_k = false;
         bool _switch_d1 = false;
@@ -441,7 +502,7 @@ public:
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
-        
+        msg118 _msg118 = {};
 
         StopReason _stopReason = StopReason::NONE;
         
