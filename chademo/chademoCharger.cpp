@@ -551,6 +551,10 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
+    // If difference between AskingAmps and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
+    // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
+    // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
+    // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
     if (_carData.AskingAmps > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.SupportDynamicAvailableOutputCurrent)
         _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
     else
@@ -587,8 +591,8 @@ void ChademoCharger::Log(bool force)
             _cyclesInState,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
+            _chargerData.AvailableOutputVoltage,
             _chargerData.MaxAvailableOutputCurrent,
-            _chargerData.AvailableOutputCurrent,
             _chargerData.AvailableOutputCurrent,
             _chargerData.RemainingChargeTimeSec,
             _chargerData.ThresholdVoltage,
