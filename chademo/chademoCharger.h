@@ -118,7 +118,7 @@ enum CarStatus
 
     /// <summary>
     /// 102.5.2 Charging system fault
-    /// Can timeout? Other timeout? Too long/short in state?
+    /// CAN timeout? Other timeout? Too long/short in state?
     /// This is analog to ChargerStatus::ERROR, only opposite direction
     /// </summary>
     ERROR = 0x4,
@@ -175,7 +175,7 @@ enum ChargerStatus
     /// <summary>
     /// 109.5.4
     /// Something is wrong with the car and/or changer.
-    /// Can timeout, car asking for too much volts, car asking for too much amps. So mainly car stuff. But spec say this is for errors both in charger or car.
+    /// CAN timeout, car asking for too much volts, car asking for too much amps. So mainly car stuff. But spec say this is for errors both in charger or car.
     /// </summary>
     CHARGING_SYSTEM_ERROR = 0x10,
 
@@ -429,6 +429,8 @@ struct ChargerData
     uint32_t RemainingChargeTimeCycles;
 
     uint16_t ThresholdVoltage;
+
+    bool SupportDynamicAvailableOutputCurrent = true;
 };
 
 

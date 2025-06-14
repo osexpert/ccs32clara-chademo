@@ -34,7 +34,7 @@ extern volatile uint32_t system_millis;
 extern global_data _global;
 
 
-#define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1)
+#define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
 /// <summary>
 /// get estimated battery volt from target and soc.
@@ -201,9 +201,11 @@ void ChademoCharger::HandlePendingCarMessages()
     if (_msg110_pending)
     {
         _msg110_pending = false;
+
         COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "[cha] 110.ExtendedFunction1 changed 0x%d -> 0x%d\r\n");
 
-        _carData.SupportDynamicAvailableOutputCurrent = has_flag((ExtendedFunction1)_msg110.m.ExtendedFunction1, ExtendedFunction1::DYNAMIC_CONTROL);
+        ExtendedFunction1 extFun = (ExtendedFunction1)_msg110.m.ExtendedFunction1;
+        _carData.SupportDynamicAvailableOutputCurrent = has_flag(extFun, ExtendedFunction1::DYNAMIC_CONTROL);
     }
 }
 
@@ -238,7 +240,6 @@ void ChademoCharger::SetCcsParamsFromCarData()
 
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
     Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
-
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
@@ -251,10 +252,6 @@ bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
     return false;
 }
 
-/// <summary>
-/// PS: Do not care about timeout before the charging loop (power off is allowed).
-/// But after we have been inside the charging loop, we must get to the end somehow...
-/// </summary>
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
@@ -315,12 +312,12 @@ void ChademoCharger::RunStateMachine()
     {
         // reset in case set during autoDetect
         _msg102_recieved = false;
-        _carData.Faults = (CarFaults)0;
-        _carData.Status = (CarStatus)0;
+        _carData.Faults = {};
+        _carData.Status = {};
         _chargerData.Status = ChargerStatus::STOPPED;
         _stopReason = StopReason::NONE;
 
-        SetSwitchD1(true); // will trigger car sending can
+        SetSwitchD1(true); // will trigger car sending CAN
 
         SetState(ChargerState::WaitForCarReadyToCharge);
     }
@@ -467,7 +464,7 @@ void ChademoCharger::RunStateMachine()
             //UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
-            // do stop can in own state to make sure we send this message to car before we kill can
+            // do stop CAN in own state to make sure we send this message to car before we kill CAN
             SetState(ChargerState::Stopping_End);
         }
     }
@@ -476,7 +473,7 @@ void ChademoCharger::RunStateMachine()
         // spec says, after setting D2:false wait 500ms before setting D1:false. We have passed 2 state changes already, so we have 300ms left.
         if (_cyclesInState > 3)
         {
-            // this stops can
+            // this stops CAN
             SetSwitchD1(false);
 
             SetState(ChargerState::Stopped);
@@ -484,7 +481,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopped)
     {
-        // NOTE: must have time to tell the car via can that plug is unlocked....so auto off when LockChargingPlug(false) is a bit too soon.
+        // NOTE: must have time to tell the car via CAN that plug is unlocked....so auto off when LockChargingPlug(false) is a bit too soon.
         _powerOffOk = true;
     }
 }
@@ -570,7 +567,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     }
     else
     {
-        // mirror these values (Change method is only called for some params...)
+        // mirror these values
        SetChargerData(
             Param::GetInt(Param::EvseMaxVoltage),
             Param::GetInt(Param::EvseMaxCurrent),
@@ -669,7 +666,7 @@ extern "C" void can1_rx0_isr(void)
     }
 }
 
-// can: 100ms +-10ms
+// CAN: 100ms +-10ms
 #define CAN_TRANSMIT_TIMEOUT_MS 10
 
 /// <summary>
@@ -712,7 +709,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
         // failure or abort
     }
 
-    // Always clear  request complete flag RQCPx
+    // Always clear request complete flag RQCPx
     CAN_TSR(canport) |= rqcp_mask;
 }
 
@@ -761,7 +758,9 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "[cha] 109.RemainingChargingTimeMinutes changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.Status, _chargerData.Status, "[cha] 109.Status changed 0x%x -> 0x%x\r\n");
 
-    _msg118.m.ExtendedFunction1 = ExtendedFunction1::DYNAMIC_CONTROL;
+    ExtendedFunction1 extFun = {};
+    if (_chargerData.SupportDynamicAvailableOutputCurrent) set_flag(&extFun, ExtendedFunction1::DYNAMIC_CONTROL);
+    COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "[cha] 118.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
 }
 
 
