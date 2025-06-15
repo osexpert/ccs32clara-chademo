@@ -66,7 +66,7 @@ global_data _global;
  * overflows every 49 days if you're wondering */
 volatile uint32_t system_millis;
 
-#define AUTO_POWER_OFF_LIMIT_SEC (60 * 3)
+#define AUTO_POWER_OFF_SEC (60 * 3)
 #define CCS_TRACE_EVERY_MS 1000 // 1 sec
 #define SYSINFO_EVERY_MS 2000 // 2 sec
 
@@ -202,20 +202,8 @@ void power_off_no_return(const char* reason)
         msleep(100);
     }
 
-    //if (_global.relayProbablyWeldedEvent)
-    //{
-    //    printf("!!! WARNING: Contactor may be welded. Use a multimeter to verify. May try the unwelding function (hold stop while power on). !!!\r\n");
-    //}
-
-    // weird...i dont think this has any effect (here)
-    // commented it
-//    DigIo::switch_d1_out.Clear();
-    // todo: WAIT
-
-    // stop can?
-
-    // power off adapter contactor here.
-    // if we did not, both the car contactors and the adapter contactor would loose power at the same time,
+    // Power off adapter contactor here.
+    // If we did not, both the car contactors and the adapter contactor would loose power at the same time,
     // and it would be chance who takes the hit.
     // Its better that adapter contactor take the hit than the car, so power it off explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
@@ -250,7 +238,7 @@ void power_off_check()
     {
         bool buttonPressedBriefly = _global.stopButtonCounter > 0;
         bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
-        bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_LIMIT_SEC;
+        bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
         if (buttonPressedBriefly && _state != MainState::WaitForSlacDone)
@@ -386,7 +374,6 @@ static void print_ccs_trace()
         int state = Param::GetInt(Param::opmode);
         const char* label = pevSttLabels[state];
 
-        // TODO: log events flags
         printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n",
             label,
             tcp_getTotalNumberOfRetries(),

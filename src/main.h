@@ -32,9 +32,9 @@ extern "C" {
 
 // Priority levels (lower = higher priority)
 //#define IRQ_PRIORITY_LOG     IRQ_PRI(13)  // dont interupt logging
-#define IRQ_PRIORITY_CAN_TX        IRQ_PRI(14)
-#define IRQ_PRIORITY_CAN_RX        IRQ_PRI(14)
-#define IRQ_PRIORITY_SCHED      IRQ_PRI(15) // dont preemt anything but can?
+#define IRQ_PRIORITY_CAN_TX     IRQ_PRI(14)
+#define IRQ_PRIORITY_CAN_RX     IRQ_PRI(14)
+#define IRQ_PRIORITY_SCHED      IRQ_PRI(15) // dont preemt anything but CAN?
 
 
 
@@ -52,16 +52,9 @@ extern "C" {
 
         bool powerOffPending = false;
 
-        // ccs delivered 1 amps or more
-        //bool ccsDeliveredAmpsEvent = false;
         bool ccsPreChargeStartedEvent = false;
         bool ccsCurrentDemandStartedEvent = false;
         bool ccsPreChargeDoneButStalledEvent = false;
-        //bool relayProbablyWeldedEvent = false;
-        //bool ccSlacDoneEvent = false;
-        //bool tcpConnectedEvent = false;
-        //bool ccsPevStateMachineStartedEvent = false;
-       // bool ccsPowerRelayOnTrigger_prechargeDone = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
 

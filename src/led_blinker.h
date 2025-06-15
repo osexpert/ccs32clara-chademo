@@ -22,6 +22,7 @@ public:
 
     // Set the pattern (array of tick counts, 0 terminates)
     void setPattern(const uint8_t newPattern[MaxPatternLength]);
+    void loadPattern(const uint8_t source[MaxPatternLength]);
 
     // Call this every 100ms
     void tick();
@@ -30,7 +31,10 @@ public:
     void applyLed(bool on);
 
 private:
-    uint8_t pattern[MaxPatternLength];
+    uint8_t pattern[MaxPatternLength];        // Active pattern
+    uint8_t pendingPattern[MaxPatternLength]; // Pending pattern
+    bool hasPendingPattern = false;
+
     int currentIndex;
     int remainingTicks;
     bool ledOn;
