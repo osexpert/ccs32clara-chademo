@@ -51,8 +51,8 @@ OBJSL		  = main.o hwinit.o params.o \
 				 my_string.o digio.o my_fp.o printf.o \
 				 errormessage.o \
 				 ipv6.o tcp.o \
-				 connMgr.o modemFinder.o pevStateMachine.o wakecontrol.o \
-				 hardwareInterface.o pushbutton.o udpChecksum.o \
+				 connMgr.o modemFinder.o pevStateMachine.o \
+				 hardwareInterface.o udpChecksum.o \
 				 homeplug.o myHelpers.o qca7000.o \
 				 appHandEXIDatatypesDecoder.o ByteStream.o EncoderChannel.o \
 				 appHandEXIDatatypesEncoder.o DecoderChannel.o EXIHeaderDecoder.o \

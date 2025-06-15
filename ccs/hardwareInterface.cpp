@@ -3,9 +3,6 @@
 #include "ccs32_globals.h"
 
 extern global_data _global;
-//extern bool stopButtonEvent;
-//extern int auto_power_off_timer_count_up_sec;
-//extern bool ccsPowerRelayOnTrigger;
 
 void hardwareInterface_showOnDisplay(char*, char*, char*)
 {
@@ -73,24 +70,11 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 void hardwareInterface_setPowerRelayOn(void)
 {
     printf("hardwareInterface_setPowerRelayOn\r\n");
-
-    // abuse the fact that this is called at end of preCharge
-    //_global.ccsPreChargeDoneEvent = true;
-
-    // D1 does not belong here??? or possibly...this will kick of the can...
-    // even so....i would have used a different signaling
-//    DigIo::switch_d1_out.Set();
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
     printf("hardwareInterface_setPowerRelayOff\r\n");
-
- //   printf("open adapter contactor\r\n");
-    // adapter does nothing here...
-    //DigIo::unknown_relay_out.Clear();
-
-    // TODO: what to do here???
 }
 
 void hardwareInterface_setStateB(void)
