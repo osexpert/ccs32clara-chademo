@@ -2,7 +2,7 @@
 
 ![image](doc/ccs2-chademo_adapter.jpg)
 
-This is ccs32clara adapted to run on Dongguan Longood CCS2 to CHAdeMO adapter (My407ccs2chademo.bin)
+This is ccs32clara adapted to run on Longood CCS2 to CHAdeMO adapter (My407ccs2chademo.bin)
 Adapter probably uses a STM32F407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
 It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A). Transformer is connected to the car-side of the adapter.
