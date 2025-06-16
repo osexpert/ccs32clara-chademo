@@ -1023,6 +1023,7 @@ static void stateFunctionWaitForSessionStopResponse(void)
       {
          // req -508
          // Todo: close the TCP connection here.
+         tcp_reset();
          publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
          pev_enterState(PEV_STATE_End);
@@ -1171,4 +1172,10 @@ void pevStateMachine_Mainfunction(void)
    // run the state machine:
    pev_cyclesInState += 1; // for timeout handling, count how long we are in a state
    pev_runFsm();
+}
+
+bool chademoInterface_isPowerOffOk()
+{
+    // plug in unlocked right after welding detection, so can't use it reliably.
+    return Param::GetInt(Param::opmode) == PEV_STATE_End;
 }

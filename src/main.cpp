@@ -225,6 +225,8 @@ void power_off_no_return(const char* reason)
     }
 }
 
+extern bool chademoInterface_isPowerOffOk();
+
 void power_off_check()
 {
     bool buttonPressed30Seconds = _global.stopButtonCounter > 10 * 30; // 30 seconds
@@ -274,7 +276,7 @@ void power_off_check()
 
     if (_global.powerOffPending)
     {
-        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCcs = chademoInterface_isPowerOffOk();
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
         if (powerOffOkCcs && powerOffOkCha)
