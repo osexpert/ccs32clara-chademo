@@ -79,7 +79,7 @@ So it is possible it will not work at all or as well as the original firmware if
 Happy hacking.
 
 ## Download
-Every commit is built automatically and can be downloaded here, as artifact of a workflow run: https://github.com/osexpert/ccs32clara-chademo/actions
+Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 
 # ccs32clara
 
