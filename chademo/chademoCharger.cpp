@@ -303,7 +303,7 @@ void ChademoCharger::RunStateMachine()
 
     if (_state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart)
     {
-        if (_global.ccsPreChargeStartedEvent)
+        if (_global.ccsPreChargeStartedTrigger)
         {
             SetState(ChargerState::Start);
         }
@@ -340,8 +340,7 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
-                //LockChargingPlug();
-                _powerOffOk = false;
+                LockChargingPlug();
                 set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
                 //PerformInsulationTest();
@@ -461,7 +460,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_chargerData.OutputVoltage <= 10 || IsTimeoutSec(10))
         {
-            //UnlockChargingPlug();
+            UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
             // do stop CAN in own state to make sure we send this message to car before we kill CAN
@@ -481,15 +480,13 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopped)
     {
-        // NOTE: must have time to tell the car via CAN that plug is unlocked....so auto off when LockChargingPlug(false) is a bit too soon.
-        _powerOffOk = true;
     }
 }
 
 bool ChademoCharger::PreChargeCompleted()
 {
     _preChargeDoneButStalled = true;
-    _global.ccsPreChargeDoneButStalledEvent = true;
+    _global.ccsPreChargeDoneButStalledTrigger = true;
 
     // keep it hanging until car contactors closed
     bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
@@ -763,4 +760,17 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "[cha] 118.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
 }
 
+bool ChademoCharger::IsPowerOffOk()
+{
+    // Must have time to tell the car via CAN that plug is unlocked, so auto off when UnlockChargingPlug() is a bit too soon.
+
+    if (_state == ChargerState::Stopped) {
+        // power off ok if stopped
+        return true;
+    }
+    else {
+        // not stopped (maybe not even started), then power off ok if plug was never locked
+        return _chargingPlugLockedTrigger == false;
+    }
+}
 

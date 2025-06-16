@@ -1174,8 +1174,8 @@ void pevStateMachine_Mainfunction(void)
    pev_runFsm();
 }
 
-bool chademoInterface_isPowerOffOk()
+bool chademoInterface_isCcsEnded()
 {
-    // plug in unlocked right after welding detection, so can't use it reliably.
     return Param::GetInt(Param::opmode) == PEV_STATE_End;
 }
+

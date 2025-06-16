@@ -437,6 +437,7 @@ struct ChargerData
 class ChademoCharger
 {
 public:
+    bool IsPowerOffOk();
     bool PreChargeCompleted();
     bool ContinueWeldingDetection();
     void UpdateChargerMessages();
@@ -455,19 +456,8 @@ public:
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
     bool GetSwitchK();
 
-    bool IsPowerOffOk()
-    {
-        return _powerOffOk;
-    }
-
     void CloseAdapterContactor();
-      
-
-    StopReason GetStopReason()
-    {
-        return _stopReason;
-    }
-
+   
     void Log(bool force = false);
 
     const char* GetStateName();
@@ -475,10 +465,22 @@ public:
 
     int _delayCycles = 0;
 
+    StopReason GetStopReason()
+    {
+        return _stopReason;
+    }
+
+    void LockChargingPlug() {
+        _chargingPlugLockedTrigger = true;
+    }
+
+    void UnlockChargingPlug() {
+    }
+
     private:
         int _logCycleCounter = 0;
-        bool _powerOffOk = true;
         int _cyclesInState = 0;
+        bool _chargingPlugLockedTrigger = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;

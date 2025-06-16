@@ -124,7 +124,7 @@ void RunMainStateMachine()
     }
     else if (_state == MainState::WaitForPreChargeStart)
     {
-        if (_global.ccsPreChargeStartedEvent)
+        if (_global.ccsPreChargeStartedTrigger)
         {
             ledBlinker->setPattern(blink_3);
             _state = MainState::WaitForPreChargeDoneButStalled;
@@ -132,7 +132,7 @@ void RunMainStateMachine()
     }
     else if (_state == MainState::WaitForPreChargeDoneButStalled)
     {
-        if (_global.ccsPreChargeDoneButStalledEvent)
+        if (_global.ccsPreChargeDoneButStalledTrigger)
         {
             ledBlinker->setPattern(blink_4);
             _state = MainState::WaitForCurrentDemandLoop;
@@ -140,7 +140,7 @@ void RunMainStateMachine()
     }
     else if (_state == MainState::WaitForCurrentDemandLoop)
     {
-        if (_global.ccsCurrentDemandStartedEvent)
+        if (_global.ccsCurrentDemandStartedTrigger)
         {
             // barely noticable, removed blink
             _state = MainState::WaitForDeliveringAmps;
@@ -225,7 +225,21 @@ void power_off_no_return(const char* reason)
     }
 }
 
-extern bool chademoInterface_isPowerOffOk();
+extern bool chademoInterface_isCcsEnded();
+
+bool ccs_isPowerOffOk()
+{
+    // plug is unlocked right after welding detection, so can't use it reliably.
+
+    if (chademoInterface_isCcsEnded()) {
+        // if ended, power off is ok
+        return true;
+    }
+    else {
+        // if not ended (maybe not even started), power off ok if plug was never locked
+        return _global.ccsConnectorLockingTrigger == false;
+    }
+}
 
 void power_off_check()
 {
@@ -276,7 +290,7 @@ void power_off_check()
 
     if (_global.powerOffPending)
     {
-        bool powerOffOkCcs = chademoInterface_isPowerOffOk();
+        bool powerOffOkCcs = ccs_isPowerOffOk();
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
         if (powerOffOkCcs && powerOffOkCha)
@@ -437,6 +451,9 @@ static void Ms30Task()
         printf("ccs kickoff, cha autodetect completed\r\n");
     }
 
+    if (_global.ccsEnded)
+        return;
+
     spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
@@ -446,6 +463,8 @@ static void Ms30Task()
     pevStateMachine_Mainfunction();
 
     ErrorMessage::SetTime(rtc_get_ms());
+
+    _global.ccsEnded = chademoInterface_isCcsEnded();
 }
 
 static void SetMacAddress()

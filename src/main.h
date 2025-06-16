@@ -47,14 +47,14 @@ extern "C" {
         int stopButtonCounter = 0;
 
         bool ccsKickoff = false;
-
         bool relayUnweldingAttempt = false;
-
         bool powerOffPending = false;
+        bool ccsEnded = false;
 
-        bool ccsPreChargeStartedEvent = false;
-        bool ccsCurrentDemandStartedEvent = false;
-        bool ccsPreChargeDoneButStalledEvent = false;
+        bool ccsPreChargeStartedTrigger = false;
+        bool ccsCurrentDemandStartedTrigger = false;
+        bool ccsPreChargeDoneButStalledTrigger = false;
+        bool ccsConnectorLockingTrigger = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
 

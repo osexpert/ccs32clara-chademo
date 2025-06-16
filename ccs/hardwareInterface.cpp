@@ -28,7 +28,7 @@ void hardwareInterface_simulateCharging(void)
 int16_t hardwareInterface_getInletVoltage(void)
 {
     // only called in precharge, so we can abuse it as trigger
-    _global.ccsPreChargeStartedEvent = true;
+    _global.ccsPreChargeStartedTrigger = true;
 
     _global.auto_power_off_timer_count_up_ms = 0;
 
@@ -49,7 +49,7 @@ int16_t hardwareInterface_getChargingTargetVoltage(void)
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
     // only called in CurrentDemand, so abuse it as trigger
-    _global.ccsCurrentDemandStartedEvent = true;
+    _global.ccsCurrentDemandStartedTrigger = true;
 
     _global.auto_power_off_timer_count_up_ms = 0;
 
@@ -90,6 +90,8 @@ void hardwareInterface_setStateC(void)
 void hardwareInterface_triggerConnectorLocking(void)
 {
     Param::SetInt(Param::LockState, LOCK_CLOSED);
+
+    _global.ccsConnectorLockingTrigger = true;
 }
 
 void hardwareInterface_triggerConnectorUnlocking(void)
