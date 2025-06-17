@@ -448,7 +448,7 @@ public:
     void Run();
     bool IsAutoDetectCompleted();
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
-    void SetState(ChargerState newState);
+    void SetState(ChargerState newState, StopReason stopReason = StopReason::NONE);
     void OpenAdapterContactor();
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);

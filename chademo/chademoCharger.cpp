@@ -258,42 +258,21 @@ void ChademoCharger::RunStateMachine()
 
     if (_state < ChargerState::ChargingLoop)
     {
-        // TODO: we are printing stop reason value, so all the printf not really needed
-        if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING))
+        StopReason stopReason = StopReason::NONE;
+        // global reason
+        if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
+        // car reason
+        if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING)) set_flag(&stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
+        if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
+        // charger reason
+        if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
+        if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR)) set_flag(&stopReason, StopReason::CHARGING_SYSTEM_ERROR);
+        if (has_flag(_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE)) set_flag(&stopReason, StopReason::BATTERY_INCOMPATIBLE);
+
+        if (stopReason != StopReason::NONE)
         {
-            printf("[cha] Car stopped before starting\r\n");
-            set_flag(&_stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
-            SetState(ChargerState::Stopping_Start);
-        }
-        if (has_flag(_carData.Status, CarStatus::ERROR))
-        {
-            printf("[cha] Car status error before starting\r\n");
-            set_flag(&_stopReason, StopReason::CAR_ERROR);
-            SetState(ChargerState::Stopping_Start);
-        }
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR))
-        {
-            printf("[cha] Charger error before starting\r\n");
-            set_flag(&_stopReason, StopReason::CHARGER_ERROR);
-            SetState(ChargerState::Stopping_Start);
-        }
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR))
-        {
-            printf("[cha] Charging systen error before starting\r\n");
-            set_flag(&_stopReason, StopReason::CHARGING_SYSTEM_ERROR);
-            SetState(ChargerState::Stopping_Start);
-        }
-        if (has_flag(_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE))
-        {
-            printf("[cha] Battery incompatible before starting\r\n");
-            set_flag(&_stopReason, StopReason::BATTERY_INCOMPATIBLE);
-            SetState(ChargerState::Stopping_Start);
-        }
-        if (_global.powerOffPending)
-        {
-            printf("[cha] Power off pending before starting\r\n");
-            set_flag(&_stopReason, StopReason::POWER_OFF_PENDING);
-            SetState(ChargerState::Stopping_Start);
+            printf("[cha] Stopping before starting\r\n");
+            SetState(ChargerState::Stopping_Start, stopReason);
         }
 
         _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxBatteryVoltage);
@@ -325,18 +304,25 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
         {
-            if (_autoDetect)
+            if (_carData.ProtocolNumber < 2)
+            {
+                printf("[cha] car ProtocolVersion %d is not supported\r\n", _carData.ProtocolNumber);
+                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE);
+                // fall thru: let error handler on top deal with it
+            }
+            else if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
+            {
+                printf("[cha] car TargetBatteryVoltage %d > charger AvailableOutputVoltage %d\r\n", _carData.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE);
+                // fall thru: let error handler on top deal with it
+            }
+            else if (_autoDetect)
             {
                 SetSwitchD1(false); // PS: even if we set to false, car can continue to send 102 for a short time
                 _autoDetect = false;
                 printf("[cha] AutoDetect completed\r\n");
 
                 SetState(ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart);
-            }
-            else if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
-            {
-                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE);
-                // fall thru: let error handler on top deal with it
             }
             else
             {
@@ -350,8 +336,7 @@ void ChademoCharger::RunStateMachine()
         }
         else if (IsTimeoutSec(20))
         {
-            set_flag(&_stopReason, StopReason::TIMEOUT);
-            SetState(ChargerState::Stopping_Start);
+            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
@@ -374,8 +359,7 @@ void ChademoCharger::RunStateMachine()
         }
         else if (IsTimeoutSec(20))
         {
-            set_flag(&_stopReason, StopReason::TIMEOUT);
-            SetState(ChargerState::Stopping_Start);
+            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
@@ -393,8 +377,7 @@ void ChademoCharger::RunStateMachine()
         }
         else if (IsTimeoutSec(20))
         {
-            set_flag(&_stopReason, StopReason::TIMEOUT);
-            SetState(ChargerState::Stopping_Start);
+            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
     else if (_state == ChargerState::ChargingLoop)
@@ -403,33 +386,29 @@ void ChademoCharger::RunStateMachine()
             _chargerData.RemainingChargeTimeCycles--;
         _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
 
+        StopReason stopReason = StopReason::NONE;
         // global reason
-        if (_global.powerOffPending) set_flag(&_stopReason, StopReason::POWER_OFF_PENDING);
+        if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reasons
-        if (_carData.CyclesSinceCarLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&_stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
-        if (_switch_k == false) set_flag(&_stopReason, StopReason::CAR_SWITCH_K_OFF);
-        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE) == false) set_flag(&_stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
-        if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&_stopReason, StopReason::CAR_NOT_IN_PARK);
-        if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&_stopReason, StopReason::CAR_ERROR);
+        if (_carData.CyclesSinceCarLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
+        if (_switch_k == false) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
+        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE) == false) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
+        if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
+        if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reasons
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR)) set_flag(&_stopReason, StopReason::CHARGING_SYSTEM_ERROR);
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&_stopReason, StopReason::CHARGER_ERROR);
-        if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&_stopReason, StopReason::CHARGING_TIME);
+        if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR)) set_flag(&stopReason, StopReason::CHARGING_SYSTEM_ERROR);
+        if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
+        if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
         // TODO: stop when battery full? No...normally the car will stop when it means it is full.
 
-        if (_stopReason != StopReason::NONE)
+        if (stopReason != StopReason::NONE)
         {
-            SetState(ChargerState::Stopping_Start);
+            SetState(ChargerState::Stopping_Start, stopReason);
         }
     }
     else if (_state == ChargerState::Stopping_Start)
     {
-        if (_stopReason == StopReason::NONE)
-            _stopReason = StopReason::UNKNOWN;
-
-        printf("[cha] Stopping: 0x%x\r\n", _stopReason);
-
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
         SetState(ChargerState::Stopping_WaitForLowAmps);
@@ -480,6 +459,11 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopped)
     {
+        if (_stopReason == StopReason::NONE)
+        {
+            printf("[cha] BUG: StopReason not set. Set to UNKNOWN\r\n");
+            _stopReason = StopReason::UNKNOWN;
+        }
     }
 }
 
@@ -512,11 +496,15 @@ extern "C" bool chademoInterface_continueWeldingDetection()
     return chademoCharger->ContinueWeldingDetection();
 }
 
-void ChademoCharger::SetState(ChargerState newState)
+void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
 {
     printf("[cha] ====>>>> set state %d/%s\r\n", newState, _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
+
+    set_flag(&_stopReason, stopReason);
+    if (_stopReason != StopReason::NONE)
+        printf("[cha] Stopping: 0x%x\r\n", _stopReason);
 
     // force log on state change
     Log(true);

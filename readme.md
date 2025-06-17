@@ -38,9 +38,10 @@ How I describe it is also how the original firmware works, AFAICT, allthou it se
 Shortly pressing stop button will initiate power off (pending).
 Between ccs has started and Slac is done, stop button must be pressed for 5 seconds to initiate power off (pending). This to allow "fiddle" with the plug or late plug insertion.
 As soon as Slac is done, the logic revert to "shortly pressing".
-When power off is pending, adapter will power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
-When nothing else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
+When power off is pending, adapter should power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
+Power off pending is set after charging is done and should auto power off immediately after charging is stopped.
 Auto power off after 3 minutes of not being inside ccs PreCharge or CurrentDemand loop (could be smarter).
+When nothing else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
 
 Special mode: hold stop button while powering on. You should hear a click from the adapter contactor. Let go of the stop button within 1 second, and you have activated contactor unwelding attempt, where 
 the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
