@@ -189,18 +189,9 @@ static void msleep(uint32_t delay)
     while (wake > system_millis);
 }
 
-extern bool tcp_isClosed(void);
-extern void tcp_reset(void);
-
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
-
-    if (!tcp_isClosed())
-    {
-        tcp_reset();
-        msleep(100);
-    }
 
     // Power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time,
@@ -436,6 +427,8 @@ static void Ms100Task(void)
     print_ccs_trace();
 }
 
+extern void tcp_reset(void);
+
 static void Ms30Task()
 {
     if (_global.relayUnweldingAttempt)
@@ -451,10 +444,13 @@ static void Ms30Task()
         printf("ccs kickoff, cha autodetect completed\r\n");
     }
 
+    // run eth even after ccsEnded, so we look "alive" to the charger
+    // (some chargers complain about contact lost with car after charging, this may fix it?)
+    spiQCA7000checkForReceivedData();
+
     if (_global.ccsEnded)
         return;
 
-    spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
     runSlacSequencer();
@@ -465,6 +461,8 @@ static void Ms30Task()
     ErrorMessage::SetTime(rtc_get_ms());
 
     _global.ccsEnded = chademoInterface_isCcsEnded();
+    if (_global.ccsEnded)
+        tcp_reset(); // kill the last connection, if any
 }
 
 static void SetMacAddress()

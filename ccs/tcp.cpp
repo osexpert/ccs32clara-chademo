@@ -60,7 +60,6 @@ void evaluateTcpPacket(void)
    uint16_t sourcePort, destinationPort, pLen, hdrLen, tmpPayloadLen;
 
    /* todo: check the IP addresses, checksum etc */
-   nTcpPacketsReceived++;
    pLen =  (((uint16_t)myethreceivebuffer[18])<<8) +  myethreceivebuffer[19]; /* length of the IP payload */
    hdrLen=(myethreceivebuffer[66]>>4) * 4; /* header length in byte */
    //log_v("pLen=%d, hdrLen=%d", pLen, hdrLen);
@@ -92,7 +91,7 @@ void evaluateTcpPacket(void)
       (((uint32_t)myethreceivebuffer[64])<<8) +
       (((uint32_t)myethreceivebuffer[65]));
    flags = myethreceivebuffer[67];
-   if (flags == TCP_FLAG_SYN+TCP_FLAG_ACK)   /* This is the connection setup response from the server. */
+   if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK))   /* This is the connection setup response from the server. */
    {
       if (tcpState == TCP_STATE_SYN_SENT)
       {
@@ -136,7 +135,6 @@ void evaluateTcpPacket(void)
 
    if (flags & TCP_FLAG_ACK)
    {
-      nTcpPacketsReceived+=1000;
       TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
       lastUnackTransmissionTime = 0; /* mark timer as "not used", because we received the ACK */
       retryCounter = 0;

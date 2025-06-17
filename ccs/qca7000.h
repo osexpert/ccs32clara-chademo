@@ -17,7 +17,6 @@ extern uint16_t myethtransmitbufferLen; /* The number of used bytes in the ether
 extern uint8_t myethreceivebuffer[MY_ETH_RECEIVE_BUFFER_LEN];
 extern uint16_t myethreceivebufferLen;
 extern uint8_t nMaxInMyEthernetReceiveCallback, nInMyEthernetReceiveCallback;
-extern uint16_t nTcpPacketsReceived;
 
 /* Global Functions */
 

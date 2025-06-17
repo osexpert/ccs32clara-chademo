@@ -17,7 +17,6 @@ static uint16_t mySpiDataSize;
 static uint8_t mySpiRxBuffer[MY_SPI_TX_RX_BUFFER_SIZE];
 static uint8_t mySpiTxBuffer[MY_SPI_TX_RX_BUFFER_SIZE];
 static uint32_t nTotalTransmittedBytes;
-uint16_t nTcpPacketsReceived;
 
 uint8_t myethtransmitbuffer[MY_ETH_TRANSMIT_BUFFER_LEN];// = &mySpiTxBuffer[10];
 uint16_t myethtransmitbufferLen; /* The number of used bytes in the ethernet transmit buffer */
