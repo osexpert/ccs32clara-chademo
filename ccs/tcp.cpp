@@ -9,19 +9,23 @@
 #define TCP_FLAG_RST 0x04
 #define TCP_FLAG_PSH 0x08
 #define TCP_FLAG_ACK 0x10
-#define TCP_TRANSMIT_PACKET_LEN 200
 
-#define TCP_ACK_TIMEOUT_MS 100 /* if for 100ms no ACK is received, we retry the transmission */
-#define TCP_MAX_NUMBER_OF_RETRANSMISSIONS 40 /* allow 40 retries with 100ms cycle, to bridge 4 seconds of broken line. */
-#define TCP_ACTIVITY_TIMER_START (5*33) /* 5 seconds */
+#define TCP_TRANSMIT_PACKET_LEN 200
 
 #define TCP_STATE_CLOSED 0
 #define TCP_STATE_SYN_SENT 1
 #define TCP_STATE_ESTABLISHED 2
 
-static uint16_t tcpActivityTimer;
-static uint32_t lastUnackTransmissionTime = 0;
-static uint8_t retryCounter = 0;
+#define TCP_ACK_INITIAL_TIMEOUT_MS 100     // Start with 100ms
+#define TCP_ACK_MAX_TIMEOUT_MS     800     // Max per-retry delay
+#define TCP_MAX_TOTAL_RETRY_TIME_MS 4000   // Retry attempts within 4s
+
+static uint32_t nextRetryTime = 0;
+static uint32_t retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
+static uint32_t retryTotalElapsed = 0;
+
+static bool lastTransmitAckPending = false;
+
 static uint8_t TcpIpRequestLen;
 static uint8_t* TcpIpRequest = &myethtransmitbuffer[14];
 static uint8_t TcpTransmitPacketLen;
@@ -79,7 +83,7 @@ void evaluateTcpPacket(void)
       log_v("%d %d %d %d",sourcePort,seccTcpPort,destinationPort, evccPort   );
       return; /* wrong port */
    }
-   tcpActivityTimer=TCP_ACTIVITY_TIMER_START;
+
    remoteSeqNr =
       (((uint32_t)myethreceivebuffer[58])<<24) +
       (((uint32_t)myethreceivebuffer[59])<<16) +
@@ -135,9 +139,8 @@ void evaluateTcpPacket(void)
 
    if (flags & TCP_FLAG_ACK)
    {
-      TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
-      lastUnackTransmissionTime = 0; /* mark timer as "not used", because we received the ACK */
-      retryCounter = 0;
+       TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
+       lastTransmitAckPending = false;
    }
 
    if (flags & TCP_FLAG_RST)
@@ -179,7 +182,6 @@ void tcp_connect(void)
    tcp_prepareTcpHeader(TCP_FLAG_SYN);
    tcp_packRequestIntoIp();
    tcpState = TCP_STATE_SYN_SENT;
-   tcpActivityTimer=TCP_ACTIVITY_TIMER_START;
 }
 
 static void tcp_sendFirstAck(void)
@@ -212,8 +214,11 @@ void tcp_transmit(void)
           addToTrace(MOD_TCPTRAFFIC, "TCP will transmit:", tcpPayload, tcpPayloadLen);
           tcp_prepareTcpHeader(TCP_FLAG_PSH + TCP_FLAG_ACK); /* data packets are always sent with flags PUSH and ACK. */
           tcp_packRequestIntoIp();
-          lastUnackTransmissionTime = rtc_get_ms(); /* record the time of transmission, to be able to detect the timeout */
-          retryCounter = TCP_MAX_NUMBER_OF_RETRANSMISSIONS; /* Allow n retries of the same packet */
+
+          lastTransmitAckPending = true; 
+          retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
+          retryTotalElapsed = 0;
+          nextRetryTime = rtc_get_ms() + retryDelay;
       }
       else
       {
@@ -334,7 +339,7 @@ static void tcp_packRequestIntoEthernet(void)
    myethtransmitbuffer[13] = 0xdd;
    myEthTransmit();
 }
-//
+
 //void tcp_disconnect(void)
 //{
 //   /* we should normally use the FIN handshake, to tell the charger that we closed the connection.
@@ -357,6 +362,8 @@ void tcp_reset()
         tcp_packRequestIntoIp();
         tcpState = TCP_STATE_CLOSED;  // close connection state
     }
+
+	lastTransmitAckPending = false;
 }
 
 bool tcp_isClosed(void)
@@ -370,29 +377,48 @@ bool tcp_isConnected(void)
 }
 
 
+void tcp_checkRetry(void)
+{
+    if (lastTransmitAckPending == false || tcpState != TCP_STATE_ESTABLISHED)
+        return;
+
+    uint32_t now = rtc_get_ms();
+    if (now >= nextRetryTime)
+    {
+        if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
+        {
+            addToTrace(MOD_TCP, "[TCP] Giving up the retry");
+            tcp_reset();
+            return;
+        }
+
+        addToTrace(MOD_TCP, "[TCP] Last packet wasn't ACKed, retransmitting"); // Resend the last packet
+        tcp_packRequestIntoEthernet(); // retransmit the same content
+
+        tcp_debug_totalRetryCounter++;
+
+        retryTotalElapsed += retryDelay;
+
+        // Update delay for next retry (exponential backoff, capped)
+        retryDelay *= 2;
+        if (retryDelay > TCP_ACK_MAX_TIMEOUT_MS)
+            retryDelay = TCP_ACK_MAX_TIMEOUT_MS;
+
+        nextRetryTime = now + retryDelay;
+    }
+}
+
 void tcp_Mainfunction(void)
 {
-   if ((lastUnackTransmissionTime > 0) && ((rtc_get_ms() - lastUnackTransmissionTime) > TCP_ACK_TIMEOUT_MS))
-   {
-      if (retryCounter>0) {
-        /* The maximum number of retransmissions are not yet over. We still are allowed to retransmit. */
-        //Retransmit
-        tcp_packRequestIntoEthernet();
-        tcp_debug_totalRetryCounter++;
-        lastUnackTransmissionTime = rtc_get_ms(); /* record the time of transmission, to be able to detect the timeout */
-        retryCounter--;
-        addToTrace(MOD_TCP, "[TCP] Last packet wasn't ACKed for 100 ms, retransmitting");
-      } else {
-        addToTrace(MOD_TCP, "[TCP] Giving up the retry");
-      }
-   }
+   tcp_checkRetry();
+
    if (connMgr_getConnectionLevel()<50)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
-      lastUnackTransmissionTime = 0;
       tcp_reset();
       return;
    }
+
    if ((connMgr_getConnectionLevel()==50) && (tcpState == TCP_STATE_CLOSED))
    {
       /* SDP is finished, but no TCP connected yet. */
