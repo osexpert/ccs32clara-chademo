@@ -23,7 +23,7 @@ After we set d2, car hopefully close contactors. After car close contactors, we 
 
 In ccs, the car set PreCharge voltage to battery voltage. Car measure the voltage and when voltage is reached, car close its contactors (difference between charger and battery voltage is small).
 
-For chademo, I _think_ charger is supposed to be "floating" when car open contactor. Then charger will measure the car battery voltage,
+For chademo, I _think_ charger is supposed to be "floating" when car closes contactors. Then charger will measure the car battery voltage,
 quickly increase own voltage to match and then "engage". So its opposite from ccs, where car does the final "engagement".
 
 The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc. If adapter had a voltmeter on the car-side,
