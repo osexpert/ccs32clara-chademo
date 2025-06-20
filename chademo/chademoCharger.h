@@ -416,7 +416,7 @@ struct ChargerData
     /// Not sure if 1 is right here...
     /// But I think 1 if we assume charger can drop its voltage fast, after charging was stopped
     /// </summary>
-    bool SupportWeldingDetection = 1;
+    bool SupportWeldingDetection = true;
 
     uint8_t MaxAvailableOutputCurrent;
     uint8_t AvailableOutputCurrent;

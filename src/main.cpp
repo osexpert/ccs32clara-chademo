@@ -193,10 +193,9 @@ void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
-    // Power off adapter contactor here.
-    // If we did not, both the car contactors and the adapter contactor would loose power at the same time,
-    // and it would be chance who takes the hit.
-    // Its better that adapter contactor take the hit than the car, so power it off explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
+    // In case of emergency shutdown (stop button for 30 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
+    // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
+    // Its better to sacrefice the adapter instead of the car, so power off adapter contactor explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
     {
         printf("Contactor was closed! This may be bad...\r\n");
@@ -323,9 +322,8 @@ float adc_to_voltage(uint16_t adc, float gain) {
 #define ADC_CHANNEL_COUNT 3
 void adc_read_all(void)
 {
-    // Buffer to store ADC results (PA8, VREFINT, VBAT)
     uint16_t adc_results[ADC_CHANNEL_COUNT];
-    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10, 11, 17 /*vrefint*/ };
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, 17 /* VREFINT */ };
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
@@ -381,7 +379,7 @@ static void print_ccs_trace()
         int state = Param::GetInt(Param::opmode);
         const char* label = pevSttLabels[state];
 
-        printf("In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n",
+        printf("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n",
             label,
             tcp_getTotalNumberOfRetries(),
             Param::GetInt(Param::EvseVoltage),

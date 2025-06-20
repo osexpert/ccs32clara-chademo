@@ -10,23 +10,7 @@ https://github.com/brechtsanders/winlibs_mingw/releases/download/15.1.0posix-12.
 winlibs-x86_64-posix-seh-gcc-14.2.0-mingw-w64msvcrt-12.0.0-r3.zip
 I extracted it to c:\ (C:\mingw64)
 
-export PATH="/c/mingw64/bin:$PATH"
-
-mingw32-make.exe
-
-
-
-
-
-cd /d/git/ccs32clara_my407ccs2chademo/libopencm3
-$ mingw32-make.exe TARGETS=stm32/f4
-
-
 $ mingw32-make.exe V=1
-
-
-
-
 
 https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
 Download:
@@ -34,11 +18,21 @@ https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-t
 It will install to:
 C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1
 
-export PATH="/c/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/14.2 rel1/bin:$PATH"
-
 What I do:
 Use git bash from start menu.
-cd /d/git/ccs32clara_my407ccs2chademo
+cd /d/git/ccs32clara-chademo
 export PATH="/c//Program Files/Python313:/c/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/14.2 rel1/bin:/c/mingw64/bin:/usr/local/bin:/usr/bin:/bin"
 mingw32-make.exe
 profit!
+
+Sometimes it seems libopencm3 is not built correctly/automatically when running the main makefile.
+Then had to:
+cd libopencm3
+mingw32-make.exe clean
+mingw32-make.exe TARGETS=stm32/f4
+
+This caused a new problem, python3 not found.
+So copied C:\Program Files\Python313\python.exe to C:\Program Files\Python313\python3.exe
+Then it worked.
+
+On Linux, this is probably just works. But this is for Windows.

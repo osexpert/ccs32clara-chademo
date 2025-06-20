@@ -18,30 +18,29 @@ Adapter will start chademo to fetch targetVoltage, soc and estimated battery vol
 Chademo will then shut down and ccs logic will start.
 When ccs reach start of PreCharge, chademo is restarted. Estimated battery voltage is used as PreCharge target voltage.
 When PreCharge reach this voltage, chademo d2 is set. We stall PreCharge and prevent it from completing until car closes contactors.
-During this time, 0 volt has been presented to car both via chademo and on the wire (because adapter contactor not closed yet). It is a lie as we are actually on estimated battery voltage at this time.
-After we set d2, car hopefully close contactors. After car close contactors, we close the adapter contactor and voila, we apperantly manifested battery voltage on the wire and via chademo instantly.
-This is _not_ how chademo is supposed to work thou (I _think_ charger is supposed to quickly increase voltage from 0 volts to target voltage, immediately after car closes the contactors).
+During this time, 0 volt has been presented to car both via chademo and on the wire, because adapter contactor not closed yet.
+After we set d2, car hopefully close contactors. After car close contactors, we close the adapter contactor and we manifested (estimated) battery voltage on the wire and via chademo instantly.
 
-The problem is that ccs seems way to slow to emulate this kind of behaviour and also PreCharge is not necesarely supported from 0 volt and up, some jump directly to target.
-At least I was unable to make the car close its contactors without using this trick. If we start chademo before PreCharge, close adapter contactor and set d2, when ccs is 0 volt, before PreCharge,
-and try to bring chademo with us on the ride thru Precharge voltage rising, chademo would time out, because car close contactors ca. 1 second after we set d2, and start to ask for amps shortly after,
-and if it does not get asked amps within ca. 4 seconds, it will fail. Getting from 0 volt before PreCharge and into CurrentDemand delivering amps on this short time, its only possible on some chargers.
-Example, Tesla v2 can use well over 10 second in PreCharge alone. So a stable and reproducable solution may not be possible without the hack, but more investigation needed to be 100% sure.
+In ccs, the car set PreCharge voltage to battery voltage. Car measure the voltage and when voltage is reached, car close its contactors (difference between charger and battery voltage is small).
 
-Ccs otoh, works exactly like we simulate it AFAIK: the PreCharge voltage is set to battery voltage and when voltage is reached, car open its contactors (difference between charger and battery voltage is small).
-The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc...
-So even thou chademo is not made for the charger and car to "meet" on battery voltage, and we do not really know the battery voltage, this _seems_ to work fine, but its hard to say if this has any issues (burnt relays etc.)
+For chademo, I _think_ charger is supposed to be "floating" when car open contactor. Then charger will measure the car battery voltage,
+quickly increase own voltage to match and then "engage". So its opposite from ccs, where car does the final "engagement".
+
+The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc. If adapter had a voltmeter on the car-side,
+it would have been possible to perform a final adjustment to the PreCharge voltage, to match measured car voltage perfectly, before closing adapter contactor.
+
 How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
 (chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so then have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
 
 ## Stop button/power off
-Shortly pressing stop button will initiate power off (pending).
-Between ccs has started and Slac is done, stop button must be pressed for 5 seconds to initiate power off (pending). This to allow "fiddle" with the plug or late plug insertion.
-As soon as Slac is done, the logic revert to "shortly pressing".
+Shortly pressing stop button will initiate power off pending.
+Between ccs has started and SLAC is done, stop button must be pressed for 5 seconds to initiate power off pending. This to allow "fiddle" with the plug or late plug insertion.
+As soon as SLAC is done, the logic reverts to "shortly pressing".
 When power off is pending, adapter should power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
-Power off pending is set after charging is done and should auto power off immediately after charging is stopped.
-Auto power off after 3 minutes of not being inside ccs PreCharge or CurrentDemand loop (could be smarter).
+Power off pending is set after charging is done and adapter should normally auto power off shortly after charging is stopped.
+Power off pending is set after 3 minutes of inactivity (not being inside ccs PreCharge or CurrentDemand loop).
 When nothing else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
+Since the adapter does not have physical locks, to be safe, never unplug the ccs plug or the adapter until the adapter/led is permanently off.
 
 Special mode: hold stop button while powering on. You should hear a click from the adapter contactor. Let go of the stop button within 1 second, and you have activated contactor unwelding attempt, where 
 the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
@@ -50,7 +49,7 @@ process, to see if the contactor becomes unstuck again. My relay got stuck for s
 ## Led
 <pre>
 Initially, slow blinking [***************_______________]
-When Slac is done, one blink [***_________]
+When SLAC is done, one blink [***_________]
 When tcp connected, two blinks [***___***_________]
 When PreCharge started, three blinks [***___***___***_________]
 When PreCharge is done, but stalled waiting for chademo, four blinks [***___***___***___***_________]
@@ -66,13 +65,27 @@ I used LeafSpy Pro to clear the DTCs, else I would probably need to visit a gara
 Not sure why I happened, if it was by chance or if the firmware made a bad move. This was in the early stage of development, maybe the firmware works better now...or maybe not!
 In any case, I suggest traveling with a ODB2 BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
 
-This firmware support chademo dynamic current control, if supported by the car (at least Leaf 40kwt does). This allows charging on chargers that deliver a lot less current than
+This firmware support chademo dynamic current control, if supported by the car (at least Leaf 40kwh does). This allows charging on chargers that deliver a lot less current than
 they say they have available. Without this, the car will fail to charge and produce an error (current deviation too large). This behaviour seems to become more common among ccs chargers.
+
+Logging works the same way as the original firmware. I use Serial USB Terminal on Android. 115200 baud.
+
+Firmware update logic is inside the bootloader, so this is not affected by the firmware:
+With adapter off, plug in usb stick with the firmware.
+Hold power button down and don't let do.
+The usb stick led flashes a few times and turns off.
+Firmware update is done and you can let go of the power button.
+Finally, adapter turns on and adapter led is flashing.
+Press the stop button to turn adapter off.
+
+Charging via usb is not part of the software, its only hardware.
+While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, and this is bootloader starting.
+Meaning, charging automatically triggers power on, so adapter will auto power off and then auto power on again by charger, and this goes on forever.
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
 For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0. Chademo 1.0 is better defined and works better IMO, so not emulating nor supporting it in this firmware.
-Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower). Also it struggle with Slac some times, 
+Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower). Also it struggle with SLAC some times, 
 specially at Tesla stations, where I may have to unplug and plug the cable (fiddle) to get things started.
 These things are improved in this firmware and this was what kicked off this project.
 But this firmware may have other problems that the original firmware does not have!
