@@ -40,7 +40,11 @@ extern global_data _global;
 /// get estimated battery volt from target and soc.
 /// make a lot of assumtions:-)
 /// maxVolt = target - 10
-/// Based on Leaf/i-MiEV data
+/// Based on Leaf/i-MiEV data.
+/// 
+/// nomVolt based on:
+/// Leaf: target: 410V, nomVolt: 355V
+/// i-MiEV: target: 360V, nomVolt: 326V
 /// </summary>
 float GetEstimatedBatteryVoltage(float target, float soc)
 {
@@ -71,26 +75,6 @@ float GetEstimatedBatteryVoltage(float target, float soc)
         return volt80 + ((soc - 80.0f) / 20.0f) * (maxVolt - volt80);
     }
 }
-
-#if false
-// Function to compute nominal voltage based on input voltage
-static uint16_t get_estimated_nominal_voltage(uint16_t targetVolt)
-{
-    // Linear mapping, target to nominal for leaf and imiev
-    // (410, 355) or 350 - 360....
-    // (360, 330)
-
-    float x1 = 410.0, y1 = 350.0;
-    float x2 = 360.0, y2 = 330.0;
-
-    // Compute slope (m) and intercept (b)
-    float m = (y2 - y1) / (x2 - x1); // slope
-    float b = y1 - m * x1;           // intercept
-
-    // Compute and return nominal voltage
-    return (uint16_t)(m * targetVolt + b);
-}
-#endif
 
 void ChademoCharger::HandlePendingCarMessages()
 {
@@ -137,7 +121,7 @@ void ChademoCharger::HandlePendingCarMessages()
         else
             _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTime10s * 10;
 
-        // Even thou spec says 0.1, 0.11 give correct value on Leaf 40kwh: 38.94kwt (with 0.1: 35.4kwt)
+        // Even thou spec says 0.1, 0.11 give more correct value on Leaf 40kwh: 38.94kwh (with 0.1: 35.4kwh). Unstable before switch(k).
         _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.11f;
     }
     if (_msg102_pending)
@@ -157,11 +141,16 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
+        if (_carData.ProtocolNumber < 2)
+        {
+            printf("[cha] car ProtocolVersion %d is not supported\r\n", _carData.ProtocolNumber);
+            set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
+        }
+
         if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
             printf("[cha] Car asking (%d) for more than max (%d) volts.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
-            // let error handlers deal with it
+            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
         {
@@ -171,15 +160,14 @@ void ChademoCharger::HandlePendingCarMessages()
         if (_state == ChargerState::ChargingLoop && _msg102.m.ChargingCurrentRequest > _chargerData.MaxAvailableOutputCurrent)
         {
             printf("[cha] Car asking (%d) for more than max (%d) amps. Stopping.\r\n", _msg102.m.ChargingCurrentRequest, _chargerData.MaxAvailableOutputCurrent);
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR);
-            // let error handlers deal with it
+            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
         {
             _carData.AskingAmps = _msg102.m.ChargingCurrentRequest;
         }
 
-        // soc and the constant both unstable before switch(k) (and also capacity, but  dont care about that)
+        // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
@@ -202,7 +190,7 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg110_pending = false;
 
-        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "[cha] 110.ExtendedFunction1 changed 0x%d -> 0x%d\r\n");
+        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "[cha] 110.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
 
         ExtendedFunction1 extFun = (ExtendedFunction1)_msg110.m.ExtendedFunction1;
         _carData.SupportDynamicAvailableOutputCurrent = has_flag(extFun, ExtendedFunction1::DYNAMIC_CONTROL);
@@ -304,17 +292,12 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
         {
-            if (_carData.ProtocolNumber < 2)
+            // Spec is confusing, but MinimumBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
+            // and MinimumBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
+            if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
             {
-                printf("[cha] car ProtocolVersion %d is not supported\r\n", _carData.ProtocolNumber);
-                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE);
-                // fall thru: let error handler on top deal with it
-            }
-            else if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
-            {
-                printf("[cha] car TargetBatteryVoltage %d > charger AvailableOutputVoltage %d\r\n", _carData.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
-                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE);
-                // fall thru: let error handler on top deal with it
+                printf("[cha] car TargetBatteryVoltage %d > charger AvailableOutputVoltage %d (incompatible).\r\n", _carData.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
             else if (_autoDetect)
             {
@@ -461,7 +444,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_stopReason == StopReason::NONE)
         {
-            printf("[cha] BUG: StopReason not set. Set to UNKNOWN\r\n");
+            printf("[cha] BUG: StopReason not set. Failover to UNKNOWN\r\n");
             _stopReason = StopReason::UNKNOWN;
         }
     }
@@ -487,7 +470,7 @@ extern "C" bool chademoInterface_preChargeCompleted()
 bool ChademoCharger::ContinueWeldingDetection()
 {
     bool contactorsOpened = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
-    // continue rebooting weldingDetection until _our_ contactors are opened
+    // continue rebooting weldingDetection until car contactors are opened
     return contactorsOpened == false;
 }
 
@@ -498,7 +481,7 @@ extern "C" bool chademoInterface_continueWeldingDetection()
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
 {
-    printf("[cha] ====>>>> set state %d/%s\r\n", newState, _stateNames[newState]);
+    printf("[cha] ====>>>> set state %s\r\n", _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
 
@@ -515,8 +498,6 @@ const char* ChademoCharger::GetStateName()
     return _stateNames[_state];
 };
 
-// may vary between car models, what they allow before they fail? spec. says 10% or 20A, a bit confusing.
-// but staying withing 10A seems reasonable...
 #define MAX_UNDERSUPPLY_AMPS 10
 
 void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
@@ -547,7 +528,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
 {
     if (_autoDetect)
     {
-        // fake it for autodetect
+        // fake for autodetect
         SetChargerData(450, 100, 0, 0);
     }
     else
@@ -567,8 +548,7 @@ void ChademoCharger::Log(bool force)
     if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second or when forced
-        printf("[cha] state:%d/%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA/%dA  rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
-            _state,
+        printf("[cha] state:%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV\r\n",
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
