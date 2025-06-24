@@ -249,32 +249,32 @@ void power_off_check()
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
         if (buttonPressedBriefly && _state != MainState::WaitForSlacDone)
         {
-            _global.powerOffPending = true; // one way street
+            _global.powerOffPending = true;
             printf("Stop button pressed briefly and slac not pending. Power off pending...\r\n");
         }
         if (buttonPressed5Seconds)
         {
-            _global.powerOffPending = true; // one way street
+            _global.powerOffPending = true;
             printf("Stop button pressed for 5 seconds. Power off pending...\r\n");
         }
         if (inactivity)
         {
-            _global.powerOffPending = true; // one way street
+            _global.powerOffPending = true;
             printf("Inactivity. Power off pending...\r\n");
         }
 
         int ccsStopReason = Param::GetInt(Param::StopReason);
         if (ccsStopReason != STOP_REASON_NONE)
         {
-            _global.powerOffPending = true; // one way street
-            printf("Ccs stop reason %d. Power off pending...\r\n", ccsStopReason);
+            _global.powerOffPending = true;
+            printf("Ccs stop reason 0x%x. Power off pending...\r\n", ccsStopReason);
         }
 
-        StopReason chaStopReason = chademoCharger->GetStopReason(); // do we need one for success? eg. accu full?
+        StopReason chaStopReason = chademoCharger->GetStopReason();
         if (chaStopReason != StopReason::NONE)
         {
-            _global.powerOffPending = true; // one way street
-            printf("Chademo stop reason %d. Power off pending...\r\n", chaStopReason);
+            _global.powerOffPending = true;
+            printf("Chademo stop reason 0x%x. Power off pending...\r\n", chaStopReason);
         }
     }
 
@@ -319,7 +319,12 @@ float adc_to_voltage(uint16_t adc, float gain) {
     return adc * (3.3f / 4095.0f) * gain;
 }
 
+static float adc_3_3_volt = 0.0f;
+static float adc_4_volt = 0.0f;
+static float adc_12_volt = 0.0f;
+
 #define ADC_CHANNEL_COUNT 3
+
 void adc_read_all(void)
 {
     uint16_t adc_results[ADC_CHANNEL_COUNT];
@@ -334,9 +339,9 @@ void adc_read_all(void)
 
     float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
     
-    _global.adc_3_3_volt = vdd_voltage;
-    _global.adc_4_volt = adc_to_voltage(adc_results[1], 2.0f);
-    _global.adc_12_volt = adc_to_voltage(adc_results[0], 11.0f);
+    adc_3_3_volt = vdd_voltage;
+    adc_4_volt = adc_to_voltage(adc_results[1], 2.0f);
+    adc_12_volt = adc_to_voltage(adc_results[0], 11.0f);
 }
 
 
@@ -356,9 +361,9 @@ void print_sysinfo()
         // Min values seen and working: v4:3.78V v12:11.46V
         printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
-            FP_FROMFLT(_global.adc_4_volt),
-            FP_FROMFLT(_global.adc_12_volt),
-            FP_FROMFLT(_global.adc_3_3_volt),
+            FP_FROMFLT(adc_4_volt),
+            FP_FROMFLT(adc_12_volt),
+            FP_FROMFLT(adc_3_3_volt),
             scheduler->GetCpuLoad() / 10,
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.powerOffPending,
@@ -540,7 +545,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo %s\r\n", GITHUB_VERSION);
+    printf("ccs32clara-chademo %s sha:%s\r\n", GITHUB_VERSION, GITHUB_SHORT_SHA);
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -556,8 +561,6 @@ extern "C" int main(void)
     systick_setup();
     can_setup();
     adc_battery_init();
-
-    //wakecontrol_init(); //Make sure board stays awake
 
     hardwareInterface_setStateB();
     SetMacAddress();

@@ -57,10 +57,6 @@ extern "C" {
         bool ccsConnectorLockingTrigger = false;
 
         uint32_t auto_power_off_timer_count_up_ms = 0;
-
-        float adc_3_3_volt = 0.0f;
-        float adc_4_volt = 0.0f;
-        float adc_12_volt = 0.0f;
     };
 
 
