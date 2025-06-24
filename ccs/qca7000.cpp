@@ -258,14 +258,14 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
 }
 
 
-void spiQCA7000checkForReceivedData(void) {
+bool spiQCA7000checkForReceivedData(void) {
   /* checks whether the QCA7000 indicates received data, and if yes, fetches the data. */
   uint16_t availBytes;
   uint16_t i;
   i=0;
   availBytes = spiQCA7000DemoReadRDBUF_BYTE_AVA();
   if (availBytes==0) {
-     return; /* nothing to do */
+     return false; /* nothing to do */
   }
   //printf("avail rx bytes: %d\r\n", availBytes);
   if (availBytes<4000) {
@@ -305,7 +305,10 @@ void spiQCA7000checkForReceivedData(void) {
        mySpiRxBuffer[i] = mySpiRxBuffer[i+2];
     }
     QCA7000checkRxDataAndDistribute(availBytes); /* Takes the data from the SPI rx buffer, splits it into ethernet frames and distributes them. */
+    return true;
   }
+
+  return false;
 }
 
 void spiQCA7000SendEthFrame(void) {
@@ -378,6 +381,14 @@ void demoQCA7000(void) {
   spiQCA7000DemoReadSignature();
   //spiQCA7000DemoReadWRBUF_SPC_AVA();
   demoQCA7000SendSoftwareVersionRequest();
-  spiQCA7000checkForReceivedData();
-  spiQCA7000checkForReceivedData();
+
+  // ~10 attempts seems to do it for me, but make it 20 for good measure
+  for (int i = 0; i < 20; i++)
+  {
+      if (spiQCA7000checkForReceivedData())
+      {
+          printf("QCA: recieved data after %d attempts\r\n", i + 1);
+          break;
+      }
+  }
 }

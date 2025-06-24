@@ -177,7 +177,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
             if (_carData.SocPercent > 100)
             {
-                printf("[cha] Car report soc > 100: %d\r\n", _carData.SocPercent);
+                printf("[cha] Car report soc %d > 100. Failover to 100.\r\n", _carData.SocPercent);
                 _carData.SocPercent = 100;
             }
 

@@ -22,7 +22,7 @@ extern uint8_t nMaxInMyEthernetReceiveCallback, nInMyEthernetReceiveCallback;
 
 void qca7000setup();
 extern void demoQCA7000(void);
-extern void spiQCA7000checkForReceivedData(void);
+extern bool spiQCA7000checkForReceivedData(void);
 extern void myEthTransmit(void);
 
 #ifdef __cplusplus
