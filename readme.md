@@ -21,13 +21,16 @@ When PreCharge reach this voltage, chademo d2 is set. We stall PreCharge and pre
 During this time, 0 volt has been presented to car both via chademo and on the wire, because adapter contactor not closed yet.
 After we set d2, car hopefully close contactors. After car close contactors, we close the adapter contactor and we manifested (estimated) battery voltage on the wire and via chademo instantly.
 
-In ccs, the car set PreCharge voltage to battery voltage. Car measure the voltage and when voltage is reached, car close its contactors (difference between charger and battery voltage is small).
+How I think ccs works: car set PreCharge voltage to battery voltage. Car measure inlet voltage and when voltage is reached, car close its contactors (difference between charger and battery voltage is small).
 
-For chademo, I _think_ charger is supposed to be "floating" when car closes contactors. Then charger will measure the car battery voltage,
-quickly increase own voltage to match and then "engage". So its opposite from ccs, where car does the final "engagement".
+How I think chademo works: Charger set d2. Charger is "floating" at this point. The car will measure inlet voltage and fail if not 0 volts.
+Ca. 1 sec after set d2, car close its contactors and clear CAN status flag CONTACTOR_OPEN. Now the charger will measure the car battery voltage,
+then quickly increase own voltage to match and then "engage". So its opposite from ccs, where car does the final "engagement".
+Shortly after this, car start asking for amps, increasing quickly, ca. 20 amps per second. If no amps delivered within ca. 4 sec, the car fails.
+So chademo has more complicated "mating" rituale than ccs and more sensitive to timing.
 
-The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc. If adapter had a voltmeter on the car-side,
-it would have been possible to perform a final adjustment to the PreCharge voltage, to match measured car voltage perfectly, before closing adapter contactor.
+So we need to bridge the gap between the opposite "engagements". The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc.
+If adapter had a voltmeter on the car-side, it would have been possible to perform a final adjustment to the PreCharge voltage, to match measured car voltage perfectly, before closing adapter contactor.
 
 How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
 (chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so then have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
