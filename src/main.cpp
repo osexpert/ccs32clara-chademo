@@ -352,7 +352,7 @@ void print_sysinfo()
     {
         adc_read_all();
 
-        bool powerOffOkCcs = Param::GetInt(Param::LockState) == LOCK_OPEN;
+        bool powerOffOkCcs = ccs_isPowerOffOk();
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
         // after charging via usb-c for one day... v4:4v v12:11.56v vdd:3.16v (vdd was low here)
