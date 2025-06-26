@@ -97,6 +97,7 @@ Happy hacking.
 
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
+Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
 
 # ccs32clara
 
