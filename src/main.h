@@ -27,40 +27,29 @@ extern "C" {
 #endif
 
 
-    // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
+// Shifted priority macro for STM32 (only top 4 bits used in NVIC)
 #define IRQ_PRI(x) ((x) << 4)
 
 // Priority levels (lower = higher priority)
-//#define IRQ_PRIORITY_LOG     IRQ_PRI(13)  // dont interupt logging
-#define IRQ_PRIORITY_CAN_TX     IRQ_PRI(14)
 #define IRQ_PRIORITY_CAN_RX     IRQ_PRI(14)
 #define IRQ_PRIORITY_SCHED      IRQ_PRI(15) // dont preemt anything but CAN?
 
+struct global_data
+{
+    int stopButtonCounter = 0;
 
+    bool ccsKickoff = false;
+    bool relayUnweldingAttempt = false;
+    bool powerOffPending = false;
+    bool ccsEnded = false;
 
+    bool ccsPreChargeStartedTrigger = false;
+    bool ccsCurrentDemandStartedTrigger = false;
+    bool ccsPreChargeDoneButStalledTrigger = false;
+    bool ccsConnectorLockingTrigger = false;
 
-#define CHA_CYCLE_MS 100 // was 10
-#define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
-
-    struct global_data
-    {
-        int stopButtonCounter = 0;
-
-        bool ccsKickoff = false;
-        bool relayUnweldingAttempt = false;
-        bool powerOffPending = false;
-        bool ccsEnded = false;
-
-        bool ccsPreChargeStartedTrigger = false;
-        bool ccsCurrentDemandStartedTrigger = false;
-        bool ccsPreChargeDoneButStalledTrigger = false;
-        bool ccsConnectorLockingTrigger = false;
-
-        uint32_t auto_power_off_timer_count_up_ms = 0;
-    };
-
-
-
+    uint32_t auto_power_off_timer_count_up_ms = 0;
+};
 
 #ifdef __cplusplus
 }

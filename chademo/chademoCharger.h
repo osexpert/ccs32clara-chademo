@@ -1,26 +1,13 @@
-
-
-/* Global Functions */
-//#ifdef __cplusplus
-//
-//extern "C" {
-//#endif
-//	/* pev state machine */
-//	extern void HandleChademoMessage(uint8_t* msg);
-//
-//
-//
-//
-//#ifdef __cplusplus
-//}
-//
-//#endif
+#pragma once
 
 #include <type_traits>
 #include "printf.h"
 
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
+
+#define CHA_CYCLE_MS 100
+#define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
 
 template<typename T>
 constexpr T min(T a, T b) {
@@ -207,7 +194,7 @@ enum class StopReason
 
 
 #define CHARGER_STATE_LIST \
-    CHARGER_STATE(PreStart_AutoDetectCompleted_WaitForPreChargeStart) \
+    CHARGER_STATE(PreStart_DiscoveryCompleted_WaitForPreChargeStart) \
     CHARGER_STATE(Start) \
     CHARGER_STATE(WaitForCarReadyToCharge) \
     CHARGER_STATE(WaitForPreChargeDone) \
@@ -413,9 +400,11 @@ struct ChargerData
     uint16_t AvailableOutputVoltage;
 
     /// <summary>
-    /// If true, the charger support helping the car to do welding detection (by lowering the voltage)
-    /// Not sure if 1 is right here...
-    /// But I think 1 if we assume charger can drop its voltage fast, after charging was stopped
+    /// If true, the charger support helping the car to do welding detection. But how can the charger help?
+    /// I think...by lowering the voltage after charging is done (become "floating").
+    /// This helps the car to use its inlet voltage detector to check it if measure the battery voltage when it closes the contactors,
+    /// and that it measure no voltage when it opens the contactors.
+    /// If the charger did not drop its voltage, the car inlet voltage detector would always measure voltage, and welding detection would not be possible.
     /// </summary>
     bool SupportWeldingDetection = true;
 
@@ -447,7 +436,7 @@ public:
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
-    bool IsAutoDetectCompleted();
+    bool IsDiscoveryCompleted();
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, StopReason stopReason = StopReason::NONE);
     void OpenAdapterContactor();
@@ -498,7 +487,7 @@ public:
 
         bool _msg102_recieved = false;
 
-        bool _autoDetect = true;
+        bool _discovery = true;
 
 
         bool _preChargeDoneButStalled = false;

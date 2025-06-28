@@ -176,6 +176,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
             if (_carData.SocPercent > 100)
             {
+                // TODO: if this happens...maybe failing would be a better way to handle it...
                 printf("[cha] Car report soc %d > 100. Failover to 100.\r\n", _carData.SocPercent);
                 _carData.SocPercent = 100;
             }
@@ -196,10 +197,10 @@ void ChademoCharger::HandlePendingCarMessages()
     }
 }
 
-bool ChademoCharger::IsAutoDetectCompleted()
+bool ChademoCharger::IsDiscoveryCompleted()
 {
-    // if autodetect, we go here when done
-    return _state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart;
+    // if discovery, we go here when done
+    return _state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart;
 }
 
 void ChademoCharger::Run()
@@ -233,7 +234,7 @@ bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
 {
     if (_cyclesInState > (max_sec * CHA_CYCLES_PER_SEC))
     {
-        printf("[cha] Timeout in %d/%s (max:%dsec)\r\n", _state, GetStateName(), max_sec);
+        printf("[cha] Timeout in %s (max:%dsec)\r\n", GetStateName(), max_sec);
         return true;
     }
     return false;
@@ -267,7 +268,7 @@ void ChademoCharger::RunStateMachine()
         _chargerData.RemainingChargeTimeCycles = _chargerData.RemainingChargeTimeSec * CHA_CYCLES_PER_SEC;
     }
 
-    if (_state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart)
+    if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart)
     {
         if (_global.ccsPreChargeStartedTrigger)
         {
@@ -276,7 +277,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Start)
     {
-        // reset in case set during autoDetect
+        // reset in case set during discovery
         _msg102_recieved = false;
         _carData.Faults = {};
         _carData.Status = {};
@@ -298,13 +299,13 @@ void ChademoCharger::RunStateMachine()
                 printf("[cha] car TargetBatteryVoltage %d > charger AvailableOutputVoltage %d (incompatible).\r\n", _carData.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
                 set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
-            else if (_autoDetect)
+            else if (_discovery)
             {
                 SetSwitchD1(false); // PS: even if we set to false, car can continue to send 102 for a short time
-                _autoDetect = false;
-                printf("[cha] AutoDetect completed\r\n");
+                _discovery = false;
+                printf("[cha] Discovery completed\r\n");
 
-                SetState(ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart);
+                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart);
             }
             else
             {
@@ -525,9 +526,9 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_autoDetect)
+    if (_discovery)
     {
-        // fake for autodetect
+        // fake for discovery
         SetChargerData(450, 100, 0, 0);
     }
     else
