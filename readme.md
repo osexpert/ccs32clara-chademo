@@ -99,6 +99,22 @@ Happy hacking.
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
 
+## Building
+If you want to compile the software from scratch, you can follow these instructions
+
+### Linux
+
+- git clone https://github.com/osexpert/ccs32clara-chademo.git
+- cd into directory ccs32clara-chademo
+- git submodule init
+- git submodule update
+- sudo apt install gcc-arm-none-eabi
+- bash
+- make get-deps
+- make
+
+This will output a My407ccs2chademo.bin file that you can flash onto the adapter
+
 # ccs32clara
 
 ![image](doc/clara_logo_colored.jpg) Hi, I'm Clara. I'm a piece of software, which was born in the OpenInverter forum community, https://openinverter.org/forum/viewtopic.php?t=3727, and I'm loving to grow due to the great people there.
