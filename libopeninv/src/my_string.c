@@ -16,7 +16,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
- #include "my_string.h"
+
+#include <stdint.h>
+#include "my_string.h"
 
 int my_strcmp(const char *str1, const char *str2)
 {
@@ -113,6 +115,41 @@ int my_atoi(const char *str)
    }
 
    return sign * Res;
+}
+
+#define UTOA_FRACDEC 100 // 2 decimal digits
+
+char* my_ftoa(char* buf, float f)
+{
+    int sign = (f < 0.0f) ? -1 : 1;
+    float absval = sign * f;
+
+    int nat = (int)absval;
+    float fracf = absval - nat;
+
+    // Multiply and round to nearest integer
+    uint32_t frac = (uint32_t)((fracf * UTOA_FRACDEC) + 0.5f);
+
+    char* p = buf;
+    if (sign < 0)
+        *p++ = '-';
+
+    p += my_ltoa(p, nat, 10);
+
+    *p++ = '.';
+
+    // Pad leading zeros in the fractional part
+    for (uint32_t dec = UTOA_FRACDEC / 10; dec > 1; dec /= 10)
+    {
+        if ((frac / dec) == 0)
+            *p++ = '0';
+        else
+            break;
+    }
+
+    my_ltoa(p, frac, 10);
+
+    return buf;
 }
 
 char *my_trim(char *str)

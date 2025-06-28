@@ -48,7 +48,7 @@ LDSCRIPT	  = linker.ld
 # -march=armv7e-m did the trick here?? -mcpu=cortex-m4 did nothing. or...
 LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib -Wl,--gc-sections,-Map,linker.map $(FPU_FLAGS)
 OBJSL		  = main.o hwinit.o params.o \
-				 my_string.o digio.o my_fp.o printf.o \
+				 my_string.o digio.o printf.o \
 				 errormessage.o \
 				 ipv6.o tcp.o \
 				 connMgr.o modemFinder.o pevStateMachine.o \

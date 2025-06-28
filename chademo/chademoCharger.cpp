@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include "chademoCharger.h"
 #include "params.h"
-#include "my_fp.h"
 #include "main.h"
 
 #include <libopencm3/stm32/can.h>
@@ -561,7 +560,7 @@ void ChademoCharger::Log(bool force)
             _chargerData.Status,
 
             _carData.AskingAmps,
-            FP_FROMFLT(_carData.BatteryCapacityKwh),
+            &_carData.BatteryCapacityKwh,  // bypass float to double promotion by passing as reference
             _carData.EstimatedChargingTimeMins,
             _carData.Faults,
             _carData.MaxBatteryVoltage,

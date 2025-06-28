@@ -41,6 +41,7 @@ char *my_trim(char *str);
 void memcpy32(int* target, int *source, int length);
 void memset32(int* target, int value, int length);
 void my_strcpy(char *str1, const char *str2);
+char* my_ftoa(char* buf, float f);
 
 #ifdef __cplusplus
 }

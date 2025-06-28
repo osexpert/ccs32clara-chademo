@@ -45,7 +45,6 @@
 #include "tcp.h"
 #include "chademoCharger.h"
 #include "led_blinker.h"
-#include "my_fp.h"
 #include "main.h"
 #include "stm32scheduler.h"
 
@@ -361,9 +360,9 @@ void print_sysinfo()
         // Min values seen and working: v4:3.78V v12:11.46V
         printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
-            FP_FROMFLT(adc_4_volt),
-            FP_FROMFLT(adc_12_volt),
-            FP_FROMFLT(adc_3_3_volt),
+            &adc_4_volt, // bypass float to double promotion by passing as reference
+            &adc_12_volt, // bypass float to double promotion by passing as reference
+            &adc_3_3_volt, // bypass float to double promotion by passing as reference
             scheduler->GetCpuLoad() / 10,
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.powerOffPending,
