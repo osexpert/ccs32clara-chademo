@@ -20,7 +20,7 @@
 #include "printf.h"
 
 #define ADAPTER_MAX_AMPS 200
-#define ADAPTER_MAX_VOLTS 500
+#define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
 template<typename T>
 constexpr T min(T a, T b) {
@@ -392,6 +392,7 @@ struct CarData
     /// 0: before 0.9
     /// 1: 0.9, 0.9.1
     /// 2: 1.0.0, 1.0.1
+    /// 3: 2.0
     /// </summary>
     uint8_t ProtocolNumber;
 
@@ -402,7 +403,7 @@ struct CarData
 
 struct ChargerData
 {
-    uint8_t ProtocolNumber = 2; // 1: chademo 0.9 2: chademo 1.0
+    uint8_t ProtocolNumber = 2; // 1: chademo 0.9 2: chademo 1.0 3: chademo 2.0
 
     /// <summary>
     /// Initial status is stopped
