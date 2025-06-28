@@ -44,11 +44,9 @@ void clock_setup(void)
 {
    rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 
-   //The reset value for PRIGROUP (=0) is not actually a definedvalue. Explicitly set 16 preemtion priorities
-   // What it does : Configures the ARM Cortex - M interrupt system to use 16 group priorities with no sub - priorities, ensuring interrupts are prioritized solely by their group priority.
-   // Without it : The system uses the default priority grouping(e.g., 8 groups with 2 sub - priorities)
+   // Configure to use 16 group priorities with no sub-priorities, ensuring interrupts are prioritized solely by their group priority.
+   // Without this, the system uses the default priority grouping (8 groups with 2 sub-priorities)
    SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_PRIGROUP_GROUP16_NOSUB;
-   //NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4); // Equivalent to GROUP16_NOSUB
 
    rcc_periph_clock_enable(RCC_GPIOA);
    rcc_periph_clock_enable(RCC_GPIOB);
@@ -142,11 +140,6 @@ void can_setup(void) {
 
     can_reset(CAN1);
 
-
-//#define CAN_BTR_TS1_7TQ  (0x6 << 16)  // TS1 bits = 6 (TimeSeg1=7)
-//#define CAN_BTR_TS2_6TQ  (0x5 << 20)  // TS2 bits = 5 (TimeSeg2=6)
-
-
     // Configure CAN for 500 kbps assuming APB1 clock is 42 MHz
     can_init(CAN1,
         false,           // TTCM (Time Triggered Communication Mode)
@@ -156,8 +149,8 @@ void can_setup(void) {
         false,           // RFLM (Receive FIFO Locked Mode)
         false,           // TXFP (Transmit FIFO Priority)
         CAN_BTR_SJW_1TQ,
-        CAN_BTR_TS1_7TQ,//        CAN_BTR_TS1_11TQ, // fff = 0x000a0000
-        CAN_BTR_TS2_6TQ,//      CAN_BTR_TS2_2TQ, // 0x00100000
+        CAN_BTR_TS1_7TQ,
+        CAN_BTR_TS2_6TQ,
         6, // Baudrate prescaler (for 500 kbps)
         false, // loopback
         false // silent
@@ -174,9 +167,6 @@ void can_setup(void) {
 
     // FIFO Message Pending Interrupt Enable (FIFO 0) (RX)
     can_enable_irq(CAN1, CAN_IER_FMPIE0);
-
-    // Transmit Mailbox Empty Interrupt  (TX)
-//    can_enable_irq(CAN1, CAN_IER_TMEIE);
 }
 
 void usart1_setup(void)

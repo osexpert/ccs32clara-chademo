@@ -13,6 +13,7 @@ It has 2 batteries. One short and one long. The long one seems to drive electron
 It has 2 controllable leds, one external and one internal (invisible).
 It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
 Some of the voltages are wired up to adc GPIOs. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
+IFAICS, there are no temperature sensors in the adapter. Ideally there could be sensors at the inlets, or maybe attached to the aluminium conductor bars.
 
 ## Operation
 Plug adapter into car. Plug cable into adapter. Power on adapter.
@@ -33,6 +34,7 @@ So chademo has more complicated "mating" rituale than ccs and more sensitive to 
 
 So we need to bridge the gap between the opposite "engagements". The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc.
 If adapter had a voltmeter on the car-side, it would have been possible to perform a final adjustment to the PreCharge voltage, to match measured car voltage perfectly, before closing adapter contactor.
+It would then also be possible to detect if the adapter contactor is welded, and prevent charging from starting and car from entering turtle mode. So this would have been a nice addition.
 
 How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
 (chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so then have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
@@ -116,6 +118,10 @@ If you want to compile the software from scratch, you can follow these instructi
 - make
 
 This will output a My407ccs2chademo.bin file that you can flash onto the adapter
+
+### Windows
+
+-- Intructions in build.txt
 
 # ccs32clara
 
