@@ -13,7 +13,7 @@ It has 2 batteries. One short and one long. The long one seems to drive electron
 It has 2 controllable leds, one external and one internal (invisible).
 It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
 Some of the voltages are wired up to adc GPIOs. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
-IFAICS, there are no temperature sensors in the adapter. Ideally there could be sensors at the inlets, or maybe attached to the aluminium conductor bars.
+AFAICS, there are no temperature sensors in the adapter. Ideally there could be sensors at the inlets, or maybe attached to the aluminium conductor bars.
 
 ## Operation
 Plug adapter into car. Plug cable into adapter. Power on adapter.
@@ -121,7 +121,7 @@ This will output a My407ccs2chademo.bin file that you can flash onto the adapter
 
 ### Windows
 
--- Intructions in build.txt
+- Instructions in build.txt
 
 # ccs32clara
 

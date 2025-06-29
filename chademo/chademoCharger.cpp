@@ -86,9 +86,9 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg100_pending = false;
 
-        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n");
-        // cha 2.0?
-        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n"); // chademo 2.0?
+        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n"); // chademo 2.0?
+
         COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage changed %d -> %d\r\n");
 
         // Allways 100%? no...240 is seen
@@ -120,8 +120,8 @@ void ChademoCharger::HandlePendingCarMessages()
         else
             _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTime10s * 10;
 
-        // Even thou spec says 0.1, 0.11 give more correct value on Leaf 40kwh: 38.94kwh (with 0.1: 35.4kwh). Unstable before switch(k).
-        _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.11f;
+        // Unstable before switch(k).
+        _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.1f;
     }
     if (_msg102_pending)
     {
@@ -225,9 +225,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
     Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
-
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
-    Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)

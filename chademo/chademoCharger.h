@@ -362,7 +362,6 @@ struct CarData
 
     uint16_t CyclesSinceCarLastAskingAmps;
 
-    //ushort BattNominalVoltage = > (ushort)Program.get_estimated_nominal_voltage(TargetVoltage);
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
