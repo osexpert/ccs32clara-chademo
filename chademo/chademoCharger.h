@@ -112,10 +112,8 @@ enum CarStatus
 
     /// <summary>
     /// 102.5.3 Vehicle status
-    /// Car initially send 0 here, kind of wrong...then it changes to 1 (OPEN).
-    /// Set the flag to 0 when the vehicle relay is closed (start)
-    /// and set as 1 after the termination of welding detection (end)
-    /// main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
+    /// Car initially send 0 here, then it changes to 1 (open) (if charger is chademo 1.0+)
+    /// Set to 0 when the vehicle relay is closed (start) and set to 1 after the termination of welding detection (end)
     /// </summary>
     CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
    
@@ -149,13 +147,13 @@ enum ChargerStatus
 
     /// <summary>
     /// 109.5.2
-    /// connector is currently locked (electromagnetic lock, plug locked into the car)
+    /// connector is currently locked. In later spec, it is only refered to as Energizing state (OutputVoltage > 10 volt)
     /// </summary>
     ENERGIZING_OR_PLUG_LOCKED = 0x4,
 
     /// <summary>
     /// 109.5.3
-    /// parameters between vehicle and charger not compatible (battery incompatible?)
+    /// parameters between vehicle and charger not compatible
     /// </summary>
     BATTERY_INCOMPATIBLE = 0x8,
 
@@ -387,9 +385,16 @@ struct CarData
     bool SupportDynamicAvailableOutputCurrent;
 };
 
+enum ProtocolNumber
+{
+    Chademo_0_9 = 1,
+    Chademo_1_0 = 2,
+    Chademo_2_0 = 3,
+};
+
 struct ChargerData
 {
-    uint8_t ProtocolNumber = 2; // 1: chademo 0.9 2: chademo 1.0 3: chademo 2.0
+    uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
 
     /// <summary>
     /// Initial status is stopped
@@ -450,7 +455,8 @@ public:
     void Log(bool force = false);
 
     const char* GetStateName();
-    bool IsTimeoutSec(uint16_t max_sec);
+    bool IsTimeoutSec(uint16_t sec);
+    bool HasElapsedSec(uint16_t sec);
 
     int _delayCycles = 0;
 

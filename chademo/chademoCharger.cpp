@@ -140,12 +140,6 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
-        if (_carData.ProtocolNumber < 2)
-        {
-            printf("[cha] car ProtocolVersion %d is not supported\r\n", _carData.ProtocolNumber);
-            set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
-        }
-
         if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
             printf("[cha] Car asking (%d) for more than max (%d) volts.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
@@ -169,8 +163,13 @@ void ChademoCharger::HandlePendingCarMessages()
         // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
+	        // I read somewhere that cha 0.9 did not have soc %. Instead charged rate and charged rate constant were in kwh? Since it also did not have battery capacity, calculating soc is not possible. But is this really true?
+			// I don't have access to chademo 0.9 car or CAN log, so I can't know for sure.
+			// But for testing I changed the code to pretend to be a chademo 0.9 charger and on a Leaf 40kwh, I get different data (eg. SocPercentConstant:255, SocPercent:179), but the formula still give
+			// correct soc % (in the example:70%). When pretending to be chademo 1.0 charger, as normal, I get SocPercentConstant:100, SocPercent:70. Not sure what to believe here.
+
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
-                _carData.SocPercent = (uint8_t)((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant * 100.0f);
+                _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else
                 _carData.SocPercent = _msg102.m.SocPercent;
 
@@ -228,14 +227,20 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
 }
 
-bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
+bool ChademoCharger::IsTimeoutSec(uint16_t sec)
 {
-    if (_cyclesInState > (max_sec * CHA_CYCLES_PER_SEC))
+    if (_cyclesInState > (sec * CHA_CYCLES_PER_SEC))
     {
-        printf("[cha] Timeout in %s (max:%dsec)\r\n", GetStateName(), max_sec);
+        printf("[cha] Timeout in %s (max:%dsec)\r\n", GetStateName(), sec);
         return true;
     }
     return false;
+}
+
+// same as IsTimeoutSec, but without the logging
+bool ChademoCharger::HasElapsedSec(uint16_t sec)
+{
+    return (_cyclesInState > (sec * CHA_CYCLES_PER_SEC));
 }
 
 void ChademoCharger::RunStateMachine()
@@ -326,7 +331,10 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD2(true);
 
-            SetState(ChargerState::WaitForCarContactorsClosed);
+            if (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0)
+                SetState(ChargerState::WaitForCarAskingAmps);
+            else
+                SetState(ChargerState::WaitForCarContactorsClosed);
         }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
@@ -347,6 +355,13 @@ void ChademoCharger::RunStateMachine()
     {
         if (_carData.AskingAmps > 0)
         {
+            if (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0)
+            {
+                CloseAdapterContactor();
+                // "hide" amps from ccs for a cycle (100ms), to give adaptor contactor time to "settle"?
+                _carData.AskingAmps = 0;
+            }
+
             // At this point (car asked for amps), CAR_STATUS_STOP_BEFORE_CHARGING is no longer valid (State >= ChargingLoop)
             // this is the trigger for the charger to turn off CHARGER_STATUS_STOP and instead turn on CHARGER_STATUS_CHARGING
 
@@ -405,7 +420,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || IsTimeoutSec(10))
+        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) 
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // CHA 0.9: spec says car must perform WD within 4 seconds, so guessing this is the logic?
+            || IsTimeoutSec(10))
         {
             // welding detection done
 

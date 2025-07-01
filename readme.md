@@ -36,8 +36,7 @@ So we need to bridge the gap between the opposite "engagements". The problem is,
 If adapter had a voltmeter on the car-side, it would have been possible to perform a final adjustment to the PreCharge voltage, to match measured car voltage perfectly, before closing adapter contactor.
 It would then also be possible to detect if the adapter contactor is welded, and prevent charging from starting and car from entering turtle mode. So this would have been a nice addition.
 
-How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
-(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so then have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
+How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it emulate chademo 0.9 so the timing may be different.
 
 ## Stop button/power off
 Shortly pressing stop button will initiate power off pending.
@@ -91,13 +90,20 @@ Meaning, charging automatically triggers power on, so adapter will auto power of
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
-For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0. Chademo 1.0 is better defined and works better IMO, so not emulating nor supporting it in this firmware.
+For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0.
 Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower). Also it struggle with SLAC some times, 
 specially at Tesla stations, where I may have to unplug and plug the cable (fiddle) to get things started.
 These things are improved in this firmware and this was what kicked off this project.
 But this firmware may have other problems that the original firmware does not have!
 So it is possible it will not work at all or as well as the original firmware if you try it. Be warned.
 Happy hacking.
+
+## Supported chargers
+Currently, all chargers I have tested has worked.
+
+## Supported cars
+This firmware emulate chademo 1.0 and is tested on Leaf 40kwh.
+Even thou it emulate chademo 1.0, theoretical support for chademo 0.9 cars (possibly Leaf/iMiev 2011-2012) has been added. If you have adapter, such car and want to be a guineapig, please let me know.
 
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
