@@ -91,7 +91,6 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage changed %d -> %d\r\n");
 
-        // Allways 100%? no...240 is seen
         COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "[cha] 100.SocPercentConstant changed %d -> %d\r\n");
 
         COMPARE_SET(_msg100.m.Unused1, _msg100_isr.m.Unused1, "[cha] 100.Unused1 changed %d -> %d\r\n");
@@ -163,10 +162,7 @@ void ChademoCharger::HandlePendingCarMessages()
         // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
-	        // I read somewhere that cha 0.9 did not have soc %. Instead charged rate and charged rate constant were in kwh? Since it also did not have battery capacity, calculating soc is not possible. But is this really true?
-			// I don't have access to chademo 0.9 car or CAN log, so I can't know for sure.
-			// But for testing I changed the code to pretend to be a chademo 0.9 charger and on a Leaf 40kwh, I get different data (eg. SocPercentConstant:255, SocPercent:179), but the formula still give
-			// correct soc % (in the example:70%). When pretending to be chademo 1.0 charger, as normal, I get SocPercentConstant:100, SocPercent:70. Not sure what to believe here.
+            // TODO: verify that soc calculation works for chademo 0.9 cars
 
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
@@ -331,15 +327,16 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD2(true);
 
-            if (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0)
-                SetState(ChargerState::WaitForCarAskingAmps);
-            else
-                SetState(ChargerState::WaitForCarContactorsClosed);
+            SetState(ChargerState::WaitForCarContactorsClosed);
         }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
+        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false ||
+			// Since chademo 0.9 does not have this flag, the alternatives are to use a fixed delay or wait for asking amps, before closing adapter contactor.
+			// Using asking amps may work, but possible it will delay too much and the car will not recieve amps soon enought, and time out (I think the timeout is 4 sec).
+			// I am not sure if the timeout is for the OutputCurrent value itself or the current measurement, in case, faking a OutputCurrent = 1 (or swap 0<->1 every cycle) could be an option to trick the car to give us more time.
+            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > 0))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
@@ -355,17 +352,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_carData.AskingAmps > 0)
         {
-            if (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0)
-            {
-                CloseAdapterContactor();
-                // "hide" amps from ccs for a cycle (100ms), to give adaptor contactor time to "settle"?
-                _carData.AskingAmps = 0;
-            }
-
-            // At this point (car asked for amps), CAR_STATUS_STOP_BEFORE_CHARGING is no longer valid (State >= ChargingLoop)
-            // this is the trigger for the charger to turn off CHARGER_STATUS_STOP and instead turn on CHARGER_STATUS_CHARGING
-
-            // Even thou charger not delivering amps yet, we set these flags.
+            // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING);
             clear_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 

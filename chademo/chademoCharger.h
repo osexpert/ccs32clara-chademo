@@ -112,13 +112,16 @@ enum CarStatus
 
     /// <summary>
     /// 102.5.3 Vehicle status
-    /// Car initially send 0 here, then it changes to 1 (open) (if charger is chademo 1.0+)
+    /// Car initially send 0 here. If charger >= chademo 1.0, car changes to 1 (open) as soon as it discovers.
+    /// If charger say it is < chademo 1.0, car keep this flag as 0 (AFAICS).
+    /// 
     /// Set to 0 when the vehicle relay is closed (start) and set to 1 after the termination of welding detection (end)
     /// </summary>
     CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
+    /// Only valid for use before car is asking for amps. After asking for amps, only the other/normal stop reasons apply.
     /// </summary>
     STOP_BEFORE_CHARGING = 0x10,
 
@@ -225,10 +228,13 @@ struct msg100
 {
     union {
         struct {
-            uint8_t MinimumChargeCurrent;
+            uint8_t MinimumChargeCurrent; // added in cha 1.0
             uint8_t Unused1;
-            uint16_t MinimumBatteryVoltage;
+            uint16_t MinimumBatteryVoltage; // added in cha 1.0
             uint16_t MaximumBatteryVoltage;
+            /// <summary>
+            /// Leaf 40kwh: always start out as 240. When car discover changer chademo version, it changes to 100 if >= chademo 1.0, or 255 if chademo 0.9. Weird stuff.
+            /// </summary>
             uint8_t SocPercentConstant;
             uint8_t Unused7;
         } m;
@@ -245,9 +251,9 @@ struct msg101
             uint8_t Unused0;
             uint8_t MaximumChargingTime10s;
             uint8_t MaximumChargingTimeMinutes;
-            uint8_t EstimatedChargingTimeMinutes;
+            uint8_t EstimatedChargingTimeMinutes; // added in cha 1.0
             uint8_t Unused4;
-            uint16_t BatteryCapacity;
+            uint16_t BatteryCapacity; // added in cha 1.0?
             uint8_t Unused7;
         } m;
         uint8_t bytes[8];
@@ -476,6 +482,11 @@ public:
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
         bool _chargingPlugLockedTrigger = false;
+        bool _switch_k = false;
+        bool _switch_d1 = false;
+        bool _msg102_recieved = false;
+        bool _discovery = true;
+        bool _preChargeDoneButStalled = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
@@ -487,25 +498,14 @@ public:
         bool _msg110_pending = false;
         msg110 _msg110_isr = {};
 
-        bool _switch_k = false;
-        bool _switch_d1 = false;
-
-        bool _msg102_recieved = false;
-
-        bool _discovery = true;
-
-
-        bool _preChargeDoneButStalled = false;
-
-
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         msg118 _msg118 = {};
 
         StopReason _stopReason = StopReason::NONE;
-        
         ChargerState _state = ChargerState::Start;
+
         CarData _carData = {};
         ChargerData _chargerData = {};
 };
