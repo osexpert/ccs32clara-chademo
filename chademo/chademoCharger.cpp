@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include "chademoCharger.h"
 #include "params.h"
-#include "my_fp.h"
 #include "main.h"
 
 #include <libopencm3/stm32/can.h>
@@ -87,12 +86,11 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg100_pending = false;
 
-        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n");
-        // cha 2.0?
-        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n"); // chademo 2.0?
+        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n"); // chademo 2.0?
+
         COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage changed %d -> %d\r\n");
 
-        // Allways 100%? no...240 is seen
         COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "[cha] 100.SocPercentConstant changed %d -> %d\r\n");
 
         COMPARE_SET(_msg100.m.Unused1, _msg100_isr.m.Unused1, "[cha] 100.Unused1 changed %d -> %d\r\n");
@@ -121,8 +119,8 @@ void ChademoCharger::HandlePendingCarMessages()
         else
             _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTime10s * 10;
 
-        // Even thou spec says 0.1, 0.11 give more correct value on Leaf 40kwh: 38.94kwh (with 0.1: 35.4kwh). Unstable before switch(k).
-        _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.11f;
+        // Unstable before switch(k).
+        _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.1f;
     }
     if (_msg102_pending)
     {
@@ -140,12 +138,6 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Faults = (CarFaults)_msg102.m.Faults;
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
-
-        if (_carData.ProtocolNumber < 2)
-        {
-            printf("[cha] car ProtocolVersion %d is not supported\r\n", _carData.ProtocolNumber);
-            set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
-        }
 
         if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
@@ -170,13 +162,16 @@ void ChademoCharger::HandlePendingCarMessages()
         // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
+            // TODO: verify that soc calculation works for chademo 0.9 cars
+
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
-                _carData.SocPercent = (uint8_t)((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant * 100.0f);
+                _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else
                 _carData.SocPercent = _msg102.m.SocPercent;
 
             if (_carData.SocPercent > 100)
             {
+                // TODO: if this happens...maybe failing would be a better way to handle it...
                 printf("[cha] Car report soc %d > 100. Failover to 100.\r\n", _carData.SocPercent);
                 _carData.SocPercent = 100;
             }
@@ -197,10 +192,10 @@ void ChademoCharger::HandlePendingCarMessages()
     }
 }
 
-bool ChademoCharger::IsAutoDetectCompleted()
+bool ChademoCharger::IsDiscoveryCompleted()
 {
-    // if autodetect, we go here when done
-    return _state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart;
+    // if discovery, we go here when done
+    return _state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart;
 }
 
 void ChademoCharger::Run()
@@ -225,19 +220,23 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
     Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
-
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
-    Param::SetInt(Param::ChargeCurrent, _carData.AskingAmps);
 }
 
-bool ChademoCharger::IsTimeoutSec(uint16_t max_sec)
+bool ChademoCharger::IsTimeoutSec(uint16_t sec)
 {
-    if (_cyclesInState > (max_sec * CHA_CYCLES_PER_SEC))
+    if (_cyclesInState > (sec * CHA_CYCLES_PER_SEC))
     {
-        printf("[cha] Timeout in %d/%s (max:%dsec)\r\n", _state, GetStateName(), max_sec);
+        printf("[cha] Timeout in %s (max:%dsec)\r\n", GetStateName(), sec);
         return true;
     }
     return false;
+}
+
+// same as IsTimeoutSec, but without the logging
+bool ChademoCharger::HasElapsedSec(uint16_t sec)
+{
+    return (_cyclesInState > (sec * CHA_CYCLES_PER_SEC));
 }
 
 void ChademoCharger::RunStateMachine()
@@ -268,7 +267,7 @@ void ChademoCharger::RunStateMachine()
         _chargerData.RemainingChargeTimeCycles = _chargerData.RemainingChargeTimeSec * CHA_CYCLES_PER_SEC;
     }
 
-    if (_state == ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart)
+    if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart)
     {
         if (_global.ccsPreChargeStartedTrigger)
         {
@@ -277,7 +276,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Start)
     {
-        // reset in case set during autoDetect
+        // reset in case set during discovery
         _msg102_recieved = false;
         _carData.Faults = {};
         _carData.Status = {};
@@ -299,13 +298,13 @@ void ChademoCharger::RunStateMachine()
                 printf("[cha] car TargetBatteryVoltage %d > charger AvailableOutputVoltage %d (incompatible).\r\n", _carData.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
                 set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
-            else if (_autoDetect)
+            else if (_discovery)
             {
                 SetSwitchD1(false); // PS: even if we set to false, car can continue to send 102 for a short time
-                _autoDetect = false;
-                printf("[cha] AutoDetect completed\r\n");
+                _discovery = false;
+                printf("[cha] Discovery completed\r\n");
 
-                SetState(ChargerState::PreStart_AutoDetectCompleted_WaitForPreChargeStart);
+                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart);
             }
             else
             {
@@ -333,7 +332,11 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
+        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false ||
+			// Since chademo 0.9 does not have this flag, the alternatives are to use a fixed delay or wait for asking amps, before closing adapter contactor.
+			// Using asking amps may work, but possible it will delay too much and the car will not recieve amps soon enought, and time out (I think the timeout is 4 sec).
+			// I am not sure if the timeout is for the OutputCurrent value itself or the current measurement, in case, faking a OutputCurrent = 1 (or swap 0<->1 every cycle) could be an option to trick the car to give us more time.
+            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > 0))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
@@ -349,10 +352,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_carData.AskingAmps > 0)
         {
-            // At this point (car asked for amps), CAR_STATUS_STOP_BEFORE_CHARGING is no longer valid (State >= ChargingLoop)
-            // this is the trigger for the charger to turn off CHARGER_STATUS_STOP and instead turn on CHARGER_STATUS_CHARGING
-
-            // Even thou charger not delivering amps yet, we set these flags.
+            // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING);
             clear_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
@@ -407,7 +407,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || IsTimeoutSec(10))
+        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) 
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // CHA 0.9: spec says car must perform WD within 4 seconds, so guessing this is the logic?
+            || IsTimeoutSec(10))
         {
             // welding detection done
 
@@ -526,9 +528,9 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_autoDetect)
+    if (_discovery)
     {
-        // fake for autodetect
+        // fake for discovery
         SetChargerData(450, 100, 0, 0);
     }
     else
@@ -561,7 +563,7 @@ void ChademoCharger::Log(bool force)
             _chargerData.Status,
 
             _carData.AskingAmps,
-            FP_FROMFLT(_carData.BatteryCapacityKwh),
+            &_carData.BatteryCapacityKwh,  // bypass float to double promotion by passing as reference
             _carData.EstimatedChargingTimeMins,
             _carData.Faults,
             _carData.MaxBatteryVoltage,

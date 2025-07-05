@@ -1,26 +1,13 @@
-
-
-/* Global Functions */
-//#ifdef __cplusplus
-//
-//extern "C" {
-//#endif
-//	/* pev state machine */
-//	extern void HandleChademoMessage(uint8_t* msg);
-//
-//
-//
-//
-//#ifdef __cplusplus
-//}
-//
-//#endif
+#pragma once
 
 #include <type_traits>
 #include "printf.h"
 
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
+
+#define CHA_CYCLE_MS 100
+#define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
 
 template<typename T>
 constexpr T min(T a, T b) {
@@ -125,15 +112,16 @@ enum CarStatus
 
     /// <summary>
     /// 102.5.3 Vehicle status
-    /// Car initially send 0 here, kind of wrong...then it changes to 1 (OPEN).
-    /// Set the flag to 0 when the vehicle relay is closed (start)
-    /// and set as 1 after the termination of welding detection (end)
-    /// main contactor open (Special: 0: During contact sticking detection, 1: Contact sticking detection completed). Called StatusVehicle in docs!!!
+    /// Car initially send 0 here. If charger >= chademo 1.0, car changes to 1 (open) as soon as it discovers.
+    /// If charger say it is < chademo 1.0, car keep this flag as 0 (AFAICS).
+    /// 
+    /// Set to 0 when the vehicle relay is closed (start) and set to 1 after the termination of welding detection (end)
     /// </summary>
     CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
+    /// Only valid for use before car is asking for amps. After asking for amps, only the other/normal stop reasons apply.
     /// </summary>
     STOP_BEFORE_CHARGING = 0x10,
 
@@ -162,13 +150,13 @@ enum ChargerStatus
 
     /// <summary>
     /// 109.5.2
-    /// connector is currently locked (electromagnetic lock, plug locked into the car)
+    /// connector is currently locked. In later spec, it is only refered to as Energizing state (OutputVoltage > 10 volt)
     /// </summary>
     ENERGIZING_OR_PLUG_LOCKED = 0x4,
 
     /// <summary>
     /// 109.5.3
-    /// parameters between vehicle and charger not compatible (battery incompatible?)
+    /// parameters between vehicle and charger not compatible
     /// </summary>
     BATTERY_INCOMPATIBLE = 0x8,
 
@@ -207,7 +195,7 @@ enum class StopReason
 
 
 #define CHARGER_STATE_LIST \
-    CHARGER_STATE(PreStart_AutoDetectCompleted_WaitForPreChargeStart) \
+    CHARGER_STATE(PreStart_DiscoveryCompleted_WaitForPreChargeStart) \
     CHARGER_STATE(Start) \
     CHARGER_STATE(WaitForCarReadyToCharge) \
     CHARGER_STATE(WaitForPreChargeDone) \
@@ -240,10 +228,13 @@ struct msg100
 {
     union {
         struct {
-            uint8_t MinimumChargeCurrent;
+            uint8_t MinimumChargeCurrent; // added in cha 1.0
             uint8_t Unused1;
-            uint16_t MinimumBatteryVoltage;
+            uint16_t MinimumBatteryVoltage; // added in cha 1.0
             uint16_t MaximumBatteryVoltage;
+            /// <summary>
+            /// Leaf 40kwh: always start out as 240. When car discover changer chademo version, it changes to 100 if >= chademo 1.0, or 255 if chademo 0.9. Weird stuff.
+            /// </summary>
             uint8_t SocPercentConstant;
             uint8_t Unused7;
         } m;
@@ -260,9 +251,9 @@ struct msg101
             uint8_t Unused0;
             uint8_t MaximumChargingTime10s;
             uint8_t MaximumChargingTimeMinutes;
-            uint8_t EstimatedChargingTimeMinutes;
+            uint8_t EstimatedChargingTimeMinutes; // added in cha 1.0
             uint8_t Unused4;
-            uint16_t BatteryCapacity;
+            uint16_t BatteryCapacity; // added in cha 1.0?
             uint8_t Unused7;
         } m;
         uint8_t bytes[8];
@@ -375,7 +366,6 @@ struct CarData
 
     uint16_t CyclesSinceCarLastAskingAmps;
 
-    //ushort BattNominalVoltage = > (ushort)Program.get_estimated_nominal_voltage(TargetVoltage);
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
@@ -401,9 +391,16 @@ struct CarData
     bool SupportDynamicAvailableOutputCurrent;
 };
 
+enum ProtocolNumber
+{
+    Chademo_0_9 = 1,
+    Chademo_1_0 = 2,
+    Chademo_2_0 = 3,
+};
+
 struct ChargerData
 {
-    uint8_t ProtocolNumber = 2; // 1: chademo 0.9 2: chademo 1.0 3: chademo 2.0
+    uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
 
     /// <summary>
     /// Initial status is stopped
@@ -413,9 +410,11 @@ struct ChargerData
     uint16_t AvailableOutputVoltage;
 
     /// <summary>
-    /// If true, the charger support helping the car to do welding detection (by lowering the voltage)
-    /// Not sure if 1 is right here...
-    /// But I think 1 if we assume charger can drop its voltage fast, after charging was stopped
+    /// If true, the charger support helping the car to do welding detection. But how can the charger help?
+    /// I think...by lowering the voltage after charging is done (become "floating").
+    /// This helps the car to use its inlet voltage detector to check it if measure the battery voltage when it closes the contactors,
+    /// and that it measure no voltage when it opens the contactors.
+    /// If the charger did not drop its voltage, the car inlet voltage detector would always measure voltage, and welding detection would not be possible.
     /// </summary>
     bool SupportWeldingDetection = true;
 
@@ -447,7 +446,7 @@ public:
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
-    bool IsAutoDetectCompleted();
+    bool IsDiscoveryCompleted();
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, StopReason stopReason = StopReason::NONE);
     void OpenAdapterContactor();
@@ -462,7 +461,8 @@ public:
     void Log(bool force = false);
 
     const char* GetStateName();
-    bool IsTimeoutSec(uint16_t max_sec);
+    bool IsTimeoutSec(uint16_t sec);
+    bool HasElapsedSec(uint16_t sec);
 
     int _delayCycles = 0;
 
@@ -482,6 +482,11 @@ public:
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
         bool _chargingPlugLockedTrigger = false;
+        bool _switch_k = false;
+        bool _switch_d1 = false;
+        bool _msg102_recieved = false;
+        bool _discovery = true;
+        bool _preChargeDoneButStalled = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
@@ -493,25 +498,14 @@ public:
         bool _msg110_pending = false;
         msg110 _msg110_isr = {};
 
-        bool _switch_k = false;
-        bool _switch_d1 = false;
-
-        bool _msg102_recieved = false;
-
-        bool _autoDetect = true;
-
-
-        bool _preChargeDoneButStalled = false;
-
-
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         msg118 _msg118 = {};
 
         StopReason _stopReason = StopReason::NONE;
-        
         ChargerState _state = ChargerState::Start;
+
         CarData _carData = {};
         ChargerData _chargerData = {};
 };

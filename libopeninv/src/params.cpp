@@ -163,7 +163,6 @@ void SetInt(PARAM_NUM ParamNum, int ParamVal)
 */
 void SetFloat(PARAM_NUM ParamNum, float ParamVal)
 {
-   //values[ParamNum] = FP_FROMFLT(ParamVal);
     values[ParamNum] = ParamVal;
 }
 

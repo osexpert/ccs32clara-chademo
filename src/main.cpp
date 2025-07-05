@@ -21,7 +21,6 @@
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
-//#include <libopencm3/stm32/memorymap.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/iwdg.h>
@@ -45,15 +44,12 @@
 #include "tcp.h"
 #include "chademoCharger.h"
 #include "led_blinker.h"
-#include "my_fp.h"
 #include "main.h"
 #include "stm32scheduler.h"
 
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
-//#define __disable_irq() __asm__ volatile ("cpsid i")
-//#define __enable_irq()  __asm__ volatile ("cpsie i")
 
 ChademoCharger* chademoCharger;
 LedBlinker* ledBlinker;
@@ -62,11 +58,9 @@ Stm32Scheduler* scheduler;
 
 global_data _global;
 
-/* monotonically increasing number of milliseconds from reset
- * overflows every 49 days if you're wondering */
 volatile uint32_t system_millis;
 
-#define AUTO_POWER_OFF_SEC (60 * 3)
+#define AUTO_POWER_OFF_SEC (60 * 3) // 3 min
 #define CCS_TRACE_EVERY_MS 1000 // 1 sec
 #define SYSINFO_EVERY_MS 2000 // 2 sec
 
@@ -160,14 +154,6 @@ void RunMainStateMachine()
     }
 }
 
-/* to solve linker warning, see https://openinverter.org/forum/viewtopic.php?p=64546#p64546 */
-extern "C" void __cxa_pure_virtual()
-{
-    while (1);
-}
-
-
-
 void LedBlinker::applyLed(bool set)
 {
     if (set)
@@ -205,11 +191,10 @@ void power_off_no_return(const char* reason)
 
     DigIo::power_on_out.Clear();
 
-    // and wont these be turned off now anyways? when power goes...
     DigIo::external_led_out_inverted.Set(); // led off
     DigIo::internal_led_out_inverted.Set(); // led off
 
-    while (1)
+    while (true)
     {
         __WFI();
     }
@@ -296,11 +281,6 @@ void adc_battery_init(void)
 {
     gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
 
-    //adc_enable_vrefint();
-    //ADC_CCR(ADC1) |= ADC_CCR_VREFEN;
-    // Enable VREFINT for calibration by setting bit 22 in ADC_CCR
-    ADC_CCR |= (1 << 22);
-
     // Enable required clocks
     rcc_periph_clock_enable(RCC_ADC1);
 
@@ -315,7 +295,8 @@ void adc_battery_init(void)
     adc_power_on(ADC1);
 }
 
-float adc_to_voltage(uint16_t adc, float gain) {
+float adc_to_voltage(uint16_t adc, float gain) 
+{
     return adc * (3.3f / 4095.0f) * gain;
 }
 
@@ -328,7 +309,7 @@ static float adc_12_volt = 0.0f;
 void adc_read_all(void)
 {
     uint16_t adc_results[ADC_CHANNEL_COUNT];
-    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, 17 /* VREFINT */ };
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF };
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
@@ -355,21 +336,20 @@ void print_sysinfo()
         bool powerOffOkCcs = ccs_isPowerOffOk();
         bool powerOffOkCha = chademoCharger->IsPowerOffOk();
 
-        // after charging via usb-c for one day... v4:4v v12:11.56v vdd:3.16v (vdd was low here)
-        // during charging car, seen between v12:12.19V - v12:12.31V
-        // right after charging car, seen max v12:11.59v
-        // Min values seen and working: v4:3.78V v12:11.46V
+        // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
+        // during charging car, vcc12 seen between 12.19-12.31V
+        // Min values seen and working: vcc4:3.78V vcc12:11.46V
         printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
-            FP_FROMFLT(adc_4_volt),
-            FP_FROMFLT(adc_12_volt),
-            FP_FROMFLT(adc_3_3_volt),
+            &adc_4_volt, // bypass float to double promotion by passing as reference
+            &adc_12_volt, // bypass float to double promotion by passing as reference
+            &adc_3_3_volt, // bypass float to double promotion by passing as reference
             scheduler->GetCpuLoad() / 10,
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.powerOffPending,
             powerOffOkCcs,
             powerOffOkCha,
-			_state
+            _state
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
@@ -407,8 +387,8 @@ static void Ms100Task(void)
 {
     if (_global.relayUnweldingAttempt)
         DigIo::contactor_out.Toggle();
-	else
-	    chademoCharger->Run();
+    else
+        chademoCharger->Run();
 
     _global.auto_power_off_timer_count_up_ms += 100;
 
@@ -435,16 +415,16 @@ extern void tcp_reset(void);
 static void Ms30Task()
 {
     if (_global.relayUnweldingAttempt)
-		return;
+        return;
 
     if (!_global.ccsKickoff)
     {
         // chademo will set these and then ccs can start
-        _global.ccsKickoff = chademoCharger->IsAutoDetectCompleted();
+        _global.ccsKickoff = chademoCharger->IsDiscoveryCompleted();
         if (!_global.ccsKickoff)
-			return;
+            return;
 
-        printf("ccs kickoff, cha autodetect completed\r\n");
+        printf("[cha] discovery completed => ccs kickoff\r\n");
     }
 
     // run eth even after ccsEnded, so we look "alive" to the charger
@@ -477,9 +457,7 @@ static void SetMacAddress()
     *((uint32_t*)&mac[2]) = DESIG_UNIQUE_ID2;
 
     addToTrace(MOD_HOMEPLUG, "Our MAC address: ", mac, 6);
-
     //more info: https://community.st.com/t5/stm32-mcus/how-to-obtain-and-use-the-stm32-96-bit-uid/ta-p/621443
-
     setOurMac(mac);
 }
 
@@ -545,7 +523,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo %s sha:%s\r\n", GITHUB_VERSION, GITHUB_SHORT_SHA);
+    printf("ccs32clara-chademo %s\r\n", GITHUB_VERSION);
 
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
@@ -588,7 +566,7 @@ extern "C" int main(void)
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
     
-    while (1)
+    while (true)
     {
         __WFI();
     }
@@ -607,14 +585,6 @@ extern "C" void tim4_isr(void)
 {
     scheduler->Run();
 }
-
-// 
-//extern "C" double __aeabi_f2d(float f) {
-//    return (double)f;
-//}
-//extern "C" float __aeabi_d2f(double f) {
-//    return (float)f;
-//}
 
 
 // minimal memset implementation for embedded

@@ -1,5 +1,7 @@
 # ccs32clara-chademo
 
+[![Build status](../../actions/workflows/CI-build.yml/badge.svg)](../../actions/workflows/CI-build.yml)
+
 ![image](doc/ccs2-chademo_adapter.jpg)
 
 This is ccs32clara derived firmware for Dongguan Longood CCS2 to CHAdeMO adapter (My407ccs2chademo.bin)
@@ -19,7 +21,8 @@ It has 2 batteries. One short and one long. The long one seems to drive electron
 2 stop buttons, but they are the same GPIO for both.
 It has 2 controllable LEDs, one external and one internal (invisible).
 It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
-Some of the voltages are wired up to ADC GPIOs. At least the 12v reading does not seem to match with what I measure on eg. Chademo d1 pin.
+Some of the voltages are wired up to adc GPIOs. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
+AFAICS, there are no temperature sensors in the adapter. Ideally there could be sensors at the inlets, or maybe attached to the aluminium conductor bars.
 
 ## Operation
 Plug adapter into car. Plug cable into adapter. Power on adapter.
@@ -40,9 +43,9 @@ So chademo has more complicated "mating" rituale than ccs and more sensitive to 
 
 So we need to bridge the gap between the opposite "engagements". The problem is, chademo does not expose the battery voltage, but we try to estimate is from target and soc.
 If adapter had a voltmeter on the car-side, it would have been possible to perform a final adjustment to the PreCharge voltage, to match measured car voltage perfectly, before closing adapter contactor.
+It would then also be possible to detect if the adapter contactor is welded, and prevent charging from starting and car from entering turtle mode. So this would have been a nice addition.
 
-How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it uses chademo 0.9 so the timing may be different
-(chademo 0.9 seem to be missing the flag that tell when car closes the contactor after d2 is set, so then have to use a fixed delay after setting d2 to close the adapter contactor, I think...).
+How I describe it is also how the original firmware works, AFAICT, allthou it seems to use a fixed nominal battery voltage of 350 volt and it emulate chademo 0.9 so the timing may be different.
 
 ## Stop button/power off
 Shortly pressing stop button will initiate power off pending.
@@ -97,13 +100,20 @@ Charging via USB is very slow, and can take up to 10 hours if the internal batte
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
-For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0. Chademo 1.0 is better defined and works better IMO, so not emulating nor supporting it in this firmware.
+For some reason it seem to emulate a chademo 0.9 charger and not chademo 1.0.
 Original firmware generally works well. It it missing several of the ccs shutdown mechanism (I struggle with both Tesla and Kempower). Also it struggle with SLAC some times, 
 specially at Tesla stations, where I may have to unplug and plug the cable (fiddle) to get things started.
 These things are improved in this firmware and this was what kicked off this project.
 But this firmware may have other problems that the original firmware does not have!
 So it is possible it will not work at all or as well as the original firmware if you try it. Be warned.
 Happy hacking.
+
+## Supported chargers
+Currently, all chargers I have tested has worked.
+
+## Supported cars
+This firmware emulate chademo 1.0 and is tested on Leaf 40kwh.
+Even thou it emulate chademo 1.0, theoretical support for chademo 0.9 cars (possibly Leaf/iMiev 2011-2012) has been added. If you have adapter, such car and want to be a guineapig, please let me know.
 
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
@@ -125,50 +135,18 @@ If you want to compile the software from scratch, you can follow these instructi
 
 This will output a My407ccs2chademo.bin file that you can flash onto the adapter
 
+### Windows
+
+- Instructions in build.txt
+
 # ccs32clara
 
-![image](doc/clara_logo_colored.jpg) Hi, I'm Clara. I'm a piece of software, which was born in the OpenInverter forum community, https://openinverter.org/forum/viewtopic.php?t=3727, and I'm loving to grow due to the great people there.
+![image](doc/clara_logo_colored.jpg) 
+
+Hi, I'm Clara. I'm a piece of software, which was born in the OpenInverter forum community, https://openinverter.org/forum/viewtopic.php?t=3727, and I'm loving to grow due to the great people there.
 Im running on an STM32, and I'm talking with a QCA7005 homeplug modem. All this, and some more components, brings my team-mate Foccci to you. Foccci is the hard(-ware) part of our powerful team. Let's charge!
 
 ![image](doc/foccci_and_clara_logo_colored.jpg)
-
-## News / Change History / Functional Status
-
-### 2024-01-24 Mini Light Bulb Demo adaptor works
-Clara configured to demo-mode using the openinverter web interface box (https://github.com/jsphuebner/esp32-web-interface). Clara runs on Foccci in a 3D printed housing, which contains a CCS2 inlet, a German SchuKo outlet, a relay to connect/disconnect the Schuko from the CCS, red-green-blus LEDs for status indication, a stop-button and D-Sub CAN connector, a little arduino to show the hardware status of the CP line (https://github.com/uhi22/arduino-controlpilot-observer) and a 18650 Li-Ion accu including step-up from accu to 5V to supply the complete box.
-![image](doc/2024-01-27_lightbulbdemo_off.jpg)
-![image](doc/2024-01-27_lightbulbdemo_on.jpg)
-
-
-### 2023-12-13 Supercharging works.
-Johu is charging the Touran on the TESLA Supercharger: https://openinverter.org/forum/viewtopic.php?p=64563#p64563 and https://www.youtube.com/watch?v=OKg3VUslol8
-
-### 2023-12-06 Charging works on ABB triple charger and Compleo
-The liboi port has been tested inside the CCS-to-CHAdeMO adapter and successfully charged a few kWh on said chargers
-
-### 2023-08-03 Charging works on public Alpitronic charger
-
-With the STM32F103RE on the Foccci board, the light-bulb-demo-charging on Alpitronic hypercharger worked on the first attempt.
-Pictures here: https://openinverter.org/forum/viewtopic.php?p=59821#p59821
-
-### 2023-07-18 Charging loop reached
-
-Using the NUCLEO F303RE development board, the STM32 talks via SPI to the QCA7005 on the Ioniq CCM. The ccs32clara reaches the charging
-loop, and shows the charging progress on the serial console in the Cube IDE.
-
-## Todos
-- [x] Implement TCP retry to compensate for single lost packets
-- [ ] Takeover latest state machine updates from pyPLC
-- [x] Control the CP line and the contactor outputs
-- [x] Add CAN
-- [x] Migrate to STM32F103RE, which is planned for the foccci board
-- [ ] (much more)
-
-## Build Environment / Compiling
-
-- arm-none-eabi-gcc
-- Controller: STM32F103RE
-- Installation of tool chain and flashing [Clara User Manual](doc/clara_user_manual.md)
 
 ## Cross References
 

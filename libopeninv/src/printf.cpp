@@ -28,7 +28,7 @@
 
 #include <stdarg.h>
 #include "printf.h"
-#include "my_fp.h"
+#include "my_string.h"
 
 /* the following should be enough for 32 bit int */
 #define PRINT_BUF_LEN 14
@@ -129,11 +129,11 @@ static int printi(IPutChar* put, int i, int b, int sg, int width, int pad, int l
 	return pc + prints (put, s, width, pad);
 }
 
-static int printfp(IPutChar* put, int i, int width, int pad)
+static int printfp(IPutChar* put, float* f, int width, int pad)
 {
 	char print_buf[PRINT_BUF_LEN];
 
-	fp_itoa(print_buf, i);
+	my_ftoa(print_buf, *f);
 
 	return prints (put, print_buf, width, pad);
 }
@@ -184,7 +184,7 @@ static int print(IPutChar* put, const char *format, va_list args )
 			//	continue;
 			//}
 			if ( *format == 'f' ) {
-				pc += printfp (put, va_arg( args, int ), width, pad);
+				pc += printfp (put, va_arg( args, float*), width, pad);
 				continue;
 			}
 			if( *format == 'c' ) {

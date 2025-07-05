@@ -41,15 +41,14 @@ CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/inclu
 EXTRACOMPILERFLAGS := $(shell \
   DATE=$$(date +%Y%m%d); \
   RUN=$${GITHUB_RUN_NUMBER:-0}; \
-  SHA=$$(echo $${GITHUB_SHA:-0} | cut -c1-7); \
-  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\" -DGITHUB_SHORT_SHA=\\\"$${SHA}\\\""; \
+  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\""; \
 )
 
 LDSCRIPT	  = linker.ld
 # -march=armv7e-m did the trick here?? -mcpu=cortex-m4 did nothing. or...
 LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib -Wl,--gc-sections,-Map,linker.map $(FPU_FLAGS)
 OBJSL		  = main.o hwinit.o params.o \
-				 my_string.o digio.o my_fp.o printf.o \
+				 my_string.o digio.o printf.o \
 				 errormessage.o \
 				 ipv6.o tcp.o \
 				 connMgr.o modemFinder.o pevStateMachine.o \
