@@ -3,14 +3,23 @@
 ![image](doc/ccs2-chademo_adapter.jpg)
 
 This is ccs32clara derived firmware for Dongguan Longood CCS2 to CHAdeMO adapter (My407ccs2chademo.bin)
-Adapter probably uses a STM32F407 cpu. It has a boot loader with support for firmware update from usb fat32, very nice.
 
+## Compatible adapters
+The firmware is compatible with the "Dongguan Longgod" adapter variants. If your adapter accepts firmware updates in the form of "My407ccs2chademo.bin" files, it is supported. Note that there are many adapter brands and re-brands on the market.
+
+- Dongguan Longgod ✅
+- EV-Boy (rebrand) ✅
+- Electway :x: Not compatible
+- A2Z :x: Not compatible
+- Feel free to expand this list!
+
+The adapter uses an STM32F407 cpu. It has a bootloader with support for firmware update from USB FAT32, very nice.
 It has an internal DC transformator to charge the batteries (pri: 210-1200V DC sec: 12.6V DC 2A). Transformer is connected to the car-side of the adapter.
 It has 2 batteries. One short and one long. The long one seems to drive electronics. Guessing the short one drive contactors (one in the adapter itself + 2 in the car).
 2 stop buttons, but they are the same GPIO for both.
-It has 2 controllable leds, one external and one internal (invisible).
+It has 2 controllable LEDs, one external and one internal (invisible).
 It has a QCA7000 powerline modem. It is wired up strangely, so can not use hw spi/dma, must use bitbang.
-Some of the voltages are wired up to adc GPIOs. At least the 12v reading does not seem to match with what i measure on eg. Chademo d1 pin.
+Some of the voltages are wired up to ADC GPIOs. At least the 12v reading does not seem to match with what I measure on eg. Chademo d1 pin.
 
 ## Operation
 Plug adapter into car. Plug cable into adapter. Power on adapter.
@@ -84,6 +93,7 @@ Press the stop button to turn adapter off.
 Charging via usb is not part of the software, its only hardware.
 While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, and this is bootloader starting.
 Meaning, charging automatically triggers power on, so adapter will auto power off and then auto power on again by charger, and this goes on forever.
+Charging via USB is very slow, and can take up to 10 hours if the internal battery is really empty.
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
