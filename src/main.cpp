@@ -295,21 +295,22 @@ void adc_battery_init(void)
     adc_power_on(ADC1);
 }
 
-float adc_to_voltage(uint16_t adc, float gain) 
+float adc_to_voltage(uint16_t adc, float vdd_voltage, float gain)
 {
-    return adc * (3.3f / 4095.0f) * gain;
+    return adc * (vdd_voltage / 4095.0f) * gain;
 }
 
 static float adc_3_3_volt = 0.0f;
 static float adc_4_volt = 0.0f;
 static float adc_12_volt = 0.0f;
+static float adc_vbat = 0.0f;
 
-#define ADC_CHANNEL_COUNT 3
+#define ADC_CHANNEL_COUNT 4
 
 void adc_read_all(void)
 {
     uint16_t adc_results[ADC_CHANNEL_COUNT];
-    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF };
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF, ADC_CHANNEL_VBAT };
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
@@ -321,8 +322,9 @@ void adc_read_all(void)
     float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
     
     adc_3_3_volt = vdd_voltage;
-    adc_4_volt = adc_to_voltage(adc_results[1], 2.0f);
-    adc_12_volt = adc_to_voltage(adc_results[0], 11.0f);
+    adc_4_volt = adc_to_voltage(adc_results[1], vdd_voltage, 2.0f);
+    adc_12_volt = adc_to_voltage(adc_results[0], vdd_voltage, 11.0f);
+    adc_vbat = adc_to_voltage(adc_results[3], vdd_voltage, 3.0f);
 }
 
 
@@ -339,11 +341,12 @@ void print_sysinfo()
         // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
         // during charging car, vcc12 seen between 12.19-12.31V
         // Min values seen and working: vcc4:3.78V vcc12:11.46V
-        printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
+        printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV vbat:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
             &adc_4_volt, // bypass float to double promotion by passing as reference
             &adc_12_volt, // bypass float to double promotion by passing as reference
             &adc_3_3_volt, // bypass float to double promotion by passing as reference
+            &adc_vbat, // bypass float to double promotion by passing as reference
             scheduler->GetCpuLoad() / 10,
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.powerOffPending,
