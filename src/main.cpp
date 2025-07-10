@@ -270,7 +270,7 @@ void power_off_check()
 
         if (powerOffOkCcs && powerOffOkCha)
         {
-            power_off_no_return("powerOffPending and both ccs and chademo says plugs are unlocked");
+            power_off_no_return("powerOffPending and both ccs and chademo says power off is ok");
         }
     }
 }

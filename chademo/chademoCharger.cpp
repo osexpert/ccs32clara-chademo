@@ -141,7 +141,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
         {
-            printf("[cha] Car asking (%d) for more than max (%d) volts.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+            printf("[cha] Car asking (%d) for more than max (%d) volts. Stopping.\r\n", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
@@ -332,11 +332,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false ||
-			// Since chademo 0.9 does not have this flag, the alternatives are to use a fixed delay or wait for asking amps, before closing adapter contactor.
-			// Using asking amps may work, but possible it will delay too much and the car will not recieve amps soon enought, and time out (I think the timeout is 4 sec).
-			// I am not sure if the timeout is for the OutputCurrent value itself or the current measurement, in case, faking a OutputCurrent = 1 (or swap 0<->1 every cycle) could be an option to trick the car to give us more time.
-            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > 0))
+        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) ||
+            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > 0)) // cha 0.9 does not use this flag (or it is unreliable?) so use askingamps as trigger
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
@@ -407,8 +404,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) 
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // CHA 0.9: spec says car must perform WD within 4 seconds, so guessing this is the logic?
+        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // Does cha 0.9 set this flag? At least spec says car must perform WD within 4 seconds after amps drops <= 5
             || IsTimeoutSec(10))
         {
             // welding detection done
