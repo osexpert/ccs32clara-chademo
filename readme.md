@@ -11,6 +11,7 @@ The firmware is compatible with the "Dongguan Longgod" adapter variants. If your
 
 - Dongguan Longgod ✅
 - EV-Boy (rebrand) ✅
+- Akyga® AK-SC-E18 (rebrand) ✅
 - Electway :x: Not compatible
 - A2Z :x: Not compatible
 - Feel free to expand this list!
