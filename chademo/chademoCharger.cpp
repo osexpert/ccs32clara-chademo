@@ -419,7 +419,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
-        if (_chargerData.OutputVoltage <= 10 || IsTimeoutSec(10))
+        // cha spec says <= 10 but we need to play by ccs rules here and at least some Tesla chargers never drop below 16 volts
+        if (_chargerData.OutputVoltage <= 20 || IsTimeoutSec(10))
         {
             UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
@@ -528,7 +529,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     if (_discovery)
     {
         // fake for discovery
-        SetChargerData(450, 100, 0, 0);
+        SetChargerData(ADAPTER_MAX_VOLTS, ADAPTER_MAX_AMPS, 0, 0);
     }
     else
     {
