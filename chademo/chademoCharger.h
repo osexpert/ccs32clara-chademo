@@ -368,6 +368,7 @@ struct CarData
 
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
+    uint8_t AskingAmpsBaseline;
 
     // PS: unstable before switch (k)
     uint8_t SocPercent;

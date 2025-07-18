@@ -308,6 +308,9 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
+                // some early models (iMiev) use 1 as baseline instead of 0. Possibly this behaviour is isolated to ProtocolNumber:0
+                _carData.AskingAmpsBaseline = _carData.AskingAmps;
+
                 LockChargingPlug();
                 set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
@@ -333,7 +336,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) ||
-            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > 0)) // cha 0.9 does not use this flag (or it is unreliable?) so use askingamps as trigger
+            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > _carData.AskingAmpsBaseline)) // cha 0.9 does not use this flag (or it is unreliable?) so use askingamps as trigger
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();
