@@ -60,7 +60,9 @@ Since the adapter does not have physical locks, to be safe, never unplug the ccs
 
 Special mode: hold stop button while powering on. You should hear a click from the adapter contactor. Let go of the stop button within 1 second, and you have activated contactor unwelding attempt, where 
 the contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the 
-process, to see if the contactor becomes unstuck again. My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
+process, to see if the contactor becomes unstuck again.
+What to test: with the adapter buttons up, facing the ccs socket, the bottom right pin will be DC+ (you should see markings). DC+ pin should be always connected to the chademo pin on the same side. The DC- pin on the left goes thru a contactor and should be normally open.
+My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
 
 ## Led
 <pre>
