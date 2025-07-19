@@ -43,12 +43,12 @@ extern global_data _global;
 /// 
 /// nomVolt based on:
 /// Leaf: target: 410V, nomVolt: 355V
-/// i-MiEV: target: 360V, nomVolt: 326V
+/// i-MiEV: target: 360V, nomVolt: 330V
 /// </summary>
 float GetEstimatedBatteryVoltage(float target, float soc)
 {
     float maxVolt = target - 10;
-    float nomVolt = 0.58f * target + 117.2f; // Linear interpolation/extrapolation
+    float nomVolt = 0.5f * target + 150.0f; // Linear interpolation/extrapolation
     float minVolt = nomVolt - (maxVolt - nomVolt);
 
     float deltaLow = 0.14f * (nomVolt - minVolt);   // Steeper drop below 20%
@@ -335,8 +335,11 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) ||
-            (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > 0)) // cha 0.9 does not use this flag (or it is unreliable?) so use askingamps as trigger. iMiev ask for 1A right from the start.
+        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
+            // cha 0.9 does not use the flag (or it is unreliable?) so use askingamps as trigger
+            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > 0)
+            // cha 0. iMiev ask for 1A from the start and won't ask for more until contactor is closed. It is suggested that iMiev need ~ 1 second after D2:true.
+            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(1)))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             CloseAdapterContactor();

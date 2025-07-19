@@ -393,6 +393,7 @@ struct CarData
 
 enum ProtocolNumber
 {
+    Chademo_0 = 0,
     Chademo_0_9 = 1,
     Chademo_1_0 = 2,
     Chademo_2_0 = 3,
