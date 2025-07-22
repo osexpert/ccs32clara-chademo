@@ -10,10 +10,13 @@ This is ccs32clara derived firmware for Dongguan Longood CCS2 to CHAdeMO adapter
 The firmware is compatible with the "Dongguan Longgod" adapter variants. If your adapter accepts firmware updates in the form of "My407ccs2chademo.bin" files, it is supported. Note that there are many adapter brands and re-brands on the market.
 
 - Dongguan Longgod ✅
+   - CCS1 US ✅
+   - CCS2 EU ✅
 - EV-Boy (rebrand) ✅
 - Akyga® AK-SC-E18 (rebrand) ✅
 - Electway :x: Not compatible
 - A2Z :x: Not compatible
+- Orientrise :x: Not compatible
 - Feel free to expand this list!
 
 The adapter uses an STM32F407 cpu. It has a bootloader with support for firmware update from USB FAT32, very nice.
