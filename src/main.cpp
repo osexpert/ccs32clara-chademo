@@ -275,10 +275,11 @@ void power_off_check()
     }
 }
 
-
-
 void adc_battery_init(void)
 {
+    printf("ST_VREFINT_CAL:%u\r\n", ST_VREFINT_CAL);
+    adc_enable_temperature_sensor(); // enables vrefint too
+
     gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
 
     // Enable required clocks
@@ -303,14 +304,13 @@ float adc_to_voltage(uint16_t adc, float vdd_voltage, float gain)
 static float adc_3_3_volt = 0.0f;
 static float adc_4_volt = 0.0f;
 static float adc_12_volt = 0.0f;
-static float adc_vbat = 0.0f;
 
-#define ADC_CHANNEL_COUNT 4
+#define ADC_CHANNEL_COUNT 3
 
 void adc_read_all(void)
 {
     uint16_t adc_results[ADC_CHANNEL_COUNT];
-    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF, ADC_CHANNEL_VBAT };
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF };
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
@@ -319,12 +319,14 @@ void adc_read_all(void)
         adc_results[i] = adc_read_regular(ADC1);
     }
 
-    float vdd_voltage = (3.3f * ST_VREFINT_CAL) / adc_results[2];
-    
-    adc_3_3_volt = vdd_voltage;
-    adc_4_volt = adc_to_voltage(adc_results[1], vdd_voltage, 2.0f);
-    adc_12_volt = adc_to_voltage(adc_results[0], vdd_voltage, 11.0f);
-    adc_vbat = adc_to_voltage(adc_results[3], vdd_voltage, 3.0f);
+    if (adc_results[2] > 0) // prevent DIV/0
+    {
+        float vdd = (3.3f * ST_VREFINT_CAL) / adc_results[2];
+
+        adc_3_3_volt = vdd;
+        adc_4_volt = adc_to_voltage(adc_results[1], vdd, 2.0f);
+        adc_12_volt = adc_to_voltage(adc_results[0], vdd, 11.0f);
+    }
 }
 
 
@@ -341,12 +343,11 @@ void print_sysinfo()
         // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
         // during charging car, vcc12 seen between 12.19-12.31V
         // Min values seen and working: vcc4:3.78V vcc12:11.46V
-        printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV vbat:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
+        printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
             system_millis / 1000,
             &adc_4_volt, // bypass float to double promotion by passing as reference
             &adc_12_volt, // bypass float to double promotion by passing as reference
             &adc_3_3_volt, // bypass float to double promotion by passing as reference
-            &adc_vbat, // bypass float to double promotion by passing as reference
             scheduler->GetCpuLoad() / 10,
             _global.auto_power_off_timer_count_up_ms / 1000,
             _global.powerOffPending,
@@ -459,7 +460,7 @@ static void SetMacAddress()
     mac[1] = DESIG_UNIQUE_ID0 & 0xFF;
     *((uint32_t*)&mac[2]) = DESIG_UNIQUE_ID2;
 
-    addToTrace(MOD_HOMEPLUG, "Our MAC address: ", mac, 6);
+    printf("Our MAC address: %02x:%02x:%02x:%02x:%02x:%02x\r\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     //more info: https://community.st.com/t5/stm32-mcus/how-to-obtain-and-use-the-stm32-96-bit-uid/ta-p/621443
     setOurMac(mac);
 }
