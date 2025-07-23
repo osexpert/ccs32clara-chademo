@@ -323,7 +323,7 @@ struct msg109
             uint8_t ProtocolNumber;
             uint16_t PresentVoltage;
             uint8_t PresentChargingCurrent;
-            uint8_t Unused4; // discharge compatible
+            uint8_t DischargeCompatible;
             uint8_t Status;
             uint8_t RemainingChargingTime10s;
             uint8_t RemainingChargingTimeMinutes;
