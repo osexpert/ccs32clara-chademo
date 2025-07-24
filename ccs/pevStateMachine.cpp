@@ -795,11 +795,26 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
       {
          if (pev_wasPowerDeliveryRequestedOn)
          {
-            publishStatus("PwrDelvy ON success", "");
-            addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
-            setCheckpoint(700);
-            pev_sendCurrentDemandReq();
-            pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+            printf("PowerDeliveryResponse ResponseCode:%d DC_EVSEStatus_isUsed:%d EVSEStatusCode:%d\r\n", 
+                dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode,
+                dinDocDec.V2G_Message.Body.PowerDeliveryRes.DC_EVSEStatus_isUsed,
+                dinDocDec.V2G_Message.Body.PowerDeliveryRes.DC_EVSEStatus.EVSEStatusCode
+                );
+
+            if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK
+                && (!dinDocDec.V2G_Message.Body.PowerDeliveryRes.DC_EVSEStatus_isUsed || dinDocDec.V2G_Message.Body.PowerDeliveryRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Ready))
+            {
+                publishStatus("PwrDelvy ON success", "");
+                addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
+                setCheckpoint(700);
+                pev_sendCurrentDemandReq();
+                pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+            }
+            else
+            {
+                // charger not ready yet? keep going.
+                pev_sendPowerDeliveryReq(1); /* 1 is ON */
+            }
          }
          else
          {
