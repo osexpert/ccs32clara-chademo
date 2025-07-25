@@ -155,6 +155,10 @@ static void encodeAndTransmit(void)
    //addToTrace("after: g_errn=" + String(g_errn));
    //addToTrace("global_streamEncPos=" + String(global_streamEncPos));
    addV2GTPHeaderAndTransmit(global_streamEnc.data, global_streamEncPos);
+
+#ifdef VERBOSE_EXI_DECODER
+   showAsHex(global_streamDec.data, global_streamEncPos, "encoded exi");
+#endif
 }
 
 static void routeDecoderInputData(void)
