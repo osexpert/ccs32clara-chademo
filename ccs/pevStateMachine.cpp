@@ -154,11 +154,10 @@ static void encodeAndTransmit(void)
    projectExiConnector_encode_DinExiDocument();
    //addToTrace("after: g_errn=" + String(g_errn));
    //addToTrace("global_streamEncPos=" + String(global_streamEncPos));
-   addV2GTPHeaderAndTransmit(global_streamEnc.data, global_streamEncPos);
-
 #ifdef VERBOSE_EXI_DECODER
-   showAsHex(global_streamDec.data, global_streamEncPos, "encoded exi");
+   showAsHex(global_streamEnc.data, global_streamEncPos, "encoded exi");
 #endif
+   addV2GTPHeaderAndTransmit(global_streamEnc.data, global_streamEncPos);
 }
 
 static void routeDecoderInputData(void)
