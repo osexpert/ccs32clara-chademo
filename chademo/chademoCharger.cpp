@@ -216,7 +216,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
     // TODO: use _carData.MaxBatteryVoltage? But what is the point? We always just ask for target voltage anyways...
-    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
+    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 20); // issue 11 try +20
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
     Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 1); // maybe some chargers don't like being asked for 0 amps?
