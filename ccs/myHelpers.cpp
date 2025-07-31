@@ -51,9 +51,9 @@ extern "C" void* memcpy(void* __restrict target, const void* __restrict source, 
 };
 
 void showAsHex(uint8_t* arr, uint16_t len, const char* info) {
-    printf("%s has %d bytes:", info, len);
+    printf("%s has %d bytes: ", info, len);
     for (uint16_t i = 0; i < len; ++i) {
-        printf(" %02X", arr[i]);
+        printf("%02X", arr[i]);
     }
     printf("\r\n");
 }

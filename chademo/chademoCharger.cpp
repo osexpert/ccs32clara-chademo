@@ -219,7 +219,19 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 20); // issue 11 try +20
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
-    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 1); // maybe some chargers don't like being asked for 0 amps?
+
+    int askingAmps = 0;
+    // issue 11: try to stall for 1 sec. If this works, make it conditional if there is a schedule and it has RelativeTimeInterval.Start = 1?
+    // But what if more than 1? we can't stall forever like this, would probably need to add a new state in eg.
+    // WaitForPreChargeDone->WaitForChargingScheduleStart->WaitForCarContactorsClosed, so we can stall for arbitrary times
+    if (_state == ChargerState::ChargingLoop && _cyclesInState > CHA_CYCLES_PER_SEC * 1)
+    {
+        askingAmps = _carData.AskingAmps;
+    }
+
+    Param::SetInt(Param::ChargeCurrent, askingAmps);
+
+
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
 }
 
