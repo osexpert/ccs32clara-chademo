@@ -219,7 +219,10 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
-    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 1); // maybe some chargers don't like being asked for 0 amps?
+
+    // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for minimum 1A regardless)
+    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 0);
+
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
 }
 
