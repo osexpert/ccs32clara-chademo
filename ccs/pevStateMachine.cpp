@@ -292,6 +292,14 @@ static void pev_sendPowerDeliveryReq(uint8_t isOn)
    encodeAndTransmit();
 }
 
+static inline void setPhysicalValue(dinPhysicalValueType* pv, int16_t value, dinunitSymbolType unit, int8_t multiplier)
+{
+    pv->Value = value;
+    pv->Unit_isUsed = 1;
+    pv->Unit = unit;
+    pv->Multiplier = multiplier;
+}
+
 static void pev_sendCurrentDemandReq(void)
 {
    uint16_t UTarget, EVMaximumVoltageLimit;
@@ -344,6 +352,15 @@ static void pev_sendCurrentDemandReq(void)
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Unit = dinunitSymbolType_s;
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Unit_isUsed = 1;
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Value = 600; /* seconds */
+
+#define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
+   req.EVMaximumVoltageLimit_isUsed = 1;
+   setPhysicalValue(&req.EVMaximumVoltageLimit, Param::GetInt(Param::MaxVoltage), dinunitSymbolType_V, 0);
+
+   req.EVMaximumCurrentLimit_isUsed = 1;
+   setPhysicalValue(&req.EVMaximumCurrentLimit, Param::GetInt(Param::MaxCurrent), dinunitSymbolType_A, 0);
+#undef req
+
    encodeAndTransmit();
 }
 
