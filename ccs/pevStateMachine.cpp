@@ -1127,6 +1127,13 @@ static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
 static void stateFunctionEnd(void)
 {
    /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
+
+   // Chademo uses StopReason to trigger power off pending, but StopReason is only set if CurrentDemand is reached.
+   // If for some reason CurrentDemand is never reached bebause of unknow bad things, make sure a StopReason is always set here, so we can power off faster.
+   if (Param::GetInt(Param::StopReason) == STOP_REASON_NONE)
+   {
+      Param::SetInt(Param::StopReason, STOP_REASON_UNKNOWN);
+   }
 }
 
 void translateOpModeToIsolationMonitor(void) {
@@ -1194,7 +1201,10 @@ static void pev_runFsm(void)
       Param::SetInt(Param::EvseCurrent, 0);
 
    if (pev_isTooLong())
+   {
+      addToTrace(MOD_PEV, "Timeout in dispatcher.");
       pev_enterState(PEV_STATE_SequenceTimeout);
+   }
 }
 
 /************ public interfaces *****************************************/
