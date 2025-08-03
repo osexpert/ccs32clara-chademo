@@ -356,6 +356,7 @@ static void pev_sendCurrentDemandReq(void)
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Unit_isUsed = 1;
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Value = 600; /* seconds */
 
+   // Charger 'Plugit HUBE S' wont work without maxes
 #define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
    req.EVMaximumVoltageLimit_isUsed = 1;
    setPhysicalValue(&req.EVMaximumVoltageLimit, Param::GetInt(Param::MaxVoltage), dinunitSymbolType_V, 0);
@@ -1043,7 +1044,7 @@ static void stateFunctionWaitForSessionStopResponse(void)
       {
          // req -508
          // Todo: close the TCP connection here.
-         tcp_reset();
+         tcp_close();
          publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
          pev_enterState(PEV_STATE_End);

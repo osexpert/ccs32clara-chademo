@@ -179,6 +179,8 @@ void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
+    tcp_reset(); // kill the last connection, if any
+
     // In case of emergency shutdown (stop button for 30 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
     // Its better to sacrefice the adapter instead of the car, so power off adapter contactor explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
@@ -431,13 +433,15 @@ static void Ms30Task()
         printf("[cha] discovery completed => ccs kickoff\r\n");
     }
 
-    // run eth even after ccsEnded, so we look "alive" to the charger
-    // (some chargers complain about contact lost with car after charging, this may fix it?)
-    spiQCA7000checkForReceivedData();
-
     if (_global.ccsEnded)
+    {
+        // run etc & tcp even after ccsEnded, so we look "alive" to the charger (some chargers give error after charging has stopped, this may fix it?)
+        spiQCA7000checkForReceivedData();
+        tcp_Mainfunction();
         return;
+    }
 
+    spiQCA7000checkForReceivedData();
     connMgr_Mainfunction(); /* ConnectionManager */
     modemFinder_Mainfunction();
     runSlacSequencer();
@@ -448,8 +452,6 @@ static void Ms30Task()
     ErrorMessage::SetTime(rtc_get_ms());
 
     _global.ccsEnded = chademoInterface_isCcsEnded();
-    if (_global.ccsEnded)
-        tcp_reset(); // kill the last connection, if any
 }
 
 static void SetMacAddress()

@@ -15,14 +15,20 @@
 #define TCP_STATE_CLOSED 0
 #define TCP_STATE_SYN_SENT 1
 #define TCP_STATE_ESTABLISHED 2
+#define TCP_STATE_FIN_WAIT_1 3
+#define TCP_STATE_FIN_WAIT_2 4
+#define TCP_STATE_CLOSING    5
+#define TCP_STATE_TIME_WAIT  6
 
 #define TCP_ACK_INITIAL_TIMEOUT_MS 100     // Start with 100ms
 #define TCP_ACK_MAX_TIMEOUT_MS     800     // Max per-retry delay
 #define TCP_MAX_TOTAL_RETRY_TIME_MS 4000   // Retry attempts within 4s
+#define TCP_TIME_WAIT_TIMEOUT_MS 1000      // Short timeout for embedded tcp
 
 static uint32_t nextRetryTime = 0;
 static uint32_t retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
 static uint32_t retryTotalElapsed = 0;
+static uint32_t timeWaitDeadline = 0;
 
 static bool lastTransmitAckPending = false;
 
@@ -50,6 +56,7 @@ static void tcp_packRequestIntoIp(void);
 static void tcp_prepareTcpHeader(uint8_t tcpFlag);
 static void tcp_sendAck(void);
 static void tcp_sendFirstAck(void);
+static void tcp_sendFin(void);
 
 /*** functions *********************************************************************/
 uint32_t tcp_getTotalNumberOfRetries(void) {
@@ -139,8 +146,19 @@ void evaluateTcpPacket(void)
 
    if (flags & TCP_FLAG_ACK)
    {
-       TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
+       TcpSeqNr = remoteAckNr;
        lastTransmitAckPending = false;
+
+       if (tcpState == TCP_STATE_FIN_WAIT_1) {
+           // We received ACK for our FIN
+           tcpState = TCP_STATE_FIN_WAIT_2;
+           addToTrace(MOD_TCP, "[TCP] Received ACK for FIN, now in FIN_WAIT_2");
+       }
+       else if (tcpState == TCP_STATE_CLOSING) {
+           // We received ACK for our ACK of their FIN
+           tcpState = TCP_STATE_CLOSED;
+           addToTrace(MOD_TCP, "[TCP] Received ACK after FIN exchange, connection closed");
+       }
    }
 
    if (flags & TCP_FLAG_RST)
@@ -151,10 +169,27 @@ void evaluateTcpPacket(void)
 
    if (flags & TCP_FLAG_FIN)
    {
-       addToTrace(MOD_TCP, "[TCP] FIN received, sending final ACK");
+       addToTrace(MOD_TCP, "[TCP] FIN received");
        TcpAckNr = remoteSeqNr + 1;
        tcp_sendAck();
-       tcpState = TCP_STATE_CLOSED;
+
+       if (tcpState == TCP_STATE_FIN_WAIT_2) {
+           tcpState = TCP_STATE_TIME_WAIT;
+           timeWaitDeadline = rtc_get_ms() + TCP_TIME_WAIT_TIMEOUT_MS;
+           addToTrace(MOD_TCP, "[TCP] Entering TIME_WAIT, will close after timeout");
+       }
+       else if (tcpState == TCP_STATE_FIN_WAIT_1) {
+           tcpState = TCP_STATE_CLOSING;
+           addToTrace(MOD_TCP, "[TCP] Received FIN while in FIN_WAIT_1 (simultaneous close)");
+       }
+       else if (tcpState == TCP_STATE_ESTABLISHED) {
+           // We were not expecting to close, but peer initiated it.
+           // Treat as passive close, and reply with FIN to match.
+           tcp_sendFin();
+           tcpState = TCP_STATE_TIME_WAIT;
+           timeWaitDeadline = rtc_get_ms() + TCP_TIME_WAIT_TIMEOUT_MS;
+           addToTrace(MOD_TCP, "[TCP] Passive close (ESTABLISHED -> TIME_WAIT after sending FIN)");
+       }
    }
 }
 
@@ -340,12 +375,31 @@ static void tcp_packRequestIntoEthernet(void)
    myEthTransmit();
 }
 
-//void tcp_disconnect(void)
-//{
-//   /* we should normally use the FIN handshake, to tell the charger that we closed the connection.
-//   But for the moment, just go away silently, and use an other port for the next connection. The
-//   server will detect our absense sooner or later by timeout, this should be good enough. */
-//}
+void tcp_sendFin(void)
+{
+   addToTrace(MOD_TCP, "[TCP] Sending FIN");
+
+   tcpHeaderLen = 20;
+   tcpPayloadLen = 0;
+   tcp_prepareTcpHeader(TCP_FLAG_FIN | TCP_FLAG_ACK);
+   tcp_packRequestIntoIp();
+
+   TcpSeqNr++;  // FIN consumes one sequence number
+   tcpState = TCP_STATE_FIN_WAIT_1;
+   lastTransmitAckPending = true;
+
+   retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
+   retryTotalElapsed = 0;
+   nextRetryTime = rtc_get_ms() + retryDelay;
+}
+
+void tcp_close(void)
+{
+    if (tcpState == TCP_STATE_ESTABLISHED) {
+        tcp_sendFin();
+    }
+}
+
 
 void tcp_reset()
 {
@@ -410,6 +464,13 @@ void tcp_checkRetry(void)
 
 void tcp_Mainfunction(void)
 {
+   if (tcpState == TCP_STATE_TIME_WAIT) {
+      if (rtc_get_ms() >= timeWaitDeadline) {
+         tcpState = TCP_STATE_CLOSED;
+         addToTrace(MOD_TCP, "[TCP] TIME_WAIT expired, connection closed");
+      }
+   }
+
    tcp_checkRetry();
 
    if (connMgr_getConnectionLevel()<50)
