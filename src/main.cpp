@@ -175,11 +175,13 @@ static void msleep(uint32_t delay)
     while (wake > system_millis);
 }
 
+extern void tcp_shutdown(void);
+
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
-    tcp_reset(); // kill the last connection, if any
+    tcp_shutdown(); // kill the last connection, if any
 
     // In case of emergency shutdown (stop button for 30 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
@@ -415,8 +417,6 @@ static void Ms100Task(void)
     print_sysinfo();
     print_ccs_trace();
 }
-
-extern void tcp_reset(void);
 
 static void Ms30Task()
 {
