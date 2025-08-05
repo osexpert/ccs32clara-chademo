@@ -64,7 +64,8 @@ uint8_t hardwareInterface_getSoc(void)
 
 uint8_t hardwareInterface_getIsAccuFull(void)
 {
-   return Param::GetInt(Param::soc) > 95;
+   // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
+   return Param::GetInt(Param::soc) == 100;
 }
 
 void hardwareInterface_setPowerRelayOn(void)
