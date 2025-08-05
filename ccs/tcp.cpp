@@ -171,14 +171,12 @@ void evaluateTcpPacket(void)
        TcpAckNr = remoteSeqNr + 1;
        tcp_sendAck();
 
-       if (tcpState == TCP_STATE_ESTABLISHED) 
+       if (tcpState == TCP_STATE_ESTABLISHED)
        {
-           // The server initiated FIN (rude). Be nice and reply with FIN, but then close the connection. All is lost in any case.
-           addToTrace(MOD_TCP, "[TCP] Passive close");
-           tcp_sendFin();
+           // The server initiated FIN. Reply with FIN.
+           addToTrace(MOD_TCP, "[TCP] Passive close, reply with FIN");
+           tcp_sendFin(); // changes state to TCP_STATE_FIN_SENT
        }
-
-       tcpState = TCP_STATE_CLOSED;
    }
 }
 
@@ -398,6 +396,8 @@ void tcp_reset()
 
     if (tcpState != TCP_STATE_CLOSED)
     {
+		addToTrace(MOD_TCP, "[TCP] Sending RST");
+
         tcpHeaderLen = 20;  // no options
         tcpPayloadLen = 0;  // no payload
         TcpAckNr = 0; // not acknowledging any data
@@ -407,11 +407,6 @@ void tcp_reset()
     }
 
 	lastTransmitAckPending = false;
-}
-
-bool tcp_isClosed(void)
-{
-   return (tcpState == TCP_STATE_CLOSED);
 }
 
 bool tcp_isConnected(void)
