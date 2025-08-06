@@ -216,21 +216,12 @@ void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
     // TODO: use _carData.MaxBatteryVoltage? But what is the point? We always just ask for target voltage anyways...
-    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 20); // issue 11 try +20
+    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
 
-    int askingAmps = 0;
-    // issue 11: try to stall for 1 sec. If this works, make it conditional if there is a schedule and it has RelativeTimeInterval.Start = 1?
-    // But what if more than 1? we can't stall forever like this, would probably need to add a new state in eg.
-    // WaitForPreChargeDone->WaitForChargingScheduleStart->WaitForCarContactorsClosed, so we can stall for arbitrary times
-    if (_state == ChargerState::ChargingLoop && _cyclesInState > CHA_CYCLES_PER_SEC * 1)
-    {
-        askingAmps = _carData.AskingAmps;
-    }
-
-    Param::SetInt(Param::ChargeCurrent, askingAmps);
-
+    // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for minimum 1A regardless)
+    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 0);
 
     Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
 }
