@@ -184,22 +184,19 @@ void tcp_connect(void)
 {
    addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting");
    setCheckpoint(301);
-   TcpTransmitPacket[20] = 0x02; /* options: 12 bytes, just copied from the Win10 notebook trace */
-   TcpTransmitPacket[21] = 0x04;
-   TcpTransmitPacket[22] = 0x05;
+
+   // TCP Options
+   TcpTransmitPacket[20] = 0x02; // Kind: 2 = Maximum Segment Size (MSS)
+   TcpTransmitPacket[21] = 0x04; // Length: 4
+   TcpTransmitPacket[22] = 0x05; // MSS = 0x05A0 = 1440 bytes
    TcpTransmitPacket[23] = 0xA0;
 
-   TcpTransmitPacket[24] = 0x01;
-   TcpTransmitPacket[25] = 0x03;
-   TcpTransmitPacket[26] = 0x03;
-   TcpTransmitPacket[27] = 0x08;
+   TcpTransmitPacket[24] = 0x01; // Kind: 1 = NOP
+   TcpTransmitPacket[25] = 0x03; // Kind: 3 = Window Scale
+   TcpTransmitPacket[26] = 0x03; // Length: 3
+   TcpTransmitPacket[27] = 0x08; // Shift count = 8 (2^8 = 256x window)
 
-   TcpTransmitPacket[28] = 0x01;
-   TcpTransmitPacket[29] = 0x01;
-   TcpTransmitPacket[30] = 0x04;
-   TcpTransmitPacket[31] = 0x02;
-
-   tcpHeaderLen = 32; /* 20 bytes normal header, plus 12 bytes options */
+   tcpHeaderLen = 28; /* 20 bytes normal header, plus 8 bytes options */
    tcpPayloadLen = 0;   /* only the TCP header, no data is in the connect message. */
    tcp_prepareTcpHeader(TCP_FLAG_SYN);
    tcp_packRequestIntoIp();
@@ -406,7 +403,7 @@ void tcp_reset()
         tcpState = TCP_STATE_CLOSED;  // close connection state
     }
 
-	lastTransmitAckPending = false;
+    lastTransmitAckPending = false;
 }
 
 bool tcp_isConnected(void)
