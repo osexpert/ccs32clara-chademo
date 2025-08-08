@@ -14,6 +14,7 @@ The firmware is compatible with the "Dongguan Longgod" adapter variants. If your
    - CCS2 EU ✅
 - EV-Boy (rebrand) ✅
 - Akyga® AK-SC-E18 (rebrand) ✅
+- EVniculus (rebrand) ✅
 - Electway :x: Not compatible
 - A2Z :x: Not compatible
 - Orientrise :x: Not compatible
