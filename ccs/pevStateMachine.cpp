@@ -813,6 +813,9 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed)
       {
+         // chatgpt: FAILED_PowerDeliveryNotApplied may require looping until ok?
+         printf("PowerDeliveryRes ResponseCode:%d\r\n", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+
          if (pev_wasPowerDeliveryRequestedOn)
          {
             publishStatus("PwrDelvy ON success", "");
