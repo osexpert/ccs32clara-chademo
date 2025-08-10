@@ -353,6 +353,126 @@ struct msg118
     };
 };
 
+// V2X
+// Trace: https://raw.githubusercontent.com/dalathegreat/EV-CANlogs/refs/heads/main/Nissan%20LEAF/V2X/v2h_startup__charge_ffrom_solar_excess_for_a_while_then_turn_on_oven_to_create_load_then_switch_off_load__then_end_session.csv
+
+/* Car discharge limits
+Vehicle 0x200, peer to EVSE 0x208?
+ 
+Trace: shortly after chargingloop, settle to MaximumDischargeCurrentInverted:240 (15A), MinimumDischargeVoltage:250, MinimumBatteryDischargeLevel:69, MaxRemainingCapacityForCharging:185
+Don't change more in the trace.
+*/
+struct msg200
+{
+    union {
+        struct {
+            uint8_t MaximumDischargeCurrentInverted;
+            uint8_t Unused1;
+            uint8_t Unused2;
+            uint8_t Unused3;
+            /// <summary>
+            /// trace: 250v make no sense...310v is absolute minimum, so what does this really mean?
+            /// </summary>
+            uint16_t MinimumDischargeVoltage;
+            /// <summary>
+            /// trace: SOC%? But 69% seems very high? Can it be 100-69=31%?
+            /// </summary>
+            uint8_t MinimumBatteryDischargeLevel;
+            uint8_t MaxRemainingCapacityForCharging;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
+
+/* Car discharge estimates
+Vehicle 0x201, peer to EVSE 0x209
+HOWEVER, 201 isn't even emitted in any of the v2x canlogs available
+*/
+struct msg201
+{
+    union {
+        struct {
+            uint8_t V2HchargeDischargeSequenceNum;
+            uint16_t ApproxDischargeCompletionTime;
+            uint16_t AvailableVehicleEnergy;
+            uint8_t Unused5;
+            uint8_t Unused6;
+            uint8_t Unused7;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
+
+
+struct msg208
+{
+    union {
+        struct {
+            /// <summary>
+            /// I am guessing...that if charger declare to support discharge and the car too, then changer will send this message, and if the value here is <> 0 (or FF??)
+            /// then car WONT ask for amps, but instead is willing to give?
+            /// 
+            /// present discharge current is a measured value 0xFF - get_measured_current();
+            /// </summary>
+            /* Present discharge current is a measured value. In the absence of
+            a shunt, the evse here is quite literally lying to the vehicle.The spec
+                seems to suggest this is tolerated unless the current measured on the EV
+                side continualy exceeds the maximum discharge current by 10amps
+                x208_evse_dischg_cap.present_discharge_current = 0xFF - 6;
+
+                So....I guess can just use 1 amp here for fun? Like a signal?
+            */
+
+            uint8_t PresentDischargeCurrentInverted;
+            uint16_t AvailableInputVoltage;
+            uint8_t AvailableInputCurrentInverted;
+            uint8_t Unused4;
+            uint8_t Unused5;
+            uint16_t LowerThresholdVoltage;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
+
+/* Discharge estimates: x209 EVSE = peer to x201 Vehicle
+NOTE: x209 is emitted in CAN logs when x201 isn't even present
+it may not be understood by leaf (or ignored unless >= a certain protocol version or v2h sequence number
+In trace start: SequenceControlNumber:2, RemainingDischargeTime:0.
+After charging loop start, set to SequenceControlNumber=2, RemainingDischargeTime=5
+Not changed after this.
+2 = CHADEMO_BIDIRECTIONAL?
+ */
+struct msg209
+{
+    union {
+        struct {
+            /// <summary>
+            /// Possibly this is mode?
+            /// enum Mode { CHADEMO_CHARGE, CHADEMO_DISCHARGE, CHADEMO_BIDIRECTIONAL }; 0,1,2?
+            /// </summary>
+            uint8_t SequenceControlNumber;
+            /// <summary>
+            /// Possibly setting this is > 0 make the car "alive" and never times out?
+            /// </summary>
+            uint16_t RemainingDischargeTime;
+            uint8_t Unused3;
+            uint8_t Unused4;
+            uint8_t Unused5;
+            uint8_t Unused6;
+            uint8_t Unused7;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
+
+
+
+
+
 #pragma pack(pop)
 
 struct CarData
