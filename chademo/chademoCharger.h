@@ -286,6 +286,7 @@ struct msg110
     union {
         struct {
             uint8_t ExtendedFunction1;
+            uint8_t Unused1;
             uint8_t Unused2;
             uint8_t Unused3;
             uint8_t Unused4;
@@ -339,6 +340,7 @@ struct msg118
     union {
         struct {
             uint8_t ExtendedFunction1;
+            uint8_t Unused1;
             uint8_t Unused2;
             uint8_t Unused3;
             uint8_t Unused4;
