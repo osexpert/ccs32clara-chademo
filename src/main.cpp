@@ -21,6 +21,7 @@
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
+#include <libopencm3/stm32/rng.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/iwdg.h>
@@ -175,13 +176,11 @@ static void msleep(uint32_t delay)
     while (wake > system_millis);
 }
 
-extern void tcp_shutdown(void);
-
 void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
-    tcp_shutdown(); // kill the last connection, if any
+    //tcp_shutdown(); // kill the last connection, if any
 
     // In case of emergency shutdown (stop button for 30 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
@@ -467,6 +466,16 @@ static void SetMacAddress()
     setOurMac(mac);
 }
 
+static void RandomPortStart()
+{
+    rng_enable();
+    uint32_t rand_num = rng_get_random_blocking(); // Get a random number
+    rng_disable(); // Disable RNG when finished to save power
+
+    uint16_t port = setPortStart(rand_num);
+    printf("Random port:%u\r\n", port);
+}
+
 /* Called when systick fires */
 extern "C" void sys_tick_handler(void)
 {
@@ -548,6 +557,7 @@ extern "C" int main(void)
 
     hardwareInterface_setStateB();
     SetMacAddress();
+    RandomPortStart();
     qca7000setup();
     demoQCA7000();
 

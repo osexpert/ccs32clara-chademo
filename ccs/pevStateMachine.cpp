@@ -1044,7 +1044,7 @@ static void stateFunctionWaitForSessionStopResponse(void)
       {
          // req -508
          // Todo: close the TCP connection here.
-         tcp_close();
+//         tcp_close();
          publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
          pev_enterState(PEV_STATE_End);
