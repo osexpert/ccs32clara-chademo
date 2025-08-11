@@ -1042,6 +1042,8 @@ static void stateFunctionWaitForSessionStopResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.SessionStopRes_isUsed)
       {
+         printf("WaitForSessionStopRes ResponseCode:%d\r\n", dinDocDec.V2G_Message.Body.SessionStopRes.ResponseCode);
+
          // req -508
          // Todo: close the TCP connection here.
 //         tcp_close();
