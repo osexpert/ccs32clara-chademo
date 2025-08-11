@@ -57,6 +57,8 @@ void clock_setup(void)
    rcc_periph_clock_enable(RCC_ADC1);
 
    rcc_periph_clock_enable(RCC_CAN1);
+
+   rcc_periph_clock_enable(RCC_RNG);
 }
 
 void systick_setup(void)

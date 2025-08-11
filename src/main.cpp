@@ -21,6 +21,7 @@
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/can.h>
+#include <libopencm3/stm32/rng.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/iwdg.h>
@@ -465,6 +466,16 @@ static void SetMacAddress()
     setOurMac(mac);
 }
 
+static void SetRandomStartPort()
+{
+    rng_enable();
+    uint32_t rand_num = rng_get_random_blocking(); // Get a random number
+    rng_disable(); // Disable RNG when finished to save power
+
+    uint16_t start_port = setStartPort(rand_num);
+    printf("Random start port:%u\r\n", start_port);
+}
+
 /* Called when systick fires */
 extern "C" void sys_tick_handler(void)
 {
@@ -546,6 +557,7 @@ extern "C" int main(void)
 
     hardwareInterface_setStateB();
     SetMacAddress();
+    SetRandomStartPort();
     qca7000setup();
     demoQCA7000();
 

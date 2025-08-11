@@ -20,6 +20,9 @@
 #define TCP_ACK_MAX_TIMEOUT_MS     800     // Max per-retry delay
 #define TCP_MAX_TOTAL_RETRY_TIME_MS 4000   // Retry attempts within 4s
 
+#define CLIENT_MIN_PORT 49152
+#define CLIENT_MAX_PORT 65535
+
 static uint32_t nextRetryTime = 0;
 static uint32_t retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
 static uint32_t retryTotalElapsed = 0;
@@ -80,7 +83,7 @@ void evaluateTcpPacket(void)
    if ((sourcePort != seccTcpPort) || (destinationPort != evccPort))
    {
       addToTrace(MOD_TCP, "[TCP] wrong port.");
-      log_v("%d %d %d %d",sourcePort,seccTcpPort,destinationPort, evccPort   );
+      log_v("%d %d %d %d",sourcePort,seccTcpPort,destinationPort, evccPort);
       return; /* wrong port */
    }
 
@@ -170,6 +173,8 @@ void tcp_connect(void)
 {
    addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting");
    setCheckpoint(301);
+   printf("evccPort:%d\r\n", evccPort);
+
    TcpTransmitPacket[20] = 0x02; /* options: 12 bytes, just copied from the Win10 notebook trace */
    TcpTransmitPacket[21] = 0x04;
    TcpTransmitPacket[22] = 0x05;
@@ -431,8 +436,17 @@ void tcp_Mainfunction(void)
    {
       /* SDP is finished, but no TCP connected yet. */
       /* use a new port */
-      evccPort++;
-      if (evccPort>65000) evccPort=60000;
+      if (evccPort == CLIENT_MAX_PORT)
+         evccPort = CLIENT_MIN_PORT;
+      else
+         evccPort++;
+
       tcp_connect();
    }
+}
+
+uint16_t setStartPort(uint32_t rand_num)
+{
+    evccPort = (rand_num % (CLIENT_MAX_PORT - CLIENT_MIN_PORT + 1)) + CLIENT_MIN_PORT;
+    return evccPort;
 }
