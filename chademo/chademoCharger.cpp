@@ -39,29 +39,26 @@ extern global_data _global;
 /// get estimated battery volt from target and soc.
 /// make a lot of assumtions:-)
 /// maxVolt = target - 10
-/// Based on Leaf/i-MiEV data.
+/// Based on Leaf data (soc from dash, volts from leafSpy).
+/// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// 
 /// nomVolt based on:
 /// Leaf: target: 410V, nomVolt: 355V
-/// i-MiEV: target: 360V, nomVolt: 330V
+/// i-MiEV: target: 370V, nomVolt: 330V
 /// </summary>
 float GetEstimatedBatteryVoltage(float target, float soc)
 {
     float maxVolt = target - 10;
-    float nomVolt = 0.5f * target + 150.0f; // Linear interpolation/extrapolation
+    float nomVolt = 0.625f * target + 98.75f;
     float minVolt = nomVolt - (maxVolt - nomVolt);
 
-    float deltaLow = 0.14f * (nomVolt - minVolt);   // Steeper drop below 20%
-    float deltaHigh = 0.10f * (maxVolt - nomVolt);  // Shallower rise above 80%
+    float deltaLow = 0.35f * (nomVolt - minVolt);
+    float deltaHigh = 0.55f * (maxVolt - nomVolt);
 
     float volt20 = nomVolt - deltaLow;
     float volt80 = nomVolt + deltaHigh;
 
-    if (soc < 20.0f)
-    {
-        return minVolt + (soc / 20.0f) * (volt20 - minVolt);
-    }
-    else if (soc < 50.0f)
+    if (soc < 50.0f)
     {
         return volt20 + ((soc - 20.0f) / 30.0f) * (nomVolt - volt20);
     }
