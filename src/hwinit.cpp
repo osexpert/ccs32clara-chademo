@@ -167,6 +167,19 @@ void can_setup(void) {
         true                // Enable filter
     );
 
+#if false
+
+    // Match 0x200 and 0x201
+    can_filter_id_mask_32bit_init(
+        1,              // Filter bank 1
+        (0x200 << 21),  // Match ID = 0x200, standard, data frame
+        (0x7FE << 21),  // Mask to ignore bit 0
+        0,
+        true
+    );
+
+#endif
+
     // FIFO Message Pending Interrupt Enable (FIFO 0) (RX)
     can_enable_irq(CAN1, CAN_IER_FMPIE0);
 }

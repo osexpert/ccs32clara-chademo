@@ -620,15 +620,23 @@ public:
         msg102 _msg102_isr = {};
         bool _msg110_pending = false;
         msg110 _msg110_isr = {};
+        bool _msg200_pending = false;
+        msg200 _msg200_isr = {};
+        bool _msg201_pending = false;
+        msg201 _msg201_isr = {};
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
         msg108 _msg108 = {};
         msg109 _msg109 = {};
         msg118 _msg118 = {};
+        msg208 _msg208 = {};
+        msg209 _msg209 = {};
 
         StopReason _stopReason = StopReason::NONE;
         ChargerState _state = ChargerState::Start;
 
         CarData _carData = {};
         ChargerData _chargerData = {};
+
+        bool _discharge = false;
 };

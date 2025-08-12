@@ -78,6 +78,8 @@ void ChademoCharger::HandlePendingCarMessages()
     static msg101 _msg101 = {};
     static msg102 _msg102 = {};
     static msg110 _msg110 = {};
+    static msg200 _msg200 = {};
+    static msg201 _msg201 = {};
 
     if (_msg100_pending)
     {
@@ -186,6 +188,29 @@ void ChademoCharger::HandlePendingCarMessages()
 
         ExtendedFunction1 extFun = (ExtendedFunction1)_msg110.m.ExtendedFunction1;
         _carData.SupportDynamicAvailableOutputCurrent = has_flag(extFun, ExtendedFunction1::DYNAMIC_CONTROL);
+    }
+    if (_msg200_pending)
+    {
+        _msg200_pending = false;
+
+        COMPARE_SET(_msg200.m.MaximumDischargeCurrentInverted, _msg200_isr.m.MaximumDischargeCurrentInverted, "[cha] 200.MaximumDischargeCurrentInverted changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "[cha] 200.Unused1 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "[cha] 200.Unused2 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "[cha] 200.Unused3 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "[cha] 200.MinimumDischargeVoltage changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "[cha] 200.MinimumBatteryDischargeLevel changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "[cha] 200.MaxRemainingCapacityForCharging changed 0x%x -> 0x%x\r\n");
+    }
+    if (_msg201_pending)
+    {
+        _msg201_pending = false;
+
+        COMPARE_SET(_msg201.m.V2HchargeDischargeSequenceNum, _msg201_isr.m.V2HchargeDischargeSequenceNum, "[cha] 201.V2HchargeDischargeSequenceNum changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "[cha] 201.ApproxDischargeCompletionTime changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "[cha] 201.AvailableVehicleEnergy changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "[cha] 201.Unused5 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.Unused6, _msg201_isr.m.Unused6, "[cha] 201.Unused6 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.Unused7, _msg201_isr.m.Unused7, "[cha] 201.Unused7 changed 0x%x -> 0x%x\r\n");
     }
 }
 
@@ -607,6 +632,18 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg110_isr.pair[0] = data[0];
         _msg110_isr.pair[1] = data[1];
     }
+    else if (id == 0x200)
+    {
+        _msg200_pending = true;
+        _msg200_isr.pair[0] = data[0];
+        _msg200_isr.pair[1] = data[1];
+    }
+    else if (id == 0x201)
+    {
+        _msg201_pending = true;
+        _msg201_isr.pair[0] = data[0];
+        _msg201_isr.pair[1] = data[1];
+    }
 }
 
 
@@ -691,6 +728,13 @@ void ChademoCharger::SendChargerMessages()
         can_transmit_blocking_fifo(CAN1, 0x109, 0x109 > 0x7FF, false, 8, _msg109.bytes);
 
         can_transmit_blocking_fifo(CAN1, 0x118, 0x118 > 0x7FF, false, 8, _msg118.bytes);
+
+        // if charger discharge is enabled? and car discharge enabled. and discharge enabled here?
+        if (_discharge)
+        {
+            can_transmit_blocking_fifo(CAN1, 0x208, 0x208 > 0x7FF, false, 8, _msg208.bytes);
+            can_transmit_blocking_fifo(CAN1, 0x209, 0x209 > 0x7FF, false, 8, _msg209.bytes);
+        }
     }
 }
 
