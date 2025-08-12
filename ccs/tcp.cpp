@@ -364,6 +364,7 @@ void tcp_reset()
 
     if (tcpState != TCP_STATE_CLOSED)
     {
+        addToTrace(MOD_TCP, "[TCP] sending RST");
         tcpHeaderLen = 20;  // no options
         tcpPayloadLen = 0;  // no payload
         TcpAckNr = 0; // not acknowledging any data
