@@ -182,7 +182,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
       L1 = p[2]; L1<<=8; L1+=p[3];
       /* The "inner" len, little endian. */
       L2 = p[9]; L2<<=8; L2+=p[8];
-      if ((p[4]=0xAA) && (p[5]=0xAA) && (p[6]=0xAA) && (p[7]=0xAA)
+      if ((p[4]==0xAA) && (p[5]==0xAA) && (p[6]==0xAA) && (p[7]==0xAA)
             && (L2+10==L1)) {
           counterOfEthFramesInSpiFrame++;
           /* The start of frame and the two length informations are plausible. Copy the payload to the eth receive buffer. */
@@ -387,7 +387,7 @@ void demoQCA7000(void) {
   {
       if (spiQCA7000checkForReceivedData())
       {
-          printf("QCA: recieved data after %d attempts\r\n", i + 1);
+          //printf("QCA: recieved data after %d attempts\r\n", i + 1);
           break;
       }
   }

@@ -356,6 +356,7 @@ static void pev_sendCurrentDemandReq(void)
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Unit_isUsed = 1;
    dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Value = 600; /* seconds */
 
+   // Charger 'Plugit HUBE S' wont work without maxes
 #define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
    req.EVMaximumVoltageLimit_isUsed = 1;
    setPhysicalValue(&req.EVMaximumVoltageLimit, Param::GetInt(Param::MaxVoltage), dinunitSymbolType_V, 0);
@@ -373,7 +374,7 @@ static void pev_sendWeldingDetectionReq(void)
    dinDocEnc.V2G_Message.Body.WeldingDetectionReq_isUsed = 1u;
    init_dinWeldingDetectionReqType(&dinDocEnc.V2G_Message.Body.WeldingDetectionReq);
 #define st dinDocEnc.V2G_Message.Body.WeldingDetectionReq.DC_EVStatus
-   st.EVReady = 1; /* 1 means true. We are ready. */
+   st.EVReady = 0; /* 0 means not ready to charge (we are done charging) */
    st.EVErrorCode = dinDC_EVErrorCodeType_NO_ERROR;
    st.EVRESSSOC = hardwareInterface_getSoc();
 #undef st
@@ -1115,13 +1116,6 @@ static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
 static void stateFunctionEnd(void)
 {
    /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
-
-   // Chademo uses StopReason to trigger power off pending, but StopReason is only set if CurrentDemand is reached.
-   // If for some reason CurrentDemand is never reached bebause of unknow bad things, make sure a StopReason is always set here, so we can power off faster.
-   if (Param::GetInt(Param::StopReason) == STOP_REASON_NONE)
-   {
-      Param::SetInt(Param::StopReason, STOP_REASON_UNKNOWN);
-   }
 }
 
 void translateOpModeToIsolationMonitor(void) {
@@ -1207,7 +1201,7 @@ void pevStateMachine_Mainfunction(void)
    pev_runFsm();
 }
 
-bool chademoInterface_isCcsEnded()
+bool chademoInterface_isCcsInStateEnd()
 {
     return Param::GetInt(Param::opmode) == PEV_STATE_End;
 }

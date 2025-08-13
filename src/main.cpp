@@ -201,13 +201,13 @@ void power_off_no_return(const char* reason)
     }
 }
 
-extern bool chademoInterface_isCcsEnded();
+extern bool chademoInterface_isCcsInStateEnd();
 
 bool ccs_isPowerOffOk()
 {
     // plug is unlocked right after welding detection, so can't use it reliably.
 
-    if (chademoInterface_isCcsEnded()) {
+    if (chademoInterface_isCcsInStateEnd()) {
         // if ended, power off is ok
         return true;
     }
@@ -249,6 +249,12 @@ void power_off_check()
             printf("Inactivity. Power off pending...\r\n");
         }
 
+        if (_global.ccsEnded)
+        {
+            _global.powerOffPending = true;
+            printf("Ccs ended. Power off pending...\r\n");
+        }
+
         int ccsStopReason = Param::GetInt(Param::StopReason);
         if (ccsStopReason != STOP_REASON_NONE)
         {
@@ -278,7 +284,6 @@ void power_off_check()
 
 void adc_battery_init(void)
 {
-    printf("ST_VREFINT_CAL:%u\r\n", ST_VREFINT_CAL);
     adc_enable_temperature_sensor(); // enables vrefint too
 
     gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
@@ -448,7 +453,7 @@ static void Ms30Task()
 
     ErrorMessage::SetTime(rtc_get_ms());
 
-    _global.ccsEnded = chademoInterface_isCcsEnded();
+    _global.ccsEnded = chademoInterface_isCcsInStateEnd();
     if (_global.ccsEnded)
         tcp_reset(); // kill the last connection, if any
 }

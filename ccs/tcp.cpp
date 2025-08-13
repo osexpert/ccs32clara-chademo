@@ -140,14 +140,6 @@ void evaluateTcpPacket(void)
       addToTrace(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
    }
 
-   // Detect TCP keepalive probe (zero payload, ACK flag set, sequence number == TcpAckNr - 1)
-   if ((tmpPayloadLen == 0) && (flags & TCP_FLAG_ACK) && (remoteSeqNr == TcpAckNr - 1))
-   {
-       addToTrace(MOD_TCP, "[TCP] keepalive probe received, sending ACK");
-       tcp_sendAck();  // Respond with normal ACK
-       return;
-   }
-
    if (flags & TCP_FLAG_ACK)
    {
        TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
