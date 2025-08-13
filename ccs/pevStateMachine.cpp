@@ -22,6 +22,7 @@
    STATE_ENTRY(WaitForCurrentDownAfterStateB, WaitCurrentDown, 0) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
+   STATE_ENTRY(WaitForTcpClosed, TcpClosed, 0) /* Handle timeout manually inside the handler */ \
    STATE_ENTRY(UnrecoverableError, Error, 0) \
    STATE_ENTRY(SequenceTimeout, Timeout, 0) \
    STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0) \
@@ -1046,15 +1047,28 @@ static void stateFunctionWaitForSessionStopResponse(void)
       if (dinDocDec.V2G_Message.Body.SessionStopRes_isUsed)
       {
          // req -508
-         // Todo: close the TCP connection here.
-         tcp_reset();
+         tcp_disconnect();
          publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
-         pev_enterState(PEV_STATE_End);
+         pev_enterState(PEV_STATE_WaitForTcpClosed);
       }
    }
 }
 
+static void stateFunctionWaitForTcpClosed(void)
+{
+    if (tcp_isClosed())
+    {
+        addToTrace(MOD_PEV, "Tcp is closed");
+        pev_enterState(PEV_STATE_End);
+    }
+    // Do not use the standard timeout handler, make little sense to go back to PEV_STATE_SequenceTimeout when we are already "done"?
+    else if (pev_cyclesInState > 33*2) /* 2sec */
+    {
+        addToTrace(MOD_PEV, "Tcp was not closed within 2 seconds");
+        pev_enterState(PEV_STATE_End);
+    }
+}
 
 static void stateFunctionSequenceTimeout(void)
 {
