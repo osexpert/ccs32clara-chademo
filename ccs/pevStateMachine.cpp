@@ -1063,7 +1063,7 @@ static void stateFunctionWaitForTcpClosed(void)
         pev_enterState(PEV_STATE_End);
     }
     // Do not use the standard timeout handler, make little sense to go back to PEV_STATE_SequenceTimeout when we are already "done"?
-    else if (pev_cyclesInState > 33*2) /* 2sec */
+    else if (pev_cyclesInState > (33*2)) /* 2sec */
     {
         addToTrace(MOD_PEV, "Tcp was not closed within 2 seconds");
         pev_enterState(PEV_STATE_End);
