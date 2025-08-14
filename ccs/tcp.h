@@ -20,9 +20,7 @@ extern "C" {
 extern void tcp_Mainfunction(void);
 extern void evaluateTcpPacket(void);
 extern uint32_t tcp_getTotalNumberOfRetries(void);
-extern void tcp_close(void);
 extern void tcp_transmit(void);
-extern void tcp_shutdown(void);
 extern uint16_t setPortStart(uint32_t rand_num);
 
 #ifdef __cplusplus

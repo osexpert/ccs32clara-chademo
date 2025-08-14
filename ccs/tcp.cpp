@@ -54,7 +54,6 @@ static void tcp_packRequestIntoIp(void);
 static void tcp_prepareTcpHeader(uint8_t tcpFlag);
 static void tcp_sendAck(void);
 static void tcp_sendFirstAck(void);
-static void tcp_sendFin(void);
 
 /*** functions *********************************************************************/
 uint32_t tcp_getTotalNumberOfRetries(void) {
@@ -115,6 +114,13 @@ void evaluateTcpPacket(void)
        return;
    }
 
+   if (flags & TCP_FLAG_FIN)
+   {
+       addToTrace(MOD_TCP, "[TCP] FIN received, closing connection");
+       tcpState = TCP_STATE_CLOSED;
+       return;
+   }
+
    if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK))   /* This is the connection setup response from the server. */
    {
       if (tcpState == TCP_STATE_SYN_SENT)
@@ -152,34 +158,12 @@ void evaluateTcpPacket(void)
 
            addToTrace(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
        }
-
-       // Detect TCP keepalive probe (zero payload, ACK flag set, sequence number == TcpAckNr - 1)
-       if ((tmpPayloadLen == 0) && (flags & TCP_FLAG_ACK) && (remoteSeqNr == TcpAckNr - 1))
-       {
-           addToTrace(MOD_TCP, "[TCP] keepalive probe received, sending ACK");
-           tcp_sendAck();  // Respond with normal ACK
-           return;
-       }
    }
 
    if (flags & TCP_FLAG_ACK)
    {
        TcpSeqNr = remoteAckNr;
        lastTransmitAckPending = false;
-   }
-
-   if (flags & TCP_FLAG_FIN)
-   {
-       addToTrace(MOD_TCP, "[TCP] FIN received");
-       TcpAckNr = remoteSeqNr + 1;
-       tcp_sendAck();
-
-       if (tcpState == TCP_STATE_ESTABLISHED)
-       {
-           // The server initiated FIN. Reply with FIN.
-           addToTrace(MOD_TCP, "[TCP] Passive close, reply with FIN");
-           tcp_sendFin(); // changes state to TCP_STATE_FIN_SENT
-       }
    }
 }
 
@@ -362,59 +346,6 @@ static void tcp_packRequestIntoEthernet(void)
    myEthTransmit();
 }
 
-void tcp_sendFin(void)
-{
-   addToTrace(MOD_TCP, "[TCP] Sending FIN");
-
-   tcpHeaderLen = 20;
-   tcpPayloadLen = 0;
-   tcp_prepareTcpHeader(TCP_FLAG_FIN | TCP_FLAG_ACK);
-   tcp_packRequestIntoIp();
-
-   TcpSeqNr++;  // FIN consumes one sequence number
-   tcpState = TCP_STATE_FIN_SENT;
-   lastTransmitAckPending = true;
-
-   retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
-   retryTotalElapsed = 0;
-   nextRetryTime = rtc_get_ms() + retryDelay;
-}
-
-void tcp_close(void)
-{
-    if (tcpState == TCP_STATE_ESTABLISHED) {
-        tcp_sendFin();
-    }
-}
-
-
-void tcp_reset()
-{
-    /* My Tesla v2 seem to run tcp over a queue that never times out,
-    at least it delivers messages to (currently) wrong ports, several days after my last visit.
-    But a brutal RST seems to do the trick. No more wrong port packages after this. */
-
-    if (tcpState != TCP_STATE_CLOSED)
-    {
-        addToTrace(MOD_TCP, "[TCP] Sending RST");
-
-        tcpHeaderLen = 20;  // no options
-        tcpPayloadLen = 0;  // no payload
-        TcpAckNr = 0; // not acknowledging any data
-        tcp_prepareTcpHeader(TCP_FLAG_RST);
-        tcp_packRequestIntoIp();
-        tcpState = TCP_STATE_CLOSED;  // close connection state
-    }
-
-    lastTransmitAckPending = false;
-}
-
-bool tcp_isConnected(void)
-{
-   return (tcpState == TCP_STATE_ESTABLISHED);
-}
-
-
 void tcp_checkRetry(void)
 {
     if (lastTransmitAckPending == false || tcpState == TCP_STATE_CLOSED)
@@ -426,7 +357,7 @@ void tcp_checkRetry(void)
         if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
         {
             addToTrace(MOD_TCP, "[TCP] Giving up the retry");
-            tcp_reset();
+            tcpState = TCP_STATE_CLOSED;
             return;
         }
 
@@ -446,16 +377,6 @@ void tcp_checkRetry(void)
     }
 }
 
-void tcp_shutdown()
-{
-   // Ideally, would set a deadline when sending FIN, then in tcp_Mainfunction, transition to CLOSED after deadline.
-   // Since were not reusing tcp after sending FIN, we can cut corners and use shutdown as deadline.
-   if (tcpState == TCP_STATE_FIN_SENT)
-      tcpState = TCP_STATE_CLOSED;
-   
-   tcp_reset();
-}
-
 void tcp_Mainfunction(void)
 {
    tcp_checkRetry();
@@ -463,7 +384,7 @@ void tcp_Mainfunction(void)
    if (connMgr_getConnectionLevel()<50)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
-      tcp_reset();
+      tcpState = TCP_STATE_CLOSED;
       return;
    }
 
