@@ -25,7 +25,7 @@ void modemFinder_Mainfunction(void) {
       return;
     }
     /* waiting time is expired. Lets look how many responses we got. */
-    addToTrace(MOD_MODEMFINDER, "[ModemFinder] Number of modems:", &numberOfSoftwareVersionResponses, 1);
+    addToTrace_bytes(MOD_MODEMFINDER, "[ModemFinder] Number of modems:", &numberOfSoftwareVersionResponses, 1);
     publishStatus("Modems:", String(numberOfSoftwareVersionResponses));
     if (numberOfSoftwareVersionResponses>0) {
       connMgr_ModemFinderOk(numberOfSoftwareVersionResponses);

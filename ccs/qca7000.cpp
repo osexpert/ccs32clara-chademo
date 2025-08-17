@@ -205,7 +205,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
             /* we log the ethernet traffic, but we stop logging it, when we entered the
                charging loop, to avoid spamming the log */
             if (checkpointNumber<700) {
-              addToTrace(MOD_ETHTRAFFIC, "ETH rx HP:", myethreceivebuffer, myethreceivebufferLen);
+              addToTrace_bytes(MOD_ETHTRAFFIC, "ETH rx HP:", myethreceivebuffer, myethreceivebufferLen);
             } else {
               /* We are in the charging loop or beyond. Do not log the ethernet traffic. */
             }
@@ -216,7 +216,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
             /* we log the ethernet traffic, but we stop logging it, when we entered the
                charging loop, to avoid spamming the log */
             if (checkpointNumber<700) {
-              addToTrace(MOD_ETHTRAFFIC, "ETH rx IP:", myethreceivebuffer, myethreceivebufferLen);
+              addToTrace_bytes(MOD_ETHTRAFFIC, "ETH rx IP:", myethreceivebuffer, myethreceivebufferLen);
             } else {
               /* We are in the charging loop or beyond. Do not log the ethernet traffic. */
             }
@@ -363,7 +363,7 @@ void myEthTransmit(void) {
   /* we log the ethernet traffic, but we stop logging it, when we entered the charging loop, to avoid
   spamming the log */
   if (checkpointNumber<700) {
-      addToTrace(MOD_ETHTRAFFIC, "ETH will transmit:", myethtransmitbuffer, myethtransmitbufferLen);
+      addToTrace_bytes(MOD_ETHTRAFFIC, "ETH will transmit:", myethtransmitbuffer, myethtransmitbufferLen);
   } else {
       /* We are in the charging loop or beyond. Do not log the ethernet traffic. */
   }
