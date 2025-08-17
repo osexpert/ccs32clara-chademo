@@ -132,7 +132,7 @@ void evaluateTcpPacket(void)
       data would end up in the myethreceivebuffer (e.g. neighbour solicitation, or TCP traffic with other ports),
       the overwritten myethreceivebuffer would lead to not seeing the tcp_rxdata anymore, if this would be just
       a pointer to myethreceivebuffer[74]. */
-      memcpy(tcp_rxdata, &myethreceivebuffer[74], tcp_rxdataLen);  /* provide the received data to the application */
+      memcpy(tcp_rxdata, &myethreceivebuffer[54 + hdrLen], tcp_rxdataLen);  /* provide the received data to the application */
       connMgr_TcpOk();
       TcpAckNr = remoteSeqNr+tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
       tcp_sendAck();
@@ -173,12 +173,7 @@ void tcp_connect(void)
    TcpTransmitPacket[22] = 0x05; // MSS = 0x05A0 = 1440 bytes
    TcpTransmitPacket[23] = 0xA0;
 
-   TcpTransmitPacket[24] = 0x01; // Kind: 1 = NOP
-   TcpTransmitPacket[25] = 0x03; // Kind: 3 = Window Scale
-   TcpTransmitPacket[26] = 0x03; // Length: 3
-   TcpTransmitPacket[27] = 0x08; // Shift count = 8 (2^8 = 256x window)
-
-   tcpHeaderLen = 28; /* 20 bytes normal header, plus 8 bytes options */
+   tcpHeaderLen = 24; /* 20 bytes normal header, plus 4 bytes options */
    tcpPayloadLen = 0;   /* only the TCP header, no data is in the connect message. */
    tcp_prepareTcpHeader(TCP_FLAG_SYN);
    tcp_packRequestIntoIp();
@@ -249,7 +244,7 @@ static void tcp_prepareTcpHeader(uint8_t tcpFlag)
 {
    uint16_t checksum;
 
-   // # TCP header needs at least 24 bytes:
+   // # TCP header needs at least 20 bytes:
    // 2 bytes source port
    // 2 bytes destination port
    // 4 bytes sequence number
@@ -365,7 +360,7 @@ void tcp_reset()
         tcpState = TCP_STATE_CLOSED;  // close connection state
     }
 
-	lastTransmitAckPending = false;
+    lastTransmitAckPending = false;
 }
 
 bool tcp_isClosed(void)
