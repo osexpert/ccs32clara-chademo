@@ -89,7 +89,7 @@ void evaluateUdpPayload(void) {
             }
          }
          else {
-            printf("v2gptPayloadType %x not supported\r\n", v2gptPayloadType);
+            addToTrace(MOD_SDP, "v2gptPayloadType 0x%x not supported", v2gptPayloadType);
          }
       }
    }

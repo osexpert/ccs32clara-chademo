@@ -19,6 +19,8 @@
 #ifndef PRINTF_H_INCLUDED
 #define PRINTF_H_INCLUDED
 
+#include <stdarg.h>
+
 #if T_DEBUG
 #define debugf(...) printf(__VA_ARGS__)
 #else
@@ -35,6 +37,6 @@ public:
 int printf(const char *format, ...);
 int sprintf(char *out, const char *format, ...);
 int fprintf(IPutChar* put, const char *format, ...);
-
+int vprintf(const char* format, va_list args);
 
 #endif // PRINTF_H_INCLUDED

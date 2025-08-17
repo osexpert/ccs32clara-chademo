@@ -224,7 +224,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
           } else {
             //Serial.println("Other message.");
             /* We do not log other messages, to avoid too much logging traffic. If needed, enable the logging,
-            by commenting-in this: addToTrace(MOD_ETHTRAFFIC, "ETH rx other:", myethreceivebuffer, myethreceivebufferLen);
+            by commenting-in this: addToTrace_bytes(MOD_ETHTRAFFIC, "ETH rx other:", myethreceivebuffer, myethreceivebufferLen);
             */
           }
           

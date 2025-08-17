@@ -139,8 +139,8 @@ void hardwareInterface_resetSimulation(void)
 /* send the measured CP duty cycle and PP resistance etc to the serial console for debugging. */
 void hardwareInterface_LogTheCpPpPhysicalData(void) 
 {
-//      addToTrace(MOD_HWIF, "cpDuty [%] ", (int16_t)Param::GetInt(Param::ControlPilotDuty));
-//      addToTrace(MOD_HWIF, "AdcProximityPilot ", (int16_t)Param::GetInt(Param::AdcProximityPilot));
-//      addToTrace(MOD_HWIF, "ResistanceProxPilot [ohm] ", (int16_t)Param::GetInt(Param::ResistanceProxPilot));
-//      addToTrace(MOD_HWIF, "HardwareVariant ", (int16_t)Param::GetInt(Param::HardwareVariant));
+//      addToTrace(MOD_HWIF, "cpDuty [%] %d", Param::GetInt(Param::ControlPilotDuty));
+//      addToTrace(MOD_HWIF, "AdcProximityPilot %d", Param::GetInt(Param::AdcProximityPilot));
+//      addToTrace(MOD_HWIF, "ResistanceProxPilot [ohm] %d", Param::GetInt(Param::ResistanceProxPilot));
+//      addToTrace(MOD_HWIF, "HardwareVariant %d", Param::GetInt(Param::HardwareVariant));
 }

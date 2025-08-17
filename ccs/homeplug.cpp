@@ -268,7 +268,7 @@ static void evaluateAttenCharInd(void)
    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received ATTEN_CHAR.IND");
    if (iAmPev==1)
    {
-      //addToTrace("[PEVSLAC] received AttenCharInd in state " + str(pevSequenceState))
+      //addToTrace("[PEVSLAC] received AttenCharInd in state %d", pevSequenceState);
       if (pevSequenceState==STATE_WAIT_FOR_ATTEN_CHAR_IND)   // we were waiting for the AttenCharInd
       {
          //todo: Handle the case when we receive multiple responses from different chargers.
@@ -279,7 +279,7 @@ static void evaluateAttenCharInd(void)
             evseMac[i] = myethreceivebuffer[6+i]; // source MAC starts at offset 6
          }
          AttenCharIndNumberOfSounds = myethreceivebuffer[69];
-         //addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): " + str(AttenCharIndNumberOfSounds))
+         //addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): %d", AttenCharIndNumberOfSounds);
          composeAttenCharRsp();
          addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
          setCheckpoint(140);
@@ -456,7 +456,7 @@ static void evaluateSetKeyCnf(void)
    }
    else
    {
-      printf("[%d] [PEVSLAC] SetKeyCnf says %d, this is formally 'rejected', but indeed ok.\r\n", rtc_get_ms(), result);
+      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says %d, this is formally 'rejected', but indeed ok.", result);
       publishStatus("modem is", "restarting");
       connMgr_SlacOk();
    }
@@ -507,7 +507,6 @@ void evaluateGetSwCnf(void)
    /* The GET_SW confirmation. This contains the software version of the homeplug modem.
       Reference: see wireshark interpreted frame from TPlink, Ioniq and Alpitronic charger */
    uint8_t i, x;
-   char strMac[20];
    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received GET_SW.CNF");
    numberOfSoftwareVersionResponses+=1;
    for (i=0; i<6; i++)
@@ -530,12 +529,9 @@ void evaluateGetSwCnf(void)
          strVersion[i]=x;
       }
       strVersion[i] = 0;
-      if (Param::GetInt(Param::logging) & MOD_HOMEPLUG) {
-         sprintf(strMac, "%02x:%02x:%02x:%02x:%02x:%02x", sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5]);
-         printf("For MAC %s ", strMac);
-         printf("software version %s\r\n", strVersion);
-      }
-      //addToTrace("For " + strMac + " the software version is " + String(strVersion));
+      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
+          sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
+          strVersion);
 #ifdef DEMO_SHOW_MODEM_SOFTWARE_VERSION_ON_OLED
       StringVersion = String(strVersion);
       Serial.println("For " + strMac + " the software version is " + StringVersion);
@@ -558,8 +554,7 @@ uint8_t isEvseModemFound(void)
 
 void slac_enterState(int n)
 {
-   if (Param::GetInt(Param::logging) & MOD_HOMEPLUG)
-      printf("[%d] [PEVSLAC] from %d entering %d\r\n", rtc_get_ms(), pevSequenceState, n);
+   addToTrace(MOD_HOMEPLUG, "[PEVSLAC] from %d entering %d", pevSequenceState, n);
    pevSequenceState = n;
    pevSequenceCyclesInState = 0;
 }
@@ -882,7 +877,7 @@ int homeplug_sanityCheck(void)
 {
    if (pevSequenceState>STATE_SDP)
    {
-      //addToTrace("ERROR: Sanity check of the homeplug state machine failed." + String(pevSequenceState));
+      //addToTrace("ERROR: Sanity check of the homeplug state machine failed: %d", pevSequenceState);
       addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the homeplug state machine failed.");
       return -1;
    }

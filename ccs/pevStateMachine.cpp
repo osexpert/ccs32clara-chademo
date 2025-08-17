@@ -148,12 +148,12 @@ static void addV2GTPHeaderAndTransmit(const uint8_t *exiBuffer, uint8_t exiBuffe
 static void encodeAndTransmit(void)
 {
    /* calls the EXI encoder, adds the V2GTP header and sends the result to ethernet */
-   //addToTrace("before: g_errn=" + String(g_errn));
-   //addToTrace("global_streamEncPos=" + String(global_streamEncPos));
+   //addToTrace("before: g_errn=%d", g_errn);
+   //addToTrace("global_streamEncPos=%d", global_streamEncPos);
    global_streamEncPos = 0;
    projectExiConnector_encode_DinExiDocument();
-   //addToTrace("after: g_errn=" + String(g_errn));
-   //addToTrace("global_streamEncPos=" + String(global_streamEncPos));
+   //addToTrace("after: g_errn=%d", g_errn);
+   //addToTrace("global_streamEncPos=%d", global_streamEncPos);
 #ifdef VERBOSE_EXI_DECODER
    showAsHex(global_streamEnc.data, global_streamEncPos, "encoded exi");
 #endif
@@ -324,7 +324,7 @@ static void pev_sendCurrentDemandReq(void)
           is more a workaround than a solution, because a physical overshoot may still lead to
           emergency shutdown. The solution is to choose an appropriate value of Param::MaxVoltage. */
        UTarget=EVMaximumVoltageLimit-1;
-       printf("Warning: TargetVoltage %dV is near to EVMaximumVoltageLimit %dV, which may cause charger shutdown.\r\n",
+       addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is near to EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
               UTarget, EVMaximumVoltageLimit);
    }
 #define tvolt dinDocEnc.V2G_Message.Body.CurrentDemandReq.EVTargetVoltage
@@ -410,8 +410,7 @@ static void stateFunctionWaitForSupportedApplicationProtocolResponse(void)
       if (aphsDoc.supportedAppProtocolRes_isUsed)
       {
          /* it is the correct response */
-         addToTrace(MOD_PEV, "supportedAppProtocolRes");
-         printf("ResponseCode %d, SchemaID_isUsed %d, SchemaID %d\r\n",
+         addToTrace(MOD_PEV, "supportedAppProtocolRes ResponseCode:%d, SchemaID_isUsed:%d, SchemaID:%d",
                 aphsDoc.supportedAppProtocolRes.ResponseCode,
                 aphsDoc.supportedAppProtocolRes.SchemaID_isUsed,
                 aphsDoc.supportedAppProtocolRes.SchemaID);
@@ -458,8 +457,8 @@ static void stateFunctionWaitForSessionSetupResponse(void)
       routeDecoderInputData();
       projectExiConnector_decode_DinExiDocument();
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
-      //addToTrace("after decoding: g_errn=" + String(g_errn));
-      //addToTrace("global_streamDecPos=" + String(global_streamDecPos));
+      //addToTrace("after decoding: g_errn=%d", g_errn);
+      //addToTrace("global_streamDecPos=%d", global_streamDecPos);
       if (dinDocDec.V2G_Message.Body.SessionSetupRes_isUsed)
       {
          memcpy(sessionId, dinDocDec.V2G_Message.Header.SessionID.bytes, SESSIONID_LEN);
@@ -567,8 +566,7 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
                // Try again.
                pev_numberOfContractAuthenticationReq += 1; // count the number of tries.
                publishStatus("Waiting f Auth", "");
-               //addToTrace("Not (yet) finished. Will again send ContractAuthenticationReq #" + String(pev_numberOfContractAuthenticationReq));
-               addToTrace(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq");
+               addToTrace(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq #%d", pev_numberOfContractAuthenticationReq);
                encodeAndTransmit();
                // We just stay in the same state, until the timeout elapses.
                pev_enterState(PEV_STATE_WaitForContractAuthenticationResponse);
@@ -632,8 +630,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                /* approx 60 seconds, should be sufficient for the charger to find its parameters.
                    ... The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from
                        https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
-               //addToTrace("ChargeParameterDiscovery lasted too long. " + String(pev_numberOfChargeParameterDiscoveryReq) + " Giving up.");
-               addToTrace(MOD_PEV, "ChargeParameterDiscovery lasted too long. Giving up.");
+               addToTrace(MOD_PEV, "ChargeParameterDiscovery lasted too long:%d Giving up.", pev_numberOfChargeParameterDiscoveryReq);
                pev_enterState(PEV_STATE_SequenceTimeout);
             }
             else
@@ -641,8 +638,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                // Try again.
                pev_numberOfChargeParameterDiscoveryReq += 1; // count the number of tries.
                publishStatus("disc ChargeParams", "");
-               //addToTrace("Not (yet) finished. Will again send ChargeParameterDiscoveryReq #" + String(pev_numberOfChargeParameterDiscoveryReq));
-               addToTrace(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq");
+               addToTrace(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq #%d", pev_numberOfChargeParameterDiscoveryReq);
                pev_sendChargeParameterDiscoveryReq();
                // we stay in the same state
                pev_enterState(PEV_STATE_WaitForChargeParameterDiscoveryResponse);
@@ -675,7 +671,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
    }
    if (tcp_rxdataLen>V2GTP_HEADER_SIZE)
    {
-      //addToTrace(MOD_PEV, "In state WaitForCableCheckResponse, received:");
+      //addToTrace_bytes(MOD_PEV, "In state WaitForCableCheckResponse, received:", tcp_rxdata, tcp_rxdataLen);
       routeDecoderInputData();
       projectExiConnector_decode_DinExiDocument();
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
@@ -684,7 +680,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
          rc = dinDocDec.V2G_Message.Body.CableCheckRes.ResponseCode;
          proc = dinDocDec.V2G_Message.Body.CableCheckRes.EVSEProcessing;
          Param::SetInt(Param::EvseVoltage, 0);
-         //addToTrace("The CableCheck result is " + String(rc) + " " + String(proc));
+         //addToTrace("The CableCheck result is %d %d", rc, proc);
          // We have two cases here:
          // 1) The charger says "cable check is finished and cable ok", by setting ResponseCode=OK and EVSEProcessing=Finished.
          // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
@@ -703,8 +699,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
          {
             if (pev_numberOfCableCheckReq>60)   /* approx 60s should be sufficient for cable check. The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
             {
-               //addToTrace("CableCheck lasted too long. " + String(pev_numberOfCableCheckReq) + " Giving up.");
-               addToTrace(MOD_PEV, "CableCheck lasted too long. Giving up.");
+               addToTrace(MOD_PEV, "CableCheck lasted too long:%d Giving up.", pev_numberOfCableCheckReq);
                pev_enterState(PEV_STATE_SequenceTimeout);
             }
             else
@@ -732,7 +727,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
    }
    if (tcp_rxdataLen>V2GTP_HEADER_SIZE)
    {
-      //addToTrace(MOD_PEV, "In state WaitForPreChargeResponse, received:");
+      //addToTrace_bytes(MOD_PEV, "In state WaitForPreChargeResponse, received:", tcp_rxdata, tcp_rxdataLen);
       routeDecoderInputData();
       projectExiConnector_decode_DinExiDocument();
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
@@ -745,9 +740,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
          uint16_t inletVtg = hardwareInterface_getInletVoltage();
          uint16_t batVtg = hardwareInterface_getAccuVoltage();
 
-         if (Param::GetInt(Param::logging) & MOD_PEV) {
-             printf("PreCharge aknowledge received. Inlet %dV, accu %dV, uMin %dV\r\n", inletVtg, batVtg, EVSEMinimumVoltage);
-         }
+         addToTrace(MOD_PEV, "PreCharge aknowledge received. Inlet %dV, accu %dV, uMin %dV", inletVtg, batVtg, EVSEMinimumVoltage);
          if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && chademoInterface_preChargeCompleted())
          {
             addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
@@ -808,14 +801,14 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
 {
    if (tcp_rxdataLen>V2GTP_HEADER_SIZE)
    {
-      //addToTrace(MOD_PEV, "In state WaitForPowerDeliveryRes, received:");
+      //addToTrace_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
       routeDecoderInputData();
       projectExiConnector_decode_DinExiDocument();
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed)
       {
          // chatgpt: FAILED_PowerDeliveryNotApplied may require looping until ok?
-         printf("PowerDeliveryRes ResponseCode:%d\r\n", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+         addToTrace(MOD_PEV, "PowerDeliveryRes ResponseCode:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
 
          if (pev_wasPowerDeliveryRequestedOn)
          {
@@ -837,8 +830,7 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
             hardwareInterface_setStateB(); /* ISO Figure 107: The PEV shall set stateB after receiving PowerDeliveryRes and before WeldingDetectionReq */
             addToTrace(MOD_PEV, "Giving the charger some time to detect StateB and ramp down the current.");
             pev_DelayCycles = 10; /* 15*30ms=450ms for charger shutdown. Should be more than sufficient, because somewhere was a requirement with 20ms between StateB until current is down. The Ioniq uses 300ms. */
-            pev_enterState(PEV_STATE_WaitForCurrentDownAfterStateB); /* We give the charger some time to detect the StateB and fully ramp down
-                                                             the current */
+            pev_enterState(PEV_STATE_WaitForCurrentDownAfterStateB); /* We give the charger some time to detect the StateB and fully ramp down the current */
          }
       }
    }
@@ -870,14 +862,11 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
 {
    if (tcp_rxdataLen>V2GTP_HEADER_SIZE)
    {
-      //addToTrace(MOD_PEV, "In state WaitForCurrentDemandRes, received:");
-      //showAsHex(tcp_rxdata, tcp_rxdataLen, "");
+      //addToTrace_bytes(MOD_PEV, "In state WaitForCurrentDemandRes, received:", tcp_rxdata, tcp_rxdataLen);
       routeDecoderInputData();
-      //printf("[%d] step1 %d\r\n", rtc_get_ms(), tcp_rxdataLen);
+      //addToTrace(MOD_PEV, "step1 %d", tcp_rxdataLen);
       projectExiConnector_decode_DinExiDocument();
-
-      //printf("[%d] step2 %d %d\r\n", rtc_get_ms(), g_errn, global_streamDecPos);
-
+      //addToTrace(MOD_PEV, "step2 %d %d", g_errn, global_streamDecPos);
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed)
       {
@@ -898,8 +887,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
          {
             /* If the charger reports a malfunction, we stop the charging. */
             /* Issue reference: https://github.com/uhi22/ccs32clara/issues/29 */
-            addToTrace(MOD_PEV,
-              "Charger reported EVSE_Malfunction. A reason could be hitting the EVMaximumVoltageLimit or EVSEMaximumVoltageLimit.");
+            addToTrace(MOD_PEV, "Charger reported EVSE_Malfunction. A reason could be hitting the EVMaximumVoltageLimit or EVSEMaximumVoltageLimit.");
             pev_wasPowerDeliveryRequestedOn=0;
             setCheckpoint(800);
             pev_sendPowerDeliveryReq(0);
@@ -990,9 +978,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
            need to repeat the requests, until the voltage is at a non-dangerous level. */
          EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
          Param::SetFloat(Param::EvseVoltage, EVSEPresentVoltage);
-         if (Param::GetInt(Param::logging) & MOD_PEV) {
-             printf("EVSEPresentVoltage %dV\r\n", (int)EVSEPresentVoltage);
-         }
+         addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", (int)EVSEPresentVoltage);
          if (EVSEPresentVoltage<MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION) {
             /* voltage is low, weldingDetection finished successfully. */
             publishStatus("WeldingDet done", "");
@@ -1016,7 +1002,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
              /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
              if (numberOfWeldingDetectionRounds<MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
                  /* max number of rounds not yet reached */
-                 addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq.");
+                 addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
                  numberOfWeldingDetectionRounds++; /* https://github.com/uhi22/ccs32clara/issues/55
                                                       Count the number of welding detection rounds. To be clarified, whether
                                                       a certain time or number of rounds make sense to cover all use cases with
@@ -1143,7 +1129,7 @@ void translateOpModeToIsolationMonitor(void) {
 
 static void pev_enterState(pevstates n)
 {
-   //printf("[%d] [PEV] from %d entering %d\r\n", rtc_get_ms(), pev_state, n);
+   //addToTrace("[PEV] from %d entering %d", pev_state, n);
    pev_state = n;
    pev_cyclesInState = 0;
    Param::SetInt(Param::opmode, n);

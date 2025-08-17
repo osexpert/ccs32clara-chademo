@@ -38,9 +38,7 @@ uint8_t connMgr_getConnectionLevel(void)
 
 void connMgr_printDebugInfos(void)
 {
-   if (Param::GetInt(Param::logging) & MOD_CONNMGR)
-      printf("[%u] [CONNMGR] %d %d %d %d %d %d %d --> %d\r\n",
-             rtc_get_ms(),
+   addToTrace(MOD_CONNMGR, "[CONNMGR] %d %d %d %d %d %d %d --> %d",
              connMgr_timerEthLink,  /* the timeout counter for "ethernet is up". Not meaningful, because Foccci modem is hardwired via SPI. */
              connMgr_timerModemLocal, /* the timeout counter for the local QCA modem */
              connMgr_timerModemRemote, /* the timeout counter for the remote modem */
@@ -77,8 +75,7 @@ void connMgr_Mainfunction(void)
 
    if (connMgr_ConnectionLevelOld!=connMgr_ConnectionLevel)
    {
-      if (Param::GetInt(Param::logging) & MOD_CONNMGR)
-         printf("[%u] [CONNMGR] ConnectionLevel changed from %d to %d.\r\n", rtc_get_ms(), connMgr_ConnectionLevelOld, connMgr_ConnectionLevel);
+      addToTrace(MOD_CONNMGR, "[CONNMGR] ConnectionLevel changed from %d to %d.", connMgr_ConnectionLevelOld, connMgr_ConnectionLevel);
       connMgr_ConnectionLevelOld = connMgr_ConnectionLevel;
    }
    if ((connMgr_cycles % 33)==0)

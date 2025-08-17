@@ -11,18 +11,33 @@ void setCheckpoint(uint16_t newcheckpoint) {
     Param::SetInt(Param::checkpoint, newcheckpoint);
 }
 
-void addToTrace(enum Module module, const char * s) {
-   if (Param::GetInt(Param::logging) & module)
-      printf("[%u] %s\r\n", rtc_get_ms(), s);
+void addToTrace(enum Module module, const char* format, ...) {
+    if (Param::GetInt(Param::logging) & module)
+    {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+
+        printf("\r\n");
+    }
 }
 
 void addToTrace_bytes(enum Module module, const char * s, uint8_t* data, uint16_t len) {
    if (Param::GetInt(Param::logging) & module) {
-      printf("[%u] %s ", rtc_get_ms(), s);
+      printf("%s ", s);
       for (uint16_t i = 0; i < len; i++)
          printf("%02x", data[i]);
       printf("\r\n");
    }
+}
+
+void showAsHex(uint8_t* arr, uint16_t len, const char* info)
+{
+    printf("%s has %d bytes: ", info, len);
+    for (uint16_t i = 0; i < len; ++i) {
+        printf("%02X", arr[i]);
+    }
+    printf("\r\n");
 }
 
 void sanityCheck(const char*) {
@@ -41,11 +56,3 @@ extern "C" void* memcpy(void* __restrict target, const void* __restrict source, 
     return dst;
 };
 
-void showAsHex(uint8_t* arr, uint16_t len, const char* info) 
-{
-    printf("%s has %d bytes:", info, len);
-    for (uint16_t i = 0; i < len; ++i) {
-        printf(" %02X", arr[i]);
-    }
-    printf("\r\n");
-}

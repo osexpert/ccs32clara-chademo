@@ -82,8 +82,7 @@ void evaluateTcpPacket(void)
    destinationPort = (((uint16_t)myethreceivebuffer[56])<<8) +  myethreceivebuffer[57];
    if ((sourcePort != seccTcpPort) || (destinationPort != evccPort))
    {
-      addToTrace(MOD_TCP, "[TCP] wrong port.");
-      log_v("%d %d %d %d",sourcePort,seccTcpPort,destinationPort, evccPort);
+      addToTrace(MOD_TCP, "[TCP] wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
       return; /* wrong port */
    }
 
@@ -163,9 +162,8 @@ void evaluateTcpPacket(void)
 
 void tcp_connect(void)
 {
-   addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting");
+   addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting from %d", evccPort);
    setCheckpoint(301);
-   printf("evccPort:%d\r\n", evccPort);
 
    // options
    TcpTransmitPacket[20] = 0x02; // Kind: 2 = Maximum Segment Size (MSS)

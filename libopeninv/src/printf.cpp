@@ -132,9 +132,7 @@ static int printi(IPutChar* put, int i, int b, int sg, int width, int pad, int l
 static int printfp(IPutChar* put, float* f, int width, int pad)
 {
 	char print_buf[PRINT_BUF_LEN];
-
 	my_ftoa(print_buf, *f);
-
 	return prints (put, print_buf, width, pad);
 }
 
@@ -205,11 +203,16 @@ static int print(IPutChar* put, const char *format, va_list args )
 	return pc;
 }
 
+int vprintf(const char* format, va_list args)
+{
+	ExternPutChar pc;
+	return print(&pc, format, args);
+}
+
 int printf(const char *format, ...)
 {
    ExternPutChar pc;
    va_list args;
-
    va_start( args, format );
    return print( &pc, format, args );
 }
@@ -218,21 +221,15 @@ int sprintf(char *out, const char *format, ...)
 {
    StringPutChar pc(out);
    va_list args;
-
    va_start( args, format );
-
    int ret = print( &pc, format, args );
-
    pc.PutChar(0);
-
    return ret;
 }
 
 int fprintf(IPutChar* put, const char *format, ...)
 {
    va_list args;
-
    va_start( args, format );
-
    return print( put, format, args );
 }
