@@ -4,7 +4,7 @@
 
 #define NEXT_TCP 0x06 /* the next protocol is TCP */
 
-#define TCP_FLAG_FIN 0x01
+#define TCP_FLAG_FIN 0x01 // "I am done sending data, but can still recieve"
 #define TCP_FLAG_SYN 0x02
 #define TCP_FLAG_RST 0x04
 #define TCP_FLAG_PSH 0x08
@@ -52,7 +52,6 @@ static void tcp_packRequestIntoEthernet(void);
 static void tcp_packRequestIntoIp(void);
 static void tcp_prepareTcpHeader(uint8_t tcpFlag);
 static void tcp_sendAck(void);
-static void tcp_sendFirstAck(void);
 
 /*** functions *********************************************************************/
 uint32_t tcp_getTotalNumberOfRetries(void) {
@@ -97,31 +96,42 @@ void evaluateTcpPacket(void)
       (((uint32_t)myethreceivebuffer[64])<<8) +
       (((uint32_t)myethreceivebuffer[65]));
    flags = myethreceivebuffer[67];
-   if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK))   /* This is the connection setup response from the server. */
+
+   if (flags & TCP_FLAG_RST)
    {
-      if (tcpState == TCP_STATE_SYN_SENT)
+       addToTrace(MOD_TCP, "[TCP] RST received, closing connection");
+       tcpState = TCP_STATE_CLOSED;
+       return;
+   }
+
+   /* It is no connection setup. We can have the following situations here: */
+   if (tcpState == TCP_STATE_CLOSED)
+   {
+       /* received something while the connection is closed. Just ignore it. */
+       addToTrace(MOD_TCP, "[TCP] ignore, not connected.");
+       return;
+   }
+
+   if (tcpState == TCP_STATE_SYN_SENT)
+   {
+      if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK))   /* This is the connection setup response from the server. */
       {
          TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
          TcpAckNr = remoteSeqNr+1; /* The ACK number of our next transmit packet is one more than the received seq number. */
          setCheckpoint(303);
          tcpState = TCP_STATE_ESTABLISHED;
-         tcp_sendFirstAck();
+         tcp_sendAck();
          connMgr_TcpOk();
          addToTrace(MOD_TCP, "[TCP] connected.");
       }
+      // Ignore everything else
       return;
    }
-   /* It is no connection setup. We can have the following situations here: */
-   if (tcpState != TCP_STATE_ESTABLISHED)
-   {
-      /* received something while the connection is closed. Just ignore it. */
-      addToTrace(MOD_TCP, "[TCP] ignore, not connected.");
-      return;
-   }
+
    /* It can be an ACK, or a data package, or a combination of both. We treat the ACK and the data independent from each other,
      to treat each combination. */
    //log_v("L=%d", tmpPayloadLen);
-   if ((tmpPayloadLen>0) && (tmpPayloadLen<TCP_RX_DATA_LEN))
+   if ((tmpPayloadLen > 0) && (tmpPayloadLen < TCP_RX_DATA_LEN))
    {
       /* This is a data transfer packet. */
       tcp_rxdataLen = tmpPayloadLen;
@@ -133,7 +143,7 @@ void evaluateTcpPacket(void)
       a pointer to myethreceivebuffer[74]. */
       memcpy(tcp_rxdata, &myethreceivebuffer[54 + hdrLen], tcp_rxdataLen);  /* provide the received data to the application */
       connMgr_TcpOk();
-      TcpAckNr = remoteSeqNr+tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
+      TcpAckNr = remoteSeqNr + tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
       tcp_sendAck();
 
       addToTrace_bytes(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
@@ -145,15 +155,9 @@ void evaluateTcpPacket(void)
        lastTransmitAckPending = false;
    }
 
-   if (flags & TCP_FLAG_RST)
-   {
-       addToTrace(MOD_TCP, "[TCP] RST received, closing connection");
-       tcpState = TCP_STATE_CLOSED;
-   }
-
    if (flags & TCP_FLAG_FIN)
    {
-       addToTrace(MOD_TCP, "[TCP] FIN received, sending final ACK");
+       addToTrace(MOD_TCP, "[TCP] FIN received, sending ACK, closing connection");
        TcpAckNr = remoteSeqNr + 1;
        tcp_sendAck();
        tcpState = TCP_STATE_CLOSED;
@@ -178,15 +182,6 @@ void tcp_connect(void)
    tcpState = TCP_STATE_SYN_SENT;
 }
 
-static void tcp_sendFirstAck(void)
-{
-   addToTrace(MOD_TCP, "[TCP] sending first ACK");
-   tcpHeaderLen = 20; /* 20 bytes normal header, no options */
-   tcpPayloadLen = 0;   /* only the TCP header, no data is in the first ACK message. */
-   tcp_prepareTcpHeader(TCP_FLAG_ACK);
-   tcp_packRequestIntoIp();
-}
-
 static void tcp_sendAck(void)
 {
 //   addToTrace(MOD_TCP, "[TCP] sending ACK");
@@ -194,6 +189,14 @@ static void tcp_sendAck(void)
    tcpPayloadLen = 0;   /* only the TCP header, no data is in the first ACK message. */
    tcp_prepareTcpHeader(TCP_FLAG_ACK);
    tcp_packRequestIntoIp();
+}
+
+static void tcp_setRetry()
+{
+    lastTransmitAckPending = true;
+    retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
+    retryTotalElapsed = 0;
+    nextRetryTime = rtc_get_ms() + retryDelay;
 }
 
 void tcp_transmit(void)
@@ -208,11 +211,7 @@ void tcp_transmit(void)
           addToTrace_bytes(MOD_TCPTRAFFIC, "TCP will transmit:", tcpPayload, tcpPayloadLen);
           tcp_prepareTcpHeader(TCP_FLAG_PSH + TCP_FLAG_ACK); /* data packets are always sent with flags PUSH and ACK. */
           tcp_packRequestIntoIp();
-
-          lastTransmitAckPending = true; 
-          retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
-          retryTotalElapsed = 0;
-          nextRetryTime = rtc_get_ms() + retryDelay;
+          tcp_setRetry();
       }
       else
       {
@@ -220,23 +219,6 @@ void tcp_transmit(void)
       }
    }
 }
-
-
-void tcp_testSendData(void)
-{
-   if (tcpState == TCP_STATE_ESTABLISHED)
-   {
-      addToTrace(MOD_TCP, "[TCP] sending data");
-      tcpHeaderLen = 20; /* 20 bytes normal header, no options */
-      tcpPayloadLen = 3;   /* demo length */
-      TcpTransmitPacket[tcpHeaderLen] = 0x55; /* demo data */
-      TcpTransmitPacket[tcpHeaderLen+1] = 0xAA; /* demo data */
-      TcpTransmitPacket[tcpHeaderLen+2] = 0xBB; /* demo data */
-      tcp_prepareTcpHeader(TCP_FLAG_PSH + TCP_FLAG_ACK); /* data packets are always sent with flags PUSH and ACK. */
-      tcp_packRequestIntoIp();
-   }
-}
-
 
 static void tcp_prepareTcpHeader(uint8_t tcpFlag)
 {
@@ -265,9 +247,10 @@ static void tcp_prepareTcpHeader(uint8_t tcpFlag)
    TcpTransmitPacket[9] = (uint8_t)(TcpAckNr>>16);
    TcpTransmitPacket[10] = (uint8_t)(TcpAckNr>>8);
    TcpTransmitPacket[11] = (uint8_t)(TcpAckNr);
-   TcpTransmitPacketLen = tcpHeaderLen + tcpPayloadLen;
-   TcpTransmitPacket[12] = (tcpHeaderLen/4) << 4; /* High-nibble: DataOffset in 4-byte-steps. Low-nibble: Reserved=0. */
 
+   TcpTransmitPacketLen = tcpHeaderLen + tcpPayloadLen;
+
+   TcpTransmitPacket[12] = (tcpHeaderLen/4) << 4; /* High-nibble: DataOffset in 4-byte-steps. Low-nibble: Reserved=0. */
    TcpTransmitPacket[13] = tcpFlag;
 #define TCP_RECEIVE_WINDOW 1000 /* number of octetts we are able to receive */
    TcpTransmitPacket[14] = (uint8_t)(TCP_RECEIVE_WINDOW>>8);
@@ -284,7 +267,6 @@ static void tcp_prepareTcpHeader(uint8_t tcpFlag)
    TcpTransmitPacket[16] = (uint8_t)(checksum >> 8);
    TcpTransmitPacket[17] = (uint8_t)(checksum);
 }
-
 
 static void tcp_packRequestIntoIp(void)
 {
@@ -334,30 +316,34 @@ static void tcp_packRequestIntoEthernet(void)
    myEthTransmit();
 }
 
-//void tcp_disconnect(void)
-//{
-//   /* we should normally use the FIN handshake, to tell the charger that we closed the connection.
-//   But for the moment, just go away silently, and use an other port for the next connection. The
-//   server will detect our absense sooner or later by timeout, this should be good enough. */
-//}
-
-void tcp_reset()
+static void tcp_sendFin()
 {
-    /* My Tesla v2 seem to run tcp over a queue that never times out,
-    at least it delivers messages to (currently) wrong ports, several days after my last visit.
-    But a brutal RST seems to do the trick. No more wrong port packages after this. */
+    addToTrace(MOD_TCP, "[TCP] sending FIN");
+    tcpHeaderLen = 20;  // no options
+    tcpPayloadLen = 0;  // no payload
+    tcp_prepareTcpHeader(TCP_FLAG_FIN | TCP_FLAG_ACK);
+    tcp_packRequestIntoIp();
+}
 
-    if (tcpState != TCP_STATE_CLOSED)
-    {
-        addToTrace(MOD_TCP, "[TCP] sending RST");
-        tcpHeaderLen = 20;  // no options
-        tcpPayloadLen = 0;  // no payload
-        TcpAckNr = 0; // not acknowledging any data
-        tcp_prepareTcpHeader(TCP_FLAG_RST);
-        tcp_packRequestIntoIp();
-        tcpState = TCP_STATE_CLOSED;  // close connection state
+void tcp_sendRst()
+{
+    addToTrace(MOD_TCP, "[TCP] sending RST");
+    tcpHeaderLen = 20;  // no options
+    tcpPayloadLen = 0;  // no payload
+    tcp_prepareTcpHeader(TCP_FLAG_RST);
+    tcp_packRequestIntoIp();
+}
+
+void tcp_disconnect(void)
+{
+    if (tcpState == TCP_STATE_ESTABLISHED){
+        tcp_sendFin();
+    }
+    else if (tcpState == TCP_STATE_SYN_SENT){
+        tcp_sendRst();
     }
 
+    tcpState = TCP_STATE_CLOSED;
     lastTransmitAckPending = false;
 }
 
@@ -371,35 +357,34 @@ bool tcp_isConnected(void)
    return (tcpState == TCP_STATE_ESTABLISHED);
 }
 
-
 void tcp_checkRetry(void)
 {
-    if (lastTransmitAckPending == false || tcpState != TCP_STATE_ESTABLISHED)
-        return;
-
-    uint32_t now = rtc_get_ms();
-    if (now >= nextRetryTime)
+    if (lastTransmitAckPending && tcpState == TCP_STATE_ESTABLISHED)
     {
-        if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
+        uint32_t now = rtc_get_ms();
+        if (now >= nextRetryTime)
         {
-            addToTrace(MOD_TCP, "[TCP] Giving up the retry");
-            tcp_reset();
-            return;
+            if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
+            {
+                addToTrace(MOD_TCP, "[TCP] Giving up the retry");
+                tcp_disconnect();
+                return;
+            }
+
+            addToTrace(MOD_TCP, "[TCP] Last packet wasn't ACKed, retransmitting"); // Resend the last packet
+            tcp_packRequestIntoEthernet(); // retransmit the same content
+
+            tcp_debug_totalRetryCounter++;
+
+            retryTotalElapsed += retryDelay;
+
+            // Update delay for next retry (exponential backoff, capped)
+            retryDelay *= 2;
+            if (retryDelay > TCP_ACK_MAX_TIMEOUT_MS)
+                retryDelay = TCP_ACK_MAX_TIMEOUT_MS;
+
+            nextRetryTime = now + retryDelay;
         }
-
-        addToTrace(MOD_TCP, "[TCP] Last packet wasn't ACKed, retransmitting"); // Resend the last packet
-        tcp_packRequestIntoEthernet(); // retransmit the same content
-
-        tcp_debug_totalRetryCounter++;
-
-        retryTotalElapsed += retryDelay;
-
-        // Update delay for next retry (exponential backoff, capped)
-        retryDelay *= 2;
-        if (retryDelay > TCP_ACK_MAX_TIMEOUT_MS)
-            retryDelay = TCP_ACK_MAX_TIMEOUT_MS;
-
-        nextRetryTime = now + retryDelay;
     }
 }
 
@@ -410,7 +395,7 @@ void tcp_Mainfunction(void)
    if (connMgr_getConnectionLevel()<50)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
-      tcp_reset();
+      tcp_disconnect();
       return;
    }
 

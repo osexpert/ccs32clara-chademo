@@ -420,8 +420,6 @@ static void Ms100Task(void)
     print_ccs_trace();
 }
 
-extern void tcp_reset(void);
-
 static void Ms30Task()
 {
     if (_global.relayUnweldingAttempt)
@@ -455,7 +453,7 @@ static void Ms30Task()
 
     _global.ccsEnded = chademoInterface_isCcsInStateEnd();
     if (_global.ccsEnded)
-        tcp_reset(); // kill the last connection, if any
+        tcp_disconnect(); // kill the last connection, if any
 }
 
 static void SetMacAddress()

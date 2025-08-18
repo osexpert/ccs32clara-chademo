@@ -1032,8 +1032,7 @@ static void stateFunctionWaitForSessionStopResponse(void)
       if (dinDocDec.V2G_Message.Body.SessionStopRes_isUsed)
       {
          // req -508
-         // Todo: close the TCP connection here.
-         tcp_reset();
+         tcp_disconnect();
          publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
          pev_enterState(PEV_STATE_End);
