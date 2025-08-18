@@ -126,6 +126,12 @@ enum CarStatus
     STOP_BEFORE_CHARGING = 0x10,
 
     /// <summary>
+    /// 102.5.6
+    /// Unknown. Possibly related to V2X?
+    /// </summary>
+    UNKNOWN_102_5_6 = 0x40,
+
+    /// <summary>
     /// 102.5.7
     /// car is V2X compatible (can deliver power to grid)
     /// </summary>
@@ -229,7 +235,7 @@ struct msg100
     union {
         struct {
             uint8_t MinimumChargeCurrent; // added in cha 1.0
-            uint8_t Unused1;
+            uint8_t MaximumChargeCurrent; // added in cha 1.0? but only seen on some cars. 0->240->correctValue. unstable before switch(k).
             uint16_t MinimumBatteryVoltage; // added in cha 1.0
             uint16_t MaximumBatteryVoltage;
             /// <summary>

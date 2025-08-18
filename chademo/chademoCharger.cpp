@@ -85,14 +85,14 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg100_pending = false;
 
-        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n"); // chademo 2.0?
-        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n"); // chademo 2.0?
+        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MaximumChargeCurrent, _msg100_isr.m.MaximumChargeCurrent, "[cha] 100.MaximumChargeCurrent changed %d -> %d\r\n");
 
+        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n");
         COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage changed %d -> %d\r\n");
 
         COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "[cha] 100.SocPercentConstant changed %d -> %d\r\n");
-
-        COMPARE_SET(_msg100.m.Unused1, _msg100_isr.m.Unused1, "[cha] 100.Unused1 changed %d -> %d\r\n");
+        
         COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "[cha] 100.Unused7 changed %d -> %d\r\n");
 
         _carData.MinimumChargeCurrent = _msg100.m.MinimumChargeCurrent;
@@ -447,8 +447,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
-        // cha spec says <= 10 but we need to play by ccs rules here and at least some Tesla chargers never drop below 16 volts
-        if (_chargerData.OutputVoltage <= 20 || IsTimeoutSec(10))
+        // cha spec says <= 10 but we need to play by ccs rules here and at least some Tesla chargers never drop below 16 volts. Seen others never drop below 28.
+        if (_chargerData.OutputVoltage <= 30 || IsTimeoutSec(10))
         {
             UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
