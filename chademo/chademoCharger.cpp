@@ -41,15 +41,23 @@ extern global_data _global;
 /// maxVolt = target - 10
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
-/// 
-/// nomVolt based on:
-/// Leaf: target: 410V, nomVolt: 355V
-/// i-MiEV: target: 370V, nomVolt: 330V
 /// </summary>
 float GetEstimatedBatteryVoltage(float target, float soc)
 {
     float maxVolt = target - 10;
-    float nomVolt = 0.625f * target + 98.75f;
+
+    float nomVolt;
+    if (target < 410f)
+    {
+        // Low segment: iMiev 370 -> 330 and meets high segment at 410
+        nomVolt = 0.625f * target + 98.75f;
+    }
+    else
+    {
+        // High segment: Leaf 40: 410 -> 355, BMW i5 M60: 450 -> 400
+        nomVolt = 1.125f * target - 106.25f;
+    }
+
     float minVolt = nomVolt - (maxVolt - nomVolt);
 
     float deltaLow = 0.35f * (nomVolt - minVolt);
@@ -433,13 +441,12 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
         if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // Does cha 0.9 set this flag? At least spec says car must perform WD within 4 seconds after amps drops <= 5
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // Spec: car should perform WD within 4 seconds after amps drops <= 5
             || IsTimeoutSec(10))
         {
-            // welding detection done
-
+            // welding detection done & car contactors open
+            printf("[cha] Car contactors open\r\n");
             OpenAdapterContactor();
-
             SetSwitchD2(false);
 
             SetState(ChargerState::Stopping_WaitForLowVolts);
