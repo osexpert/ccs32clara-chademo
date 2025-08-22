@@ -47,7 +47,7 @@ float GetEstimatedBatteryVoltage(float target, float soc)
     float maxVolt = target - 10;
 
     float nomVolt;
-    if (target < 410f)
+    if (target < 410)
     {
         // Low segment: iMiev 370 -> 330 and meets high segment at 410
         nomVolt = 0.625f * target + 98.75f;
