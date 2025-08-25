@@ -579,7 +579,6 @@ extern "C" int main(void)
     nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
 
     Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
-    Param::SetInt(Param::VehicleSideIsoMonAllowed, 1); /* isolation monitoring on vehicle side is allowed per default */
     Param::SetInt(Param::MaxCurrent, 200);
 
     scheduler->AddTask(Ms30Task, 30);

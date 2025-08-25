@@ -50,12 +50,12 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 
 void hardwareInterface_setPowerRelayOn(void)
 {
-    //printf("hardwareInterface_setPowerRelayOn\r\n");
+    printf("hardwareInterface_setPowerRelayOn\r\n");
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
-    //printf("hardwareInterface_setPowerRelayOff\r\n");
+    printf("hardwareInterface_setPowerRelayOff\r\n");
 }
 
 void hardwareInterface_setStateB(void)

@@ -38,9 +38,6 @@
  * IDs are 16 bit, so 65535 is the maximum
  */
 
- //Define a version string of your firmware here
-
-#define VERSION 0.44
 
 #include "myLogging.h"
 
@@ -111,7 +108,7 @@
 /*    VALUE_ENTRY(CanWatchdog,        "dig",           2016 ) \ */ \
 /*    VALUE_ENTRY(CanAwake,           OFFON,           2032 ) \ */ \
 /*    VALUE_ENTRY(ButtonPushed,       OFFON,           2033 ) \ */ \
-    VALUE_ENTRY(VehicleSideIsoMonAllowed, OFFON,     2035 ) \
+/*    VALUE_ENTRY(VehicleSideIsoMonAllowed, OFFON,     2035 ) \ */ \
  /*   VALUE_ENTRY(cpuload,            "%",             2094 ) */
 
 
@@ -212,8 +209,6 @@ enum _actuatortest
    TEST_LEDBLUE,
    TEST_STATEC
 };
-
-#define DEMOCONTROL_STANDALONE 234 /* activates the demo-mode without CAN input. Uses just an "unlikely" uint16 number, to reduce risk of unintended activation. */
 
 
 //Generated enum-string for possible errors

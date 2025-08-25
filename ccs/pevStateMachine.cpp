@@ -302,7 +302,7 @@ static inline void setPhysicalValue(dinPhysicalValueType* pv, int16_t value, din
     pv->Value = value;
     pv->Unit_isUsed = 1;
     pv->Unit = unit;
-    pv->Multiplier = multiplier;
+    pv->Multiplier = multiplier; /* -3 to 3. The exponent for base of 10. */
 }
 
 static void pev_sendCurrentDemandReq(void)
@@ -822,7 +822,8 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
    }
 }
 
-static void stateFunctionWaitForCurrentDownAfterStateB(void) {
+static void stateFunctionWaitForCurrentDownAfterStateB(void) 
+{
     /* During normal end of the charging session, we have set the StateB, and
        want to give the charger some time to ramp down the current completely,
        before we are opening the contactors. */
@@ -1077,36 +1078,12 @@ static void stateFunctionEnd(void)
    /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
 }
 
-void translateOpModeToIsolationMonitor(void) {
-  /* translate the Focccis operation state to a control signal which can be used to
-     control the vehicle side isolation monitor.
-     Discussion here: https://openinverter.org/forum/viewtopic.php?p=80149#p80149 */
-  pevstates op;
-  op = (pevstates)Param::GetInt(Param::opmode);
-  if (op==PEV_STATE_WaitForPreChargeResponse) {
-    /* If we are in precharge, we tell the vehicle side isolation monitoring to keep calm,
-       because the next step will be that the contactors close, and then the charger side
-       isolation monitoring shall be the only one which is monitoring the isolation. Because
-       if we would have two isolation monitors working at the same time, they could/would
-       detection isolation faults by seeing each other. */
-    Param::SetInt(Param::VehicleSideIsoMonAllowed, 0);
-  }
-  if ((op==PEV_STATE_WaitForSessionStopResponse) ||
-      (op==PEV_STATE_UnrecoverableError) ||
-      (op==PEV_STATE_End) ||
-      (op==PEV_STATE_Connecting)) {
-      /* If the charger is not connected, allow the vehicle side isolation monitor to work. */
-      Param::SetInt(Param::VehicleSideIsoMonAllowed, 1);
-  }
-}
-
 static void pev_enterState(pevstates n)
 {
    //addToTrace("[PEV] from %d entering %d", pev_state, n);
    pev_state = n;
    pev_cyclesInState = 0;
    Param::SetInt(Param::opmode, n);
-   translateOpModeToIsolationMonitor();
 }
 
 static uint8_t pev_isTooLong(void)
