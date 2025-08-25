@@ -134,6 +134,7 @@ enum CarStatus
     /// <summary>
     /// 102.5.7
     /// car is V2X compatible (can deliver power to grid)
+    /// If you set this flag without also sending messages 208/209, car will fail/ERROR.
     /// </summary>
     DISCHARGE_COMPATIBLE = 0x80,
 };
@@ -372,19 +373,24 @@ struct msg200
 {
     union {
         struct {
-            uint8_t MaximumDischargeCurrentInverted;
-            uint8_t Unused1;
-            uint8_t Unused2;
-            uint8_t Unused3;
+            uint8_t MaximumDischargeCurrentInverted; // FF
+            uint8_t Unused1; // 00
+            uint8_t Unused2; // 00
+            uint8_t Unused3; // 00
             /// <summary>
             /// trace: 250v make no sense...310v is absolute minimum, so what does this really mean?
+            /// I think it is inverted and means 5 amps, but 5 amps what?
             /// </summary>
-            uint16_t MinimumDischargeVoltage;
+            uint16_t MinimumDischargeVoltage; // FA 00
             /// <summary>
             /// trace: SOC%? But 69% seems very high? Can it be 100-69=31%?
+            /// Or kwh? 31kwh?
             /// </summary>
-            uint8_t MinimumBatteryDischargeLevel;
-            uint8_t MaxRemainingCapacityForCharging;
+            uint8_t MinimumBatteryDischargeLevel; // 1A
+            /// <summary>
+            /// kwh?
+            /// </summary>
+            uint8_t MaxRemainingCapacityForCharging; // FF
         } m;
         uint8_t bytes[8];
         uint32_t pair[2];
@@ -399,7 +405,7 @@ struct msg201
 {
     union {
         struct {
-            uint8_t V2HchargeDischargeSequenceNum;
+            uint8_t V2HchargeDischargeSequenceNum; // 2
             uint16_t ApproxDischargeCompletionTime;
             uint16_t AvailableVehicleEnergy;
             uint8_t Unused5;
@@ -411,6 +417,7 @@ struct msg201
     };
 };
 
+// 0x202 01 01 01 00 00 00 00 00
 
 struct msg208
 {
@@ -431,12 +438,12 @@ struct msg208
                 So....I guess can just use 1 amp here for fun? Like a signal?
             */
 
-            uint8_t PresentDischargeCurrentInverted;
-            uint16_t AvailableInputVoltage;
-            uint8_t AvailableInputCurrentInverted;
-            uint8_t Unused4;
-            uint8_t Unused5;
-            uint16_t LowerThresholdVoltage;
+            uint8_t PresentDischargeCurrentInverted; // FF
+            uint16_t MaxDischargeVoltage; // AA 00
+            uint8_t MaxDischargeCurrentInverted; // FF
+            uint8_t Unused4; // 00
+            uint8_t Unused5; // 00
+            uint16_t LowerThresholdVoltage; // AA 00
         } m;
         uint8_t bytes[8];
         uint32_t pair[2];
@@ -459,9 +466,9 @@ struct msg209
             /// Possibly this is mode?
             /// enum Mode { CHADEMO_CHARGE, CHADEMO_DISCHARGE, CHADEMO_BIDIRECTIONAL }; 0,1,2?
             /// </summary>
-            uint8_t SequenceControlNumber;
+            uint8_t SequenceControlNumber; // 01 or 02 (seen both)
             /// <summary>
-            /// Possibly setting this is > 0 make the car "alive" and never times out?
+            /// Possibly setting this is > 0 make the car "alive" and never times out? No...seems to have no function.
             /// </summary>
             uint16_t RemainingDischargeTime;
             uint8_t Unused3;
@@ -517,6 +524,8 @@ struct CarData
     uint8_t EstimatedChargingTimeMins;
 
     bool SupportDynamicAvailableOutputCurrent;
+
+    uint8_t MaxDischargeCurrent;
 };
 
 enum ProtocolNumber
@@ -552,6 +561,15 @@ struct ChargerData
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
+
+    uint8_t DischargeCurrent;
+
+    // just some value seen in can logs.. seen 10, 15. Some say car will allow 10A deviation from what you say? So if we always say we use 10A, we can use anything between 0-20A? 
+    // For any current above 20A then need real measured amps.
+    uint8_t MaxDischargeCurrent = 20; 
+    uint16_t RemainingDischargeTime;
+
+    bool DischargeCompatible = false;// safe to have this on for all?
 
     // initial value from car, charger count it down
     uint16_t RemainingChargeTimeSec;
@@ -644,5 +662,5 @@ public:
         CarData _carData = {};
         ChargerData _chargerData = {};
 
-        bool _discharge = false;
+//        bool _dischargeSupported = false;
 };

@@ -4,6 +4,7 @@
 #include "chademoCharger.h"
 #include "params.h"
 #include "main.h"
+#include "pevStateMachine.h"
 
 #include <libopencm3/stm32/can.h>
 
@@ -42,7 +43,7 @@ extern global_data _global;
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-float GetEstimatedBatteryVoltage(float target, float soc)
+static float GetEstimatedBatteryVoltage(float target, float soc)
 {
     float maxVolt = target - 10;
 
@@ -208,6 +209,8 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "[cha] 200.MinimumDischargeVoltage changed 0x%x -> 0x%x\r\n");
         COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "[cha] 200.MinimumBatteryDischargeLevel changed 0x%x -> 0x%x\r\n");
         COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "[cha] 200.MaxRemainingCapacityForCharging changed 0x%x -> 0x%x\r\n");
+
+        _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaximumDischargeCurrentInverted;
     }
     if (_msg201_pending)
     {
@@ -416,8 +419,6 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
-        // TODO: stop when battery full? No...normally the car will stop when it means it is full.
-
         if (stopReason != StopReason::NONE)
         {
             SetState(ChargerState::Stopping_Start, stopReason);
@@ -445,8 +446,8 @@ void ChademoCharger::RunStateMachine()
             || IsTimeoutSec(10))
         {
             // welding detection done & car contactors open
-            printf("[cha] Car contactors open\r\n");
-            OpenAdapterContactor();
+            printf("[cha] Car contactors opened\r\n");
+            
             SetSwitchD2(false);
 
             SetState(ChargerState::Stopping_WaitForLowVolts);
@@ -454,9 +455,11 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
-        // cha spec says <= 10 but we need to play by ccs rules here and at least some Tesla chargers never drop below 16 volts. Seen others never drop below 28.
+        // cha spec says <= 10 but we need to play by ccs rules here. Seen some chargers never drop below 28v.
         if (_chargerData.OutputVoltage <= 30 || IsTimeoutSec(10))
         {
+            OpenAdapterContactor();
+
             UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
@@ -565,6 +568,16 @@ void ChademoCharger::SetChargerDataFromCcsParams()
         // fake for discovery
         SetChargerData(ADAPTER_MAX_VOLTS, ADAPTER_MAX_AMPS, 0, 0);
     }
+#ifdef CHADEMO_STANDALONE_TESTING
+    else if (true)
+    {
+        SetChargerData(ADAPTER_MAX_VOLTS, 
+            ADAPTER_MAX_AMPS, 
+            _carData.EstimatedBatteryVoltage,
+            0 //_carData.AskingAmps
+        );
+    }
+#endif
     else
     {
         // mirror these values
@@ -735,8 +748,7 @@ void ChademoCharger::SendChargerMessages()
 
         can_transmit_blocking_fifo(CAN1, 0x118, 0x118 > 0x7FF, false, 8, _msg118.bytes);
 
-        // if charger discharge is enabled? and car discharge enabled. and discharge enabled here?
-        if (_discharge)
+        if (_chargerData.DischargeCompatible) // need to send DC messages if charger declare DC, else car fails
         {
             can_transmit_blocking_fifo(CAN1, 0x208, 0x208 > 0x7FF, false, 8, _msg208.bytes);
             can_transmit_blocking_fifo(CAN1, 0x209, 0x209 > 0x7FF, false, 8, _msg209.bytes);
@@ -754,6 +766,8 @@ void ChademoCharger::UpdateChargerMessages()
 
     COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent changed %d -> %d\r\n");
+
+    COMPARE_SET(_msg109.m.DischargeCompatible, _chargerData.DischargeCompatible, "[cha] 109.DischargeCompatible changed %d -> %d\r\n");
 
     // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
     uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
@@ -779,6 +793,23 @@ void ChademoCharger::UpdateChargerMessages()
     ExtendedFunction1 extFun = {};
     if (_chargerData.SupportDynamicAvailableOutputCurrent) set_flag(&extFun, ExtendedFunction1::DYNAMIC_CONTROL);
     COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "[cha] 118.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
+
+    if (_chargerData.DischargeCompatible)
+    {
+        COMPARE_SET(_msg208.m.MaxDischargeCurrentInverted, 0xff - _chargerData.MaxDischargeCurrent, "[cha] 208.MaxDischargeCurrentInverted changed %d -> %d\r\n"); // 15
+        
+        COMPARE_SET(_msg208.m.PresentDischargeCurrentInverted, 0xff - _chargerData.DischargeCurrent, "[cha] 208.PresentDischargeCurrentInverted changed %d -> %d\r\n"); // 0
+
+        // todo: use _chargerData.AvailableOutputVoltage??
+        COMPARE_SET(_msg208.m.MaxDischargeVoltage, 500, "[cha] 208.MaxDischargeVoltage changed %d -> %d\r\n"); // same
+        // 250...seems random...I think this is something inverted, eg. 255 - 250 = 5. And maybe amps instead of volts...
+        COMPARE_SET(_msg208.m.LowerThresholdVoltage, 250, "[cha] 208.LowerThresholdVoltage changed %d -> %d\r\n");
+
+        COMPARE_SET(_msg209.m.RemainingDischargeTime, _chargerData.RemainingDischargeTime, "[cha] 209.RemainingDischargeTime changed %d -> %d\r\n");
+
+        // mode CHADEMO_BIDIRECTIONAL? What if car declare something else than 2? Do we need to mirror 201.V2HchargeDischargeSequenceNum?
+        COMPARE_SET(_msg209.m.SequenceControlNumber, 2, "[cha] 209.SequenceControlNumber changed %d -> %d\r\n"); 
+    }
 }
 
 bool ChademoCharger::IsPowerOffOk()
