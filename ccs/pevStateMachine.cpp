@@ -957,8 +957,9 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                       // If we were welded, the measured voltage should be battery voltage, and its very unlikely that this would be exactly the same as last charging voltage.
                       // It should most certainly be lower, as the charging voltage is always higher than the battery voltage.
                       // So it seems the charger is lying to us and just send us its last known voltage.
-                      addToTrace(MOD_PEV, "WeldingDetection voltage is still same as last charging voltage: charger is probably lying.");
-                      // TODO: consider faking EVSEPresentVoltage to 0 avoid Stopping_WaitForLowVolts waiting for 10 seconds
+                      addToTrace(MOD_PEV, "WeldingDetection voltage equals last charging voltage: charger is probably lying. Fake EvseVoltage 0.");
+                      // Fake low voltage to avoid Stopping_WaitForLowVolts waiting 10 seconds
+                      Param::SetInt(Param::EvseVoltage, 0);
                   }
                   else {
                       /* even after multiple welding detection requests/responses, the voltage did not fall as expected.
