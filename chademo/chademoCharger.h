@@ -569,7 +569,7 @@ struct ChargerData
     uint8_t MaxDischargeCurrent = 20; 
     uint16_t RemainingDischargeTime;
 
-    bool DischargeCompatible = false;// safe to have this on for all?
+    bool DischargeCompatible = true;// safe to have this on for all?
 
     // initial value from car, charger count it down
     uint16_t RemainingChargeTimeSec;

@@ -423,6 +423,37 @@ void ChademoCharger::RunStateMachine()
         {
             SetState(ChargerState::Stopping_Start, stopReason);
         }
+        else
+        {
+            bool dischargeSupported = has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE)
+                && _chargerData.DischargeCompatible
+                && _carData.MaxDischargeCurrent > 0;
+
+            // try to buy us more time!
+            bool discharge = false;
+            if (dischargeSupported)
+            {
+                // discharger: hack to detect, it will just echo target voltage as output voltage. may not apply to all dischargers...
+                if (chademoInterface_getCcsFirstChargingVoltage() == _carData.TargetBatteryVoltage)
+                {
+                    printf("test: discharger\r\n");
+                    _chargerData.OutputCurrent = 0; // reverse mirroring done by discharger
+                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
+                    discharge = true;
+                }
+                // experiment to help in cases where charger is slow to deliver amps?
+                else if (_cyclesInState > (CHA_CYCLES_PER_SEC * 3) && _chargerData.OutputCurrent == 0)
+                {
+                    printf("test: buy time\r\n");
+                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // could use 1, but 10 seems to work.
+                    discharge = true;
+                }
+            }
+            if (discharge == false)
+            {
+                _chargerData.DischargeCurrent = 0;
+            }
+        }
     }
     else if (_state == ChargerState::Stopping_Start)
     {

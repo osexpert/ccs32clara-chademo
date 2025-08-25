@@ -201,8 +201,6 @@ void power_off_no_return(const char* reason)
     }
 }
 
-extern bool chademoInterface_isCcsInStateEnd();
-
 bool ccs_isPowerOffOk()
 {
     // plug is unlocked right after welding detection, so can't use it reliably.
@@ -434,6 +432,18 @@ static void Ms30Task()
 
         printf("[cha] discovery completed => ccs kickoff\r\n");
     }
+
+#ifdef CHADEMO_STANDALONE_TESTING
+
+    static int delay = 100;
+    delay--;
+    if (delay == 0)
+    {
+        chademoInterface_preChargeCompleted();
+        _global.ccsPreChargeStartedTrigger = true;
+    }
+    return;
+#endif
 
     // run eth even after ccsEnded, so we look "alive" to the charger
     // (some chargers complain about contact lost with car after charging, this may fix it?)

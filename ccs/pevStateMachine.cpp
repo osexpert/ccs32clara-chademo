@@ -18,6 +18,7 @@
    STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 30) \
    STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 5) \
    STATE_ENTRY(WaitForPowerDeliveryResponse, PowerDelivery, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
+   STATE_ENTRY(WaitForCarAskingAmps, CarAskingAmps, 0) \
    STATE_ENTRY(WaitForCurrentDemandResponse, CurrentDemand, 5) /* Test with 5s timeout. Just experimental. The specified performance time is 25ms (ISO), the specified timeout 250ms. */\
    STATE_ENTRY(WaitForCurrentDownAfterStateB, WaitCurrentDown, 0) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
@@ -82,7 +83,9 @@ static uint16_t pev_numberOfCableCheckReq;
 static uint8_t pev_wasPowerDeliveryRequestedOn;
 static int EVSEPresentVoltage;
 static int LastChargingVoltage;
+static int FirstChargingVoltage;
 static uint16_t EVSEMinimumVoltage;
+static uint16_t EVSEMinimumAmps;
 static uint8_t numberOfWeldingDetectionRounds;
 
 /***local function prototypes *****************************************/
@@ -272,6 +275,7 @@ static void pev_sendPowerDeliveryReq(uint8_t isOn)
    pev_wasPowerDeliveryRequestedOn = isOn;
    if (isOn) {
        // reset if set from previous session
+       FirstChargingVoltage = 0;
        LastChargingVoltage = 0;
    }
 
@@ -603,6 +607,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             int evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
             int evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
             EVSEMinimumVoltage = combineValueAndMultiplier(dcparm.EVSEMinimumVoltageLimit);
+            EVSEMinimumAmps = combineValueAndMultiplier(dcparm.EVSEMinimumCurrentLimit);
 #undef dcparm
             Param::SetInt(Param::EvseMaxVoltage, evseMaxVoltage);
             Param::SetInt(Param::EvseMaxCurrent, evseMaxCurrent);
@@ -801,8 +806,17 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
             publishStatus("PwrDelvy ON success", "");
             addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
             setCheckpoint(700);
-            pev_sendCurrentDemandReq();
-            pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+            int16_t askingAmps = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
+            if (askingAmps < EVSEMinimumAmps)
+            {
+                addToTrace(MOD_PEV, "AskingAmps:%d is less than EVSEMinimumAmps:%d. Waiting for car to demand more.", askingAmps, EVSEMinimumAmps);
+                pev_enterState(PEV_STATE_WaitForCarAskingAmps);
+            }
+            else
+            {
+                pev_sendCurrentDemandReq();
+                pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+            }
          }
          else
          {
@@ -820,6 +834,23 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
          }
       }
    }
+}
+
+static void stateFunctionWaitForCarAskingAmps(void)
+{
+    int16_t askingAmps = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
+    if (askingAmps >= EVSEMinimumAmps)
+    {
+        addToTrace(MOD_PEV, "askingAmps:%d satisfy EVSEMinimumAmps:%d", askingAmps, EVSEMinimumAmps);
+        pev_sendCurrentDemandReq();
+        pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+    }
+    else if (pev_cyclesInState > 133) // 30 × 133 = 3990 ms
+    {
+        addToTrace(MOD_PEV, "askingAmps:%d did not satisfy EVSEMinimumAmps:%d within 4 seconds", askingAmps, EVSEMinimumAmps);
+        pev_sendCurrentDemandReq();
+        pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+    }
 }
 
 static void stateFunctionWaitForCurrentDownAfterStateB(void) {
@@ -917,6 +948,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
          {
             /* continue charging loop */
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
+            if (FirstChargingVoltage == 0) FirstChargingVoltage = EVSEPresentVoltage;
             LastChargingVoltage = EVSEPresentVoltage;
             uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
             //publishStatus("Charging", String(u) + "V", String(hardwareInterface_getSoc()) + "%");
@@ -1161,3 +1193,6 @@ bool chademoInterface_isCcsInStateEnd(){
     return Param::GetInt(Param::opmode) == PEV_STATE_End;
 }
 
+int chademoInterface_getCcsFirstChargingVoltage(){
+    return FirstChargingVoltage;
+}
