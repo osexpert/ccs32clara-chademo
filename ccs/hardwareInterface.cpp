@@ -4,26 +4,6 @@
 
 extern global_data _global;
 
-void hardwareInterface_showOnDisplay(char*, char*, char*)
-{
-}
-
-void hardwareInterface_initDisplay(void)
-{
-}
-
-int hardwareInterface_sanityCheck()
-{
-   return 0; /* 0 is OK */
-}
-
-void hardwareInterface_simulatePreCharge(void)
-{
-}
-
-void hardwareInterface_simulateCharging(void)
-{
-}
 
 int16_t hardwareInterface_getInletVoltage(void)
 {
@@ -70,21 +50,23 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 
 void hardwareInterface_setPowerRelayOn(void)
 {
-    printf("hardwareInterface_setPowerRelayOn\r\n");
+    //printf("hardwareInterface_setPowerRelayOn\r\n");
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
-    printf("hardwareInterface_setPowerRelayOff\r\n");
+    //printf("hardwareInterface_setPowerRelayOff\r\n");
 }
 
 void hardwareInterface_setStateB(void)
 {
+   printf("hardwareInterface_setStateB\r\n");
    DigIo::state_c_out_inverted.Set();
 }
 
 void hardwareInterface_setStateC(void)
 {
+   printf("hardwareInterface_setStateC\r\n");
    DigIo::state_c_out_inverted.Clear();
 }
 
@@ -132,15 +114,4 @@ bool hardwareInterface_stopChargeRequested()
     return (stopReason != STOP_REASON_NONE);
 }
 
-void hardwareInterface_resetSimulation(void)
-{
-}
 
-/* send the measured CP duty cycle and PP resistance etc to the serial console for debugging. */
-void hardwareInterface_LogTheCpPpPhysicalData(void) 
-{
-//      addToTrace(MOD_HWIF, "cpDuty [%] %d", Param::GetInt(Param::ControlPilotDuty));
-//      addToTrace(MOD_HWIF, "AdcProximityPilot %d", Param::GetInt(Param::AdcProximityPilot));
-//      addToTrace(MOD_HWIF, "ResistanceProxPilot [ohm] %d", Param::GetInt(Param::ResistanceProxPilot));
-//      addToTrace(MOD_HWIF, "HardwareVariant %d", Param::GetInt(Param::HardwareVariant));
-}

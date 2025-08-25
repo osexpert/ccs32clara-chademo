@@ -76,15 +76,12 @@ static const uint8_t exiDemoSupportedApplicationProtocolRequestIoniq[]= {0x80, 0
 static uint16_t pev_cyclesInState;
 static uint8_t pev_DelayCycles;
 static pevstates pev_state=PEV_STATE_NotYetInitialized;
-static uint8_t pev_isUserStopRequestOnCarSide=0;
-static uint8_t pev_isUserStopRequestOnChargerSide=0;
 static uint16_t pev_numberOfContractAuthenticationReq;
 static uint16_t pev_numberOfChargeParameterDiscoveryReq;
 static uint16_t pev_numberOfCableCheckReq;
 static uint8_t pev_wasPowerDeliveryRequestedOn;
-static uint8_t pev_isBulbOn;
-static uint16_t pev_cyclesLightBulbDelay;
 static int EVSEPresentVoltage;
+static int LastChargingVoltage;
 static uint16_t EVSEMinimumVoltage;
 static uint8_t numberOfWeldingDetectionRounds;
 
@@ -243,7 +240,6 @@ static void pev_sendCableCheckReq(void)
       that we enter the safe shutdown sequence as intended.
       (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
    connMgr_ApplOk(31);
-   hardwareInterface_LogTheCpPpPhysicalData(); /* for trouble shooting, log some physical values to the console */
 }
 
 static void pev_sendPreChargeReq(void)
@@ -273,6 +269,12 @@ static void pev_sendPreChargeReq(void)
 
 static void pev_sendPowerDeliveryReq(uint8_t isOn)
 {
+   pev_wasPowerDeliveryRequestedOn = isOn;
+   if (isOn) {
+       // reset if set from previous session
+       LastChargingVoltage = 0;
+   }
+
    projectExiConnector_prepare_DinExiDocument();
    dinDocEnc.V2G_Message.Body.PowerDeliveryReq_isUsed = 1u;
    init_dinPowerDeliveryReqType(&dinDocEnc.V2G_Message.Body.PowerDeliveryReq);
@@ -393,7 +395,6 @@ static void stateFunctionConnected(void)
    addToTrace(MOD_PEV, "Checkpoint400: Sending the initial SupportedApplicationProtocolReq");
    setCheckpoint(400);
    addV2GTPHeaderAndTransmit(exiDemoSupportedApplicationProtocolRequestIoniq, sizeof(exiDemoSupportedApplicationProtocolRequestIoniq));
-   hardwareInterface_resetSimulation();
    Param::SetInt(Param::StopReason, STOP_REASON_NONE);
    pev_enterState(PEV_STATE_WaitForSupportedApplicationProtocolResponse);
 }
@@ -719,7 +720,6 @@ static void stateFunctionWaitForCableCheckResponse(void)
 
 static void stateFunctionWaitForPreChargeResponse(void)
 {
-   hardwareInterface_simulatePreCharge();
    if (pev_DelayCycles>0)
    {
       pev_DelayCycles-=1;
@@ -745,24 +745,11 @@ static void stateFunctionWaitForPreChargeResponse(void)
          {
             addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
             publishStatus("PreCharge done", "");
-            if (isLightBulbDemo)
-            {
-               // For light-bulb-demo, nothing to do here.
-               addToTrace(MOD_PEV, "This is a light bulb demo. Do not turn-on the relay at end of precharge.");
-               addToTrace(MOD_PEV, "Sending PowerDeliveryReq.");
-               pev_sendPowerDeliveryReq(1); /* 1 is ON */
-               pev_wasPowerDeliveryRequestedOn=1;
-               setCheckpoint(600);
-               pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
-            }
-            else
-            {
-               // In real-world-case, turn the power relay on.
-               hardwareInterface_setPowerRelayOn();
-               pev_DelayCycles = 15; /* 15*30ms, explanation see below */
-               pev_enterState(PEV_STATE_WaitForContactorsClosed);
-            }
-         }
+            // Turn the power relay on.
+            hardwareInterface_setPowerRelayOn();
+            pev_DelayCycles = 15; /* 15*30ms, explanation see below */
+            pev_enterState(PEV_STATE_WaitForContactorsClosed);
+          }
          else
          {
             publishStatus("PreChrge ongoing", String(u) + "V");
@@ -791,7 +778,6 @@ static void stateFunctionWaitForContactorsClosed(void)
    }
    addToTrace(MOD_PEV, "Contactors assumingly finished closing. Sending PowerDeliveryReq.");
    pev_sendPowerDeliveryReq(1); /* 1 is ON */
-   pev_wasPowerDeliveryRequestedOn=1;
    setCheckpoint(600);
    pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
 }
@@ -843,11 +829,11 @@ static void stateFunctionWaitForCurrentDownAfterStateB(void) {
     if (pev_DelayCycles>0) {
         /* just waiting */
         pev_DelayCycles--;
-    } else {
+
+    } else if (chademoInterface_carContactorsOpened()) {
         /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
-        addToTrace(MOD_PEV, "Turning off the relay and starting the WeldingDetection");
+        addToTrace(MOD_PEV, "Starting WeldingDetection");
         hardwareInterface_setPowerRelayOff();
-        pev_isBulbOn = 0;
         setCheckpoint(850);
         /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
         will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
@@ -871,7 +857,8 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
       if (dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed)
       {
          /* as long as the accu is not full and no stop-demand from the user, we continue charging */
-         pev_isUserStopRequestOnChargerSide=0;
+         bool pev_isUserStopRequestOnChargerSide = false;
+         bool pev_stopRequestFromCharger = false;
          if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Shutdown)
          {
             /* https://github.com/uhi22/pyPLC#example-flow, checkpoint 790: If the user stops the
@@ -880,35 +867,31 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                on other chargers. */
             addToTrace(MOD_PEV, "Checkpoint790: Charging is terminated from charger side.");
             setCheckpoint(790);
-            pev_isUserStopRequestOnChargerSide = 1;
+            pev_isUserStopRequestOnChargerSide = true;
             Param::SetInt(Param::StopReason, STOP_REASON_CHARGER_SHUTDOWN);
          }
-         if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Malfunction)
+         else if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Malfunction)
          {
             /* If the charger reports a malfunction, we stop the charging. */
             /* Issue reference: https://github.com/uhi22/ccs32clara/issues/29 */
             addToTrace(MOD_PEV, "Charger reported EVSE_Malfunction. A reason could be hitting the EVMaximumVoltageLimit or EVSEMaximumVoltageLimit.");
-            pev_wasPowerDeliveryRequestedOn=0;
-            setCheckpoint(800);
-            pev_sendPowerDeliveryReq(0);
-            pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
+            pev_stopRequestFromCharger = true;
             Param::SetInt(Param::StopReason, STOP_REASON_CHARGER_EVSE_MALFUNCTION);
          }
-         if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_EmergencyShutdown)
+         else if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_EmergencyShutdown)
          {
             /* If the charger reports an emergency, we stop the charging. */
             addToTrace(MOD_PEV, "Charger reported EmergencyShutdown.");
-            pev_wasPowerDeliveryRequestedOn=0;
-            setCheckpoint(800);
-            pev_sendPowerDeliveryReq(0);
-            pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
+            pev_stopRequestFromCharger = true;
             Param::SetInt(Param::StopReason, STOP_REASON_CHARGER_EMERGENCY_SHUTDOWN);
          }
+
          /* If the pushbutton is pressed longer than 0.5s or enable is set to off, we interpret this as charge stop request. */
-         pev_isUserStopRequestOnCarSide = hardwareInterface_stopChargeRequested();
-         if (hardwareInterface_getIsAccuFull() || pev_isUserStopRequestOnCarSide || pev_isUserStopRequestOnChargerSide)
+         bool pev_isUserStopRequestOnCarSide = hardwareInterface_stopChargeRequested();
+         bool pev_isAccuFull = hardwareInterface_getIsAccuFull();
+         if (pev_isAccuFull || pev_isUserStopRequestOnCarSide || pev_isUserStopRequestOnChargerSide || pev_stopRequestFromCharger)
          {
-            if (hardwareInterface_getIsAccuFull())
+            if (pev_isAccuFull)
             {
                publishStatus("Accu full", "");
                addToTrace(MOD_PEV, "Accu is full. Sending PowerDeliveryReq Stop.");
@@ -919,12 +902,12 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                publishStatus("User req stop on car side", "");
                addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
             }
-            else
+            else if (pev_isUserStopRequestOnChargerSide)
             {
                publishStatus("User req stop on charger side", "");
                addToTrace(MOD_PEV, "User requested stop on charger side. Sending PowerDeliveryReq Stop.");
             }
-            pev_wasPowerDeliveryRequestedOn=0;
+
             setCheckpoint(800);
             pev_sendPowerDeliveryReq(0); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                             sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
@@ -933,8 +916,8 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
          else
          {
             /* continue charging loop */
-            hardwareInterface_simulateCharging();
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
+            LastChargingVoltage = EVSEPresentVoltage;
             uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
             //publishStatus("Charging", String(u) + "V", String(hardwareInterface_getSoc()) + "%");
             Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
@@ -942,22 +925,6 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             setCheckpoint(710);
             pev_sendCurrentDemandReq();
             pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
-         }
-      }
-   }
-   if (isLightBulbDemo)
-   {
-      if (pev_cyclesLightBulbDelay<=33*2)
-      {
-         pev_cyclesLightBulbDelay+=1;
-      }
-      else
-      {
-         if (!pev_isBulbOn)
-         {
-            addToTrace(MOD_PEV, "This is a light bulb demo. Turning-on the bulb when 2s in the main charging loop.");
-            hardwareInterface_setPowerRelayOn();
-            pev_isBulbOn = 1;
          }
       }
    }
@@ -973,50 +940,57 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.WeldingDetectionRes_isUsed)
       {
-        /* The charger measured the voltage on the cable, and gives us the value. In the first
-           round will show a quite high voltage, because the contactors are just opening. We
-           need to repeat the requests, until the voltage is at a non-dangerous level. */
-         EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-         Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
-         addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", (int)EVSEPresentVoltage);
-         if (EVSEPresentVoltage<MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION) {
-            /* voltage is low, weldingDetection finished successfully. */
-            publishStatus("WeldingDet done", "");
-            addToTrace(MOD_PEV, "WeldingDetection successfully finished. Sending SessionStopReq");
-            projectExiConnector_prepare_DinExiDocument();
-            dinDocEnc.V2G_Message.Body.SessionStopReq_isUsed = 1u;
-            init_dinSessionStopType(&dinDocEnc.V2G_Message.Body.SessionStopReq);
-            /* no other fields are mandatory */
-            setCheckpoint(900);
-            encodeAndTransmit();
-            addToTrace(MOD_PEV, "Unlocking the connector");
-            /* unlock the connectore here. Better here than later, to avoid endless locked connector in case of broken SessionStopResponse. */
-            hardwareInterface_triggerConnectorUnlocking();
-            pev_enterState(PEV_STATE_WaitForSessionStopResponse);
-         } else {
+          /* The charger measured the voltage on the cable, and gives us the value. In the first
+             round will show a quite high voltage, because the contactors are just opening. We
+             need to repeat the requests, until the voltage is at a non-dangerous level. */
+          EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
+          Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
+          addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", EVSEPresentVoltage);
+          bool voltageIsLow = EVSEPresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
+          if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
 
-             if (chademoInterface_continueWeldingDetection()) {
-                 numberOfWeldingDetectionRounds = 0; // reboot and keep running until chademo is ready
-             }
+              publishStatus("WeldingDet done", "");
 
-             /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
-             if (numberOfWeldingDetectionRounds<MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
-                 /* max number of rounds not yet reached */
-                 addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
-                 numberOfWeldingDetectionRounds++; /* https://github.com/uhi22/ccs32clara/issues/55
-                                                      Count the number of welding detection rounds. To be clarified, whether
-                                                      a certain time or number of rounds make sense to cover all use cases with
-                                                      different chargers etc */
-                 pev_sendWeldingDetectionReq();
-                 pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
-             } else {
-                 /* even after multiple welding detection requests/responses, the voltage did not fall as expected.
-                 This may be due to two hanging/welded contactors or an issue of the charging station. We let the state machine
-                 run into timeout and safe shutdown sequence, this will at least indicate the red light to the user. */
-                 addToTrace(MOD_PEV, "WeldingDetection: ERROR: contactors probably welded. Did not reach low voltage. Entering safe shutdown.");
-                 ErrorMessage::Post(ERR_RELAYWELDED);
-             }
-         }
+              if (voltageIsLow == false) {
+                  if (EVSEPresentVoltage == LastChargingVoltage) {
+                      // Charger still says it has the same voltage as when we were last charging.
+                      // If we were welded, the measured voltage should be battery voltage, and its very unlikely that this would be exactly the same as last charging voltage.
+                      // It should most certainly be lower, as the charging voltage is always higher than the battery voltage.
+                      // So it seems the charger is lying to us and just send us its last known voltage.
+                      addToTrace(MOD_PEV, "WeldingDetection voltage is still same as last charging voltage: charger is probably lying.");
+                      // TODO: consider faking EVSEPresentVoltage to 0 avoid Stopping_WaitForLowVolts waiting for 10 seconds
+                  }
+                  else {
+                      /* even after multiple welding detection requests/responses, the voltage did not fall as expected.
+                      This may be due to two hanging/welded contactors or an issue of the charging station. */
+                      addToTrace(MOD_PEV, "WeldingDetection: ERROR: contactors probably welded. Did not reach low voltage.");
+                      ErrorMessage::Post(ERR_RELAYWELDED);
+                  }
+              }
+
+              addToTrace(MOD_PEV, "WeldingDetection finished. Sending SessionStopReq");
+              projectExiConnector_prepare_DinExiDocument();
+              dinDocEnc.V2G_Message.Body.SessionStopReq_isUsed = 1u;
+              init_dinSessionStopType(&dinDocEnc.V2G_Message.Body.SessionStopReq);
+              /* no other fields are mandatory */
+              setCheckpoint(900);
+              encodeAndTransmit();
+              addToTrace(MOD_PEV, "Unlocking the connector");
+              /* unlock the connectore here. Better here than later, to avoid endless locked connector in case of broken SessionStopResponse. */
+              hardwareInterface_triggerConnectorUnlocking();
+              pev_enterState(PEV_STATE_WaitForSessionStopResponse);
+          }
+          /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
+          else {
+              /* max number of rounds not yet reached */
+              numberOfWeldingDetectionRounds++; /* https://github.com/uhi22/ccs32clara/issues/55
+                                                   Count the number of welding detection rounds. To be clarified, whether
+                                                   a certain time or number of rounds make sense to cover all use cases with
+                                                   different chargers etc */
+              addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
+              pev_sendWeldingDetectionReq();
+              pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
+          }
       }
    }
 }
@@ -1039,7 +1013,6 @@ static void stateFunctionWaitForSessionStopResponse(void)
       }
    }
 }
-
 
 static void stateFunctionSequenceTimeout(void)
 {
@@ -1151,8 +1124,6 @@ static void pev_runFsm(void)
          pev_enterState(PEV_STATE_NotYetInitialized);
          hardwareInterface_setStateB();
          hardwareInterface_setPowerRelayOff();
-         pev_isBulbOn = 0;
-         pev_cyclesLightBulbDelay = 0;
       }
       return;
    }
@@ -1186,8 +1157,7 @@ void pevStateMachine_Mainfunction(void)
    pev_runFsm();
 }
 
-bool chademoInterface_isCcsInStateEnd()
-{
+bool chademoInterface_isCcsInStateEnd(){
     return Param::GetInt(Param::opmode) == PEV_STATE_End;
 }
 

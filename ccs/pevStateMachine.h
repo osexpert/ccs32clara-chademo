@@ -13,11 +13,12 @@ extern const char pevSttLabels[][MAX_LABEL_LEN];
 extern "C" {
 #endif
 /* pev state machine */
-extern void pevStateMachine_ReInit(void);
 extern void pevStateMachine_Mainfunction(void);
 
 extern bool chademoInterface_preChargeCompleted();
-extern bool chademoInterface_continueWeldingDetection();
+extern bool chademoInterface_carContactorsOpened();
+extern int chademoInterface_getCcsFirstChargingVoltage();
+extern bool chademoInterface_isCcsInStateEnd();
 
 #ifdef __cplusplus
 }

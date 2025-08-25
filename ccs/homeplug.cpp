@@ -591,7 +591,6 @@ void runSlacSequencer(void)
    {
       publishStatus("Starting SLAC", "");
       addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
-      hardwareInterface_LogTheCpPpPhysicalData();
       setCheckpoint(100);
       composeSlacParamReq();
       myEthTransmit();
@@ -741,7 +740,6 @@ void runSlacSequencer(void)
       {
          // It was sufficient time to get the answers from the modems.
          addToTrace(MOD_HOMEPLUG, "[PEVSLAC] It was sufficient time to get the answers from the modems.");
-         hardwareInterface_LogTheCpPpPhysicalData();
          // Let's see what we received.
          if (!isEvseModemFound())
          {

@@ -568,7 +568,7 @@ class ChademoCharger
 public:
     bool IsPowerOffOk();
     bool PreChargeCompleted();
-    bool ContinueWeldingDetection();
+    bool CarContactorsOpened();
     void UpdateChargerMessages();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();

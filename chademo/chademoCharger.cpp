@@ -502,16 +502,15 @@ extern "C" bool chademoInterface_preChargeCompleted()
     return chademoCharger->PreChargeCompleted();
 }
 
-bool ChademoCharger::ContinueWeldingDetection()
+bool ChademoCharger::CarContactorsOpened()
 {
     bool contactorsOpened = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
-    // continue rebooting weldingDetection until car contactors are opened
-    return contactorsOpened == false;
+    return contactorsOpened;
 }
 
-extern "C" bool chademoInterface_continueWeldingDetection()
+extern "C" bool chademoInterface_carContactorsOpened()
 {
-    return chademoCharger->ContinueWeldingDetection();
+    return chademoCharger->CarContactorsOpened();
 }
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
