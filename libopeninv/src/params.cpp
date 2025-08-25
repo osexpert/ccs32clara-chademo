@@ -23,32 +23,10 @@
 namespace Param
 {
 
-#define PARAM_ENTRY(category, name, unit, min, max, def, id) { category, #name, unit, (min), (max), (def), id, TYPE_PARAM },
-#define TESTP_ENTRY(category, name, unit, min, max, def, id) { category, #name, unit, (min), (max), (def), id, TYPE_TESTPARAM },
-#define VALUE_ENTRY(name, unit, id) { 0, #name, unit, 0, 0, 0, id, TYPE_SPOTVALUE },
-static const Attributes attribs[] =
-{
-    PARAM_LIST
-};
-#undef PARAM_ENTRY
-#undef TESTP_ENTRY
-#undef VALUE_ENTRY
-
 #define PARAM_ENTRY(category, name, unit, min, max, def, id) (def),
 #define TESTP_ENTRY(category, name, unit, min, max, def, id) (def),
 #define VALUE_ENTRY(name, unit, id) 0,
-static float values[] =
-{
-    PARAM_LIST
-};
-#undef PARAM_ENTRY
-#undef TESTP_ENTRY
-#undef VALUE_ENTRY
-
-#define PARAM_ENTRY(category, name, unit, min, max, def, id) FLAG_NONE,
-#define TESTP_ENTRY(category, name, unit, min, max, def, id) FLAG_NONE,
-#define VALUE_ENTRY(name, unit, id) FLAG_NONE,
-static uint8_t flags[] =
+static int values[] =
 {
     PARAM_LIST
 };
@@ -70,54 +48,12 @@ enum _dupes
 
 
 /**
-* Set a parameter
-*
-* @param[in] ParamNum Parameter index
-* @param[in] ParamVal New value of parameter
-* @return 0 if set ok, -1 if ParamVal outside of allowed range
-*/
-//int SetFixedPoint_RangeCheck_ChangeNotify(PARAM_NUM ParamNum, s32fp ParamVal)
-//{
-//    char res = -1;
-//
-//    if (ParamVal >= attribs[ParamNum].min && ParamVal <= attribs[ParamNum].max)
-//    {
-//        values[ParamNum] = ParamVal;
-//        Change(ParamNum); // FIXME: its a bit weird that this is the only Set that call Change. It make no sense...
-//        res = 0;
-//    }
-//    return res;
-//}
-
-/**
-* Get a parameters fixed point value
-* Renamed from Get -> GetFixedPoint (seems like it can't be used, return wrong data)
-* @param[in] ParamNum Parameter index
-* @return Parameters value
-*/
-//s32fp GetFixedPoint(PARAM_NUM ParamNum)
-//{
-//    return values[ParamNum];
-//}
-
-/**
 * Get a parameters integer value
 *
 * @param[in] ParamNum Parameter index
 * @return Parameters value
 */
 int GetInt(PARAM_NUM ParamNum)
-{
-    return values[ParamNum];
-}
-
-/**
-* Get a parameters float value
-*
-* @param[in] ParamNum Parameter index
-* @return Parameters value
-*/
-float GetFloat(PARAM_NUM ParamNum)
 {
     return values[ParamNum];
 }
@@ -141,126 +77,9 @@ bool GetBool(PARAM_NUM ParamNum)
 */
 void SetInt(PARAM_NUM ParamNum, int ParamVal)
 {
-    values[ParamNum] = ParamVal;// FP_FROMINT(ParamVal);
-}
-
-/**
-* Set a parameters fixed point value without range check and callback
-*
-* @param[in] ParamNum Parameter index
-* @param[in] ParamVal New value of parameter
-*/
-//void SetFixedPoint(PARAM_NUM ParamNum, s32fp ParamVal)
-//{
-//   values[ParamNum] = ParamVal;
-//}
-
-/**
-* Set a parameters floating point value without range check and callback
-*
-* @param[in] ParamNum Parameter index
-* @param[in] ParamVal New value of parameter
-*/
-void SetFloat(PARAM_NUM ParamNum, float ParamVal)
-{
     values[ParamNum] = ParamVal;
 }
 
-/**
-* Get the paramater index from a parameter name
-*
-* @param[in] name Parameters name
-* @return Parameter index if found, PARAM_INVALID otherwise
-*/
-PARAM_NUM NumFromString(const char *name)
-{
-    PARAM_NUM paramNum = PARAM_INVALID;
-    const Attributes *pCurAtr = attribs;
 
-    for (int i = 0; i < PARAM_LAST; i++, pCurAtr++)
-    {
-         if (0 == my_strcmp(pCurAtr->name, name))
-         {
-             paramNum = (PARAM_NUM)i;
-             break;
-         }
-    }
-    return paramNum;
-}
-
-/**
-* Get the paramater index from a parameters unique id
-*
-* @param[in] id Parameters unique id
-* @return Parameter index if found, PARAM_INVALID otherwise
-*/
-PARAM_NUM NumFromId(uint32_t id)
-{
-    PARAM_NUM paramNum = PARAM_INVALID;
-    const Attributes *pCurAtr = attribs;
-
-    for (int i = 0; i < PARAM_LAST; i++, pCurAtr++)
-    {
-         if (pCurAtr->id == id)
-         {
-             paramNum = (PARAM_NUM)i;
-             break;
-         }
-    }
-    return paramNum;
-}
-
-/**
-* Get the parameter attributes
-*
-* @param[in] ParamNum Parameter index
-* @return Parameter attributes
-*/
-const Attributes *GetAttrib(PARAM_NUM ParamNum)
-{
-    return &attribs[ParamNum];
-}
-
-/** Load default values for all parameters
-Clarification: all params automatically get their def. vals. BUT in case you want to refresh the default and overwrite potentional changes...
-*/
-void LoadDefaults()
-{
-   const Attributes *curAtr = attribs;
-
-   for (int idx = 0; idx < PARAM_LAST; idx++, curAtr++)
-   {
-       if (curAtr->id > 0)
-       {
-           SetFloat((PARAM_NUM)idx, curAtr->def);
-           //SetFixedPoint((PARAM_NUM)idx, curAtr->def);
-       }
-   }
-}
-
-void SetFlagsRaw(PARAM_NUM param, uint8_t rawFlags)
-{
-   flags[param] = rawFlags;
-}
-
-void SetFlag(PARAM_NUM param, PARAM_FLAG flag)
-{
-   flags[param] |= (uint8_t)flag;
-}
-
-void ClearFlag(PARAM_NUM param, PARAM_FLAG flag)
-{
-   flags[param] &= (uint8_t)~flag;
-}
-
-PARAM_FLAG GetFlag(PARAM_NUM param)
-{
-   return (PARAM_FLAG)flags[param];
-}
-
-PARAM_TYPE GetType(PARAM_NUM param)
-{
-   return (PARAM_TYPE)attribs[param].type;
-}
 
 }

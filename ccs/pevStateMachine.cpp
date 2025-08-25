@@ -84,7 +84,7 @@ static uint16_t pev_numberOfCableCheckReq;
 static uint8_t pev_wasPowerDeliveryRequestedOn;
 static uint8_t pev_isBulbOn;
 static uint16_t pev_cyclesLightBulbDelay;
-static float EVSEPresentVoltage;
+static int EVSEPresentVoltage;
 static uint16_t EVSEMinimumVoltage;
 static uint8_t numberOfWeldingDetectionRounds;
 
@@ -599,12 +599,12 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             publishStatus("ChargeParams discovered", "");
             addToTrace(MOD_PEV, "Checkpoint550: ChargeParams are discovered.. Will change to state C.");
 #define dcparm dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.DC_EVSEChargeParameter
-            float evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
-            float evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
+            int evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
+            int evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
             EVSEMinimumVoltage = combineValueAndMultiplier(dcparm.EVSEMinimumVoltageLimit);
 #undef dcparm
-            Param::SetFloat(Param::EvseMaxVoltage, evseMaxVoltage);
-            Param::SetFloat(Param::EvseMaxCurrent, evseMaxCurrent);
+            Param::SetInt(Param::EvseMaxVoltage, evseMaxVoltage);
+            Param::SetInt(Param::EvseMaxCurrent, evseMaxCurrent);
 
             setCheckpoint(550);
             // pull the CP line to state C here:
@@ -735,7 +735,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
       {
          addToTrace(MOD_PEV, "PreCharge aknowledge received.");
          EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
-         Param::SetFloat(Param::EvseVoltage, EVSEPresentVoltage);
+         Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
 
          uint16_t inletVtg = hardwareInterface_getInletVoltage();
          uint16_t batVtg = hardwareInterface_getAccuVoltage();
@@ -937,7 +937,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
             uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
             //publishStatus("Charging", String(u) + "V", String(hardwareInterface_getSoc()) + "%");
-            Param::SetFloat(Param::EvseVoltage, EVSEPresentVoltage);
+            Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
             Param::SetInt(Param::EvseCurrent, evsePresentCurrent);
             setCheckpoint(710);
             pev_sendCurrentDemandReq();
@@ -977,7 +977,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
            round will show a quite high voltage, because the contactors are just opening. We
            need to repeat the requests, until the voltage is at a non-dangerous level. */
          EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-         Param::SetFloat(Param::EvseVoltage, EVSEPresentVoltage);
+         Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
          addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", (int)EVSEPresentVoltage);
          if (EVSEPresentVoltage<MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION) {
             /* voltage is low, weldingDetection finished successfully. */

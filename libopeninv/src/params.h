@@ -38,52 +38,9 @@ namespace Param
    #undef TESTP_ENTRY
    #undef VALUE_ENTRY
 
-   typedef enum
-   {
-      FLAG_NONE = 0,
-      FLAG_HIDDEN = 1
-   } PARAM_FLAG;
-
-   typedef enum
-   {
-      TYPE_PARAM,
-      TYPE_TESTPARAM,
-      TYPE_SPOTVALUE,
-   } PARAM_TYPE;
-
-   typedef struct
-   {
-      char const *category;
-      char const *name;
-      char const *unit;
-      float min;
-      float max;
-      float def;
-      uint16_t id;
-      uint16_t type;
-   } Attributes;
-
-   //int    SetFixedPoint_RangeCheck_ChangeNotify(PARAM_NUM ParamNum, s32fp ParamVal);
-//   s32fp  GetFixedPoint(PARAM_NUM ParamNum);
    int    GetInt(PARAM_NUM ParamNum);
-   float  GetFloat(PARAM_NUM ParamNum);
    bool   GetBool(PARAM_NUM ParamNum);
    void   SetInt(PARAM_NUM ParamNum, int ParamVal);
-   //void   SetFixedPoint(PARAM_NUM ParamNum, s32fp ParamVal);
-   void   SetFloat(PARAM_NUM ParamNum, float ParamVal);
-   PARAM_NUM NumFromString(const char *name);
-   PARAM_NUM NumFromId(uint32_t id);
-   const Attributes *GetAttrib(PARAM_NUM ParamNum);
-   void LoadDefaults();
-   void SetFlagsRaw(PARAM_NUM param, uint8_t rawFlags);
-   void SetFlag(PARAM_NUM param, PARAM_FLAG flag);
-   void ClearFlag(PARAM_NUM param, PARAM_FLAG flag);
-   PARAM_FLAG GetFlag(PARAM_NUM param);
-   PARAM_TYPE GetType(PARAM_NUM param);
-   uint32_t GetIdSum();
-
-   //User defined callback
-   //void Change(Param::PARAM_NUM ParamNum);
 }
 
 #endif //PARAM_H_INCLUDED
