@@ -455,8 +455,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
-        // cha spec says <= 10 but we need to play by ccs rules here. Seen some chargers never drop below 28v.
-        if (_chargerData.OutputVoltage <= 30 || IsTimeoutSec(10))
+        // cha spec says <= 10 but we need to play by ccs rules here. Seen some chargers never drop below 28v. Clara uses 40.
+        if (_chargerData.OutputVoltage <= 40 || IsTimeoutSec(10))
         {
             OpenAdapterContactor();
 

@@ -297,14 +297,6 @@ static void pev_sendPowerDeliveryReq(uint8_t isOn)
    encodeAndTransmit();
 }
 
-static inline void setPhysicalValue(dinPhysicalValueType* pv, int16_t value, dinunitSymbolType unit, int8_t multiplier)
-{
-    pv->Value = value;
-    pv->Unit_isUsed = 1;
-    pv->Unit = unit;
-    pv->Multiplier = multiplier; /* -3 to 3. The exponent for base of 10. */
-}
-
 static void pev_sendCurrentDemandReq(void)
 {
    uint16_t UTarget, EVMaximumVoltageLimit;
@@ -329,44 +321,47 @@ static void pev_sendCurrentDemandReq(void)
        addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is near to EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
               UTarget, EVMaximumVoltageLimit);
    }
-#define tvolt dinDocEnc.V2G_Message.Body.CurrentDemandReq.EVTargetVoltage
-   tvolt.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
-   tvolt.Unit = dinunitSymbolType_V;
-   tvolt.Unit_isUsed = 1;
-   tvolt.Value = UTarget; /* The charging target voltage. Scaling is 1V. */
-#undef tvolt
-   // EVTargetCurrent
-#define tcurr dinDocEnc.V2G_Message.Body.CurrentDemandReq.EVTargetCurrent
-   tcurr.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
-   tcurr.Unit = dinunitSymbolType_A;
-   tcurr.Unit_isUsed = 1;
-   tcurr.Value = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
-#undef tcurr
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.ChargingComplete = 0; /* boolean. Todo: Do we need to take this from command line? Or is it fine
-    that the PEV just sends a PowerDeliveryReq with STOP, if it decides to stop the charging? */
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.BulkChargingComplete_isUsed = 1u;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.BulkChargingComplete = 0u; /* not complete */
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToFullSoC_isUsed = 1u;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToFullSoC.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToFullSoC.Unit = dinunitSymbolType_s;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToFullSoC.Unit_isUsed = 1;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToFullSoC.Value = 1200; /* seconds */
+#define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
+   req.EVTargetVoltage.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
+   req.EVTargetVoltage.Unit = dinunitSymbolType_V;
+   req.EVTargetVoltage.Unit_isUsed = 1;
+   req.EVTargetVoltage.Value = UTarget; /* The charging target voltage. Scaling is 1V. */
 
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC_isUsed = 1u;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Unit = dinunitSymbolType_s;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Unit_isUsed = 1;
-   dinDocEnc.V2G_Message.Body.CurrentDemandReq.RemainingTimeToBulkSoC.Value = 600; /* seconds */
+   req.EVTargetCurrent.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
+   req.EVTargetCurrent.Unit = dinunitSymbolType_A;
+   req.EVTargetCurrent.Unit_isUsed = 1;
+   req.EVTargetCurrent.Value = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
+
+   req.ChargingComplete = 0; /* boolean. Is it fine that the PEV just sends a PowerDeliveryReq with STOP, if it decides to stop the charging? */
+
+   req.BulkChargingComplete_isUsed = 1;
+   req.BulkChargingComplete = 0; /* not complete */
+
+   req.RemainingTimeToFullSoC_isUsed = 1;
+   req.RemainingTimeToFullSoC.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
+   req.RemainingTimeToFullSoC.Unit = dinunitSymbolType_s;
+   req.RemainingTimeToFullSoC.Unit_isUsed = 1;
+   req.RemainingTimeToFullSoC.Value = 1200; /* seconds */
+
+   req.RemainingTimeToBulkSoC_isUsed = 1;
+   req.RemainingTimeToBulkSoC.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
+   req.RemainingTimeToBulkSoC.Unit = dinunitSymbolType_s;
+   req.RemainingTimeToBulkSoC.Unit_isUsed = 1;
+   req.RemainingTimeToBulkSoC.Value = 600; /* seconds */
 
    // Charger 'Plugit HUBE S' wont work without maxes
-#define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
    req.EVMaximumVoltageLimit_isUsed = 1;
-   setPhysicalValue(&req.EVMaximumVoltageLimit, Param::GetInt(Param::MaxVoltage), dinunitSymbolType_V, 0);
+   req.EVMaximumVoltageLimit.Multiplier = 0;
+   req.EVMaximumVoltageLimit.Unit = dinunitSymbolType_V;
+   req.EVMaximumVoltageLimit.Unit_isUsed = 1;
+   req.EVMaximumVoltageLimit.Value = Param::GetInt(Param::MaxVoltage);
 
    req.EVMaximumCurrentLimit_isUsed = 1;
-   setPhysicalValue(&req.EVMaximumCurrentLimit, Param::GetInt(Param::MaxCurrent), dinunitSymbolType_A, 0);
+   req.EVMaximumCurrentLimit.Multiplier = 0;
+   req.EVMaximumCurrentLimit.Unit = dinunitSymbolType_A;
+   req.EVMaximumCurrentLimit.Unit_isUsed = 1;
+   req.EVMaximumCurrentLimit.Value = Param::GetInt(Param::MaxCurrent);
 #undef req
-
    encodeAndTransmit();
 }
 
