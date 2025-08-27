@@ -22,7 +22,6 @@
    STATE_ENTRY(WaitForCurrentDownAfterStateB, WaitCurrentDown, 0) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
-   STATE_ENTRY(UnrecoverableError, Error, 0) \
    STATE_ENTRY(SequenceTimeout, Timeout, 0) \
    STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0) \
    STATE_ENTRY(SafeShutDownWaitForContactorsOpen, WaitForContactorsOpen, 0) \
@@ -277,23 +276,25 @@ static void pev_sendPowerDeliveryReq(uint8_t isOn)
 
    projectExiConnector_prepare_DinExiDocument();
    dinDocEnc.V2G_Message.Body.PowerDeliveryReq_isUsed = 1u;
-   init_dinPowerDeliveryReqType(&dinDocEnc.V2G_Message.Body.PowerDeliveryReq);
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.ReadyToChargeState = isOn; /* 1=ON, 0=OFF */
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter_isUsed = 1;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVReady = 1; /* 1 means true. We are ready. */
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVErrorCode = dinDC_EVErrorCodeType_NO_ERROR;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVRESSSOC = hardwareInterface_getSoc();
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.ChargingComplete = 0; /* boolean. Charging not finished. */
+#define req dinDocEnc.V2G_Message.Body.PowerDeliveryReq
+   init_dinPowerDeliveryReqType(&req);
+   req.ReadyToChargeState = isOn; /* 1=ON, 0=OFF */
+   req.DC_EVPowerDeliveryParameter_isUsed = 1;
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVReady = 1; /* 1 means true. We are ready. */
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVErrorCode = dinDC_EVErrorCodeType_NO_ERROR;
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVRESSSOC = hardwareInterface_getSoc();
+   req.DC_EVPowerDeliveryParameter.ChargingComplete = 0; /* boolean. Charging not finished. */
    /* some "optional" fields seem to be mandatory, at least the Ioniq sends them, and the Compleo charger ignores the message if too short.
       See https://github.com/uhi22/OpenV2Gx/commit/db2c7addb0cae0e16175d666e736efd551f3e14d#diff-333579da65917bc52ef70369b576374d0ee5dbca47d2b1e3bedb6f062decacff
       Let's fill them:
    */
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVCabinConditioning_isUsed = 1;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVCabinConditioning = 0;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVRESSConditioning_isUsed = 1;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus.EVRESSConditioning = 0;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.BulkChargingComplete_isUsed  = 1;
-   dinDocEnc.V2G_Message.Body.PowerDeliveryReq.DC_EVPowerDeliveryParameter.BulkChargingComplete = 0;
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVCabinConditioning_isUsed = 1;
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVCabinConditioning = 0;
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVRESSConditioning_isUsed = 1;
+   req.DC_EVPowerDeliveryParameter.DC_EVStatus.EVRESSConditioning = 0;
+   req.DC_EVPowerDeliveryParameter.BulkChargingComplete_isUsed  = 1;
+   req.DC_EVPowerDeliveryParameter.BulkChargingComplete = 0;
+#undef req
    encodeAndTransmit();
 }
 
@@ -1000,7 +1001,6 @@ static void stateFunctionWaitForSessionStopResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.SessionStopRes_isUsed)
       {
-         // req -508
          tcp_disconnect();
          publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
@@ -1017,19 +1017,7 @@ static void stateFunctionSequenceTimeout(void)
    addToTrace(MOD_PEV, "Safe-shutdown-sequence: setting state B");
    setCheckpoint(1100);
    hardwareInterface_setStateB(); /* setting CP line to B disables in the charger the current flow. */
-   pev_DelayCycles = 66; /* 66*30ms=2s for charger shutdown */
-   pev_enterState(PEV_STATE_SafeShutDownWaitForChargerShutdown);
-}
-
-static void stateFunctionUnrecoverableError(void)
-{
-   /* Here we end, if the EVSE reported an error code, which terminates the charging session. */
-   publishStatus("ERROR reported", "");
-   /* Initiate the safe-shutdown-sequence. */
-   addToTrace(MOD_PEV, "Safe-shutdown-sequence: setting state B");
-   ErrorMessage::Post(ERR_EVSEFAULT);
-   setCheckpoint(1200);
-   hardwareInterface_setStateB(); /* setting CP line to B disables in the charger the current flow. */
+   tcp_disconnect(); /* Once signaled B, the session is dead: no further valid messages can happen. Close tcp. */
    pev_DelayCycles = 66; /* 66*30ms=2s for charger shutdown */
    pev_enterState(PEV_STATE_SafeShutDownWaitForChargerShutdown);
 }
