@@ -17,8 +17,8 @@ extern void pevStateMachine_Mainfunction(void);
 
 extern bool chademoInterface_preChargeCompleted();
 extern bool chademoInterface_carContactorsOpened();
-extern int chademoInterface_getCcsFirstChargingVoltage();
 extern bool chademoInterface_isCcsInStateEnd();
+extern int chademoInterface_chargingVoltageMirrorsTarget();
 
 #ifdef __cplusplus
 }

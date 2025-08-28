@@ -423,6 +423,37 @@ void ChademoCharger::RunStateMachine()
         {
             SetState(ChargerState::Stopping_Start, stopReason);
         }
+        else
+        {
+            // Seen in a log that set RemainingDischargeTime=5 right after car ask for amps, and keep it like this for the rest of the session.
+            // Not sure if this is good for anything...if it triggers anything...
+            // Possibly this is also a way to get more time, without asking for DischargeCurrent. Not tried it.
+
+            bool dischargeSupported = _chargerData.DischargeCompatible
+                && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE)
+                && _carData.MaxDischargeCurrent > 0;
+
+            _chargerData.DischargeCurrent = 0; // reset every iteration
+            if (dischargeSupported)
+            {
+                // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
+                bool chargerIsDischarger = chademoInterface_chargingVoltageMirrorsTarget();
+                if (chargerIsDischarger)
+                {
+                    // one discharger is observed to mirror asked amps as delivered amps.
+                    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps...)
+                    _chargerData.OutputCurrent = 0;
+                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
+                }
+                // 3 seconds passed without amps delivered? We are living dangerously. Try to buy us more time!
+                else if (_cyclesInState > (CHA_CYCLES_PER_SEC * 3) && _chargerData.OutputCurrent == 0)
+                {
+                    // this will/should put the car into discharge mode, where it no longer care about if amps are delivered
+                    // (allthou the car will still ask for plenty, it will be happy with getting none)
+                    _chargerData.DischargeCurrent = 1;
+                }
+            }
+        }
     }
     else if (_state == ChargerState::Stopping_Start)
     {

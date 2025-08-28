@@ -84,6 +84,9 @@ static int LastChargingVoltage;
 static uint16_t EVSEMinimumVoltage;
 static uint8_t numberOfWeldingDetectionRounds;
 
+static bool ChargingVoltageDifferentFromTarget;
+static bool ChargingVoltageDifferentFromTarget_isSet;
+
 /***local function prototypes *****************************************/
 
 static uint8_t pev_isTooLong(void);
@@ -272,6 +275,7 @@ static void pev_sendPowerDeliveryReq(uint8_t isOn)
    if (isOn) {
        // reset if set from previous session
        LastChargingVoltage = 0;
+       ChargingVoltageDifferentFromTarget = ChargingVoltageDifferentFromTarget_isSet = false;
    }
 
    projectExiConnector_prepare_DinExiDocument();
@@ -914,11 +918,16 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
          {
             /* continue charging loop */
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
-            LastChargingVoltage = EVSEPresentVoltage;
             uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
             //publishStatus("Charging", String(u) + "V", String(hardwareInterface_getSoc()) + "%");
             Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
             Param::SetInt(Param::EvseCurrent, evsePresentCurrent);
+
+            if (EVSEPresentVoltage != hardwareInterface_getChargingTargetVoltage()) ChargingVoltageDifferentFromTarget = true;
+            ChargingVoltageDifferentFromTarget_isSet = true;
+
+            LastChargingVoltage = EVSEPresentVoltage;
+
             setCheckpoint(710);
             pev_sendCurrentDemandReq();
             pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
@@ -1120,3 +1129,6 @@ bool chademoInterface_isCcsInStateEnd(){
     return Param::GetInt(Param::opmode) == PEV_STATE_End;
 }
 
+int chademoInterface_chargingVoltageMirrorsTarget() {
+    return ChargingVoltageDifferentFromTarget_isSet && ChargingVoltageDifferentFromTarget == false;
+}
