@@ -201,8 +201,6 @@ void power_off_no_return(const char* reason)
     }
 }
 
-extern bool chademoInterface_isCcsInStateEnd();
-
 bool ccs_isPowerOffOk()
 {
     // plug is unlocked right after welding detection, so can't use it reliably.

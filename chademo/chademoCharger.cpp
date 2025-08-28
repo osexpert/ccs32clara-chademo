@@ -216,7 +216,7 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg201_pending = false;
 
-        COMPARE_SET(_msg201.m.V2HchargeDischargeSequenceNum, _msg201_isr.m.V2HchargeDischargeSequenceNum, "[cha] 201.V2HchargeDischargeSequenceNum changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.ProtocolNumber, _msg201_isr.m.ProtocolNumber, "[cha] 201.ProtocolNumber changed 0x%x -> 0x%x\r\n");
         COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "[cha] 201.ApproxDischargeCompletionTime changed 0x%x -> 0x%x\r\n");
         COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "[cha] 201.AvailableVehicleEnergy changed 0x%x -> 0x%x\r\n");
         COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "[cha] 201.Unused5 changed 0x%x -> 0x%x\r\n");
@@ -838,8 +838,7 @@ void ChademoCharger::UpdateChargerMessages()
 
         COMPARE_SET(_msg209.m.RemainingDischargeTime, _chargerData.RemainingDischargeTime, "[cha] 209.RemainingDischargeTime changed %d -> %d\r\n");
 
-        // mode CHADEMO_BIDIRECTIONAL? What if car declare something else than 2? Do we need to mirror 201.V2HchargeDischargeSequenceNum?
-        COMPARE_SET(_msg209.m.SequenceControlNumber, 2, "[cha] 209.SequenceControlNumber changed %d -> %d\r\n"); 
+        COMPARE_SET(_msg209.m.ProtocolNumber, _chargerData.DischargeProtocolNumber, "[cha] 209.ProtocolNumber changed %d -> %d\r\n");
     }
 }
 

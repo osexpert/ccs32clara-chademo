@@ -405,7 +405,7 @@ struct msg201
 {
     union {
         struct {
-            uint8_t V2HchargeDischargeSequenceNum; // 2
+            uint8_t ProtocolNumber; // 2
             uint16_t ApproxDischargeCompletionTime;
             uint16_t AvailableVehicleEnergy;
             uint8_t Unused5;
@@ -453,8 +453,8 @@ struct msg208
 /* Discharge estimates: x209 EVSE = peer to x201 Vehicle
 NOTE: x209 is emitted in CAN logs when x201 isn't even present
 it may not be understood by leaf (or ignored unless >= a certain protocol version or v2h sequence number
-In trace start: SequenceControlNumber:2, RemainingDischargeTime:0.
-After charging loop start, set to SequenceControlNumber=2, RemainingDischargeTime=5
+In trace start: ProtocolNumber:2, RemainingDischargeTime:0.
+After charging loop start, set to ProtocolNumber=2, RemainingDischargeTime=5
 Not changed after this.
 2 = CHADEMO_BIDIRECTIONAL?
  */
@@ -462,11 +462,7 @@ struct msg209
 {
     union {
         struct {
-            /// <summary>
-            /// Possibly this is mode?
-            /// enum Mode { CHADEMO_CHARGE, CHADEMO_DISCHARGE, CHADEMO_BIDIRECTIONAL }; 0,1,2?
-            /// </summary>
-            uint8_t SequenceControlNumber; // 01 or 02 (seen both)
+            uint8_t ProtocolNumber; // 1 or 2 (seen both)
             /// <summary>
             /// Possibly setting this is > 0 make the car "alive" and never times out? No...seems to have no function.
             /// </summary>
@@ -539,6 +535,8 @@ enum ProtocolNumber
 struct ChargerData
 {
     uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
+
+    uint8_t DischargeProtocolNumber = 2;
 
     /// <summary>
     /// Initial status is stopped
