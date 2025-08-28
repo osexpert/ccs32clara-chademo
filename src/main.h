@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+//#define CHADEMO_STANDALONE_TESTING
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
 #define IRQ_PRI(x) ((x) << 4)
