@@ -187,6 +187,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent);
         }
 
+        _dischargeActivated = _chargerData.DischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE);
         _msg102_recieved = true;
     }
     if (_msg110_pending)
@@ -375,6 +376,7 @@ void ChademoCharger::RunStateMachine()
             || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(3)))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
+            // iMiev seems to ask for amps (>1) approx 1 second after CloseAdapterContactor(), so...iMiev asking amps (>1) seems to be triggered by sensing high voltage at the inlet?
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarAskingAmps);
@@ -429,12 +431,8 @@ void ChademoCharger::RunStateMachine()
             // Not sure if this is good for anything...if it triggers anything...
             // Possibly this is also a way to get more time, without asking for DischargeCurrent. Not tried it.
 
-            bool dischargeSupported = _chargerData.DischargeCompatible
-                && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE)
-                && _carData.MaxDischargeCurrent > 0;
-
             _chargerData.DischargeCurrent = 0; // reset every iteration
-            if (dischargeSupported)
+            if (_dischargeActivated && _carData.MaxDischargeCurrent > 0)
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_chargingVoltageMirrorsTarget();
@@ -779,8 +777,9 @@ void ChademoCharger::SendChargerMessages()
 
         can_transmit_blocking_fifo(CAN1, 0x118, 0x118 > 0x7FF, false, 8, _msg118.bytes);
 
-        if (_chargerData.DischargeCompatible) // need to send DC messages if charger declare DC, else car fails
+        if (_dischargeActivated)
         {
+            // need to send DC messages if charger declare DC, else car fails
             can_transmit_blocking_fifo(CAN1, 0x208, 0x208 > 0x7FF, false, 8, _msg208.bytes);
             can_transmit_blocking_fifo(CAN1, 0x209, 0x209 > 0x7FF, false, 8, _msg209.bytes);
         }
@@ -798,7 +797,7 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber changed %d -> %d\r\n");
     COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent changed %d -> %d\r\n");
 
-    COMPARE_SET(_msg109.m.DischargeCompatible, _chargerData.DischargeCompatible, "[cha] 109.DischargeCompatible changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeActivated, "[cha] 109.DischargeCompatible changed %d -> %d\r\n");
 
     // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
     uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
@@ -825,7 +824,7 @@ void ChademoCharger::UpdateChargerMessages()
     if (_chargerData.SupportDynamicAvailableOutputCurrent) set_flag(&extFun, ExtendedFunction1::DYNAMIC_CONTROL);
     COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "[cha] 118.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
 
-    if (_chargerData.DischargeCompatible)
+    if (_dischargeActivated)
     {
         COMPARE_SET(_msg208.m.MaxDischargeCurrentInverted, 0xff - _chargerData.MaxDischargeCurrent, "[cha] 208.MaxDischargeCurrentInverted changed %d -> %d\r\n"); // 15
         
