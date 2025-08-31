@@ -203,26 +203,26 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg200_pending = false;
 
-        COMPARE_SET(_msg200.m.MaximumDischargeCurrentInverted, _msg200_isr.m.MaximumDischargeCurrentInverted, "[cha] 200.MaximumDischargeCurrentInverted changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "[cha] 200.Unused1 changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "[cha] 200.Unused2 changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "[cha] 200.Unused3 changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "[cha] 200.MinimumDischargeVoltage changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "[cha] 200.MinimumBatteryDischargeLevel changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "[cha] 200.MaxRemainingCapacityForCharging changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg200.m.MaxDischargeCurrentInverted, _msg200_isr.m.MaxDischargeCurrentInverted, "[cha] 200.MaxDischargeCurrentInverted changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "[cha] 200.Unused1 changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "[cha] 200.Unused2 changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "[cha] 200.Unused3 changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "[cha] 200.MinimumDischargeVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "[cha] 200.MinimumBatteryDischargeLevel changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "[cha] 200.MaxRemainingCapacityForCharging changed %d -> %d\r\n");
 
-        _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaximumDischargeCurrentInverted;
+        _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaxDischargeCurrentInverted;
     }
     if (_msg201_pending)
     {
         _msg201_pending = false;
 
-        COMPARE_SET(_msg201.m.ProtocolNumber, _msg201_isr.m.ProtocolNumber, "[cha] 201.ProtocolNumber changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "[cha] 201.ApproxDischargeCompletionTime changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "[cha] 201.AvailableVehicleEnergy changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "[cha] 201.Unused5 changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg201.m.Unused6, _msg201_isr.m.Unused6, "[cha] 201.Unused6 changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg201.m.Unused7, _msg201_isr.m.Unused7, "[cha] 201.Unused7 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg201.m.ProtocolNumber, _msg201_isr.m.ProtocolNumber, "[cha] 201.ProtocolNumber changed %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "[cha] 201.ApproxDischargeCompletionTime changed %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "[cha] 201.AvailableVehicleEnergy changed %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "[cha] 201.Unused5 changed %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.Unused6, _msg201_isr.m.Unused6, "[cha] 201.Unused6 changed %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.Unused7, _msg201_isr.m.Unused7, "[cha] 201.Unused7 changed %d -> %d\r\n");
     }
 }
 
@@ -833,7 +833,7 @@ void ChademoCharger::UpdateChargerMessages()
         // todo: use _chargerData.AvailableOutputVoltage??
         COMPARE_SET(_msg208.m.MaxDischargeVoltage, 500, "[cha] 208.MaxDischargeVoltage changed %d -> %d\r\n"); // same
         // 250...seems random...I think this is something inverted, eg. 255 - 250 = 5. And maybe amps instead of volts...
-        COMPARE_SET(_msg208.m.LowerThresholdVoltage, 250, "[cha] 208.LowerThresholdVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg208.m.MinimimDischargeVoltage, 250, "[cha] 208.MinimimDischargeVoltage changed %d -> %d\r\n");
 
         COMPARE_SET(_msg209.m.RemainingDischargeTime, _chargerData.RemainingDischargeTime, "[cha] 209.RemainingDischargeTime changed %d -> %d\r\n");
 

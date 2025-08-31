@@ -373,7 +373,7 @@ struct msg200
 {
     union {
         struct {
-            uint8_t MaximumDischargeCurrentInverted; // FF
+            uint8_t MaxDischargeCurrentInverted; // FF
             uint8_t Unused1; // 00
             uint8_t Unused2; // 00
             uint8_t Unused3; // 00
@@ -443,7 +443,7 @@ struct msg208
             uint8_t MaxDischargeCurrentInverted; // FF
             uint8_t Unused4; // 00
             uint8_t Unused5; // 00
-            uint16_t LowerThresholdVoltage; // AA 00
+            uint16_t MinimimDischargeVoltage; // AA 00
         } m;
         uint8_t bytes[8];
         uint32_t pair[2];
