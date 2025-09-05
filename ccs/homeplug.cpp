@@ -529,8 +529,8 @@ void evaluateGetSwCnf(void)
          strVersion[i]=x;
       }
       strVersion[i] = 0;
-      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
-          sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
+      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:xx:xx:xx:xx:%02x software version %s",
+          sourceMac[0], sourceMac[5],
           strVersion);
 #ifdef DEMO_SHOW_MODEM_SOFTWARE_VERSION_ON_OLED
       StringVersion = String(strVersion);

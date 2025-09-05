@@ -102,6 +102,7 @@ void evaluateTcpPacket(void)
    {
        addToTrace(MOD_TCP, "[TCP] RST received, closing connection");
        tcpState = TCP_STATE_CLOSED;
+       finPending = peerFinPending = false;
        return;
    }
 
@@ -210,7 +211,7 @@ void tcp_transmit(void)
       {
           /* The packet fits into our transmit buffer. */
           addToTrace_bytes(MOD_TCPTRAFFIC, "TCP will transmit:", tcpPayload, tcpPayloadLen);
-          tcp_prepareTcpHeader(TCP_FLAG_PSH + TCP_FLAG_ACK); /* data packets are always sent with flags PUSH and ACK. */
+          tcp_prepareTcpHeader(TCP_FLAG_PSH | TCP_FLAG_ACK); /* data packets are always sent with flags PUSH and ACK. */
           tcp_packRequestIntoIp();
           tcp_setRetry();
       }
@@ -341,8 +342,9 @@ void tcp_disconnect(void)
         tcp_sendFin();
         finPending = false;
     }
-    else if (tcpState == TCP_STATE_SYN_SENT){
+    else if (tcpState == TCP_STATE_SYN_SENT) {
         tcp_sendRst();
+        finPending = peerFinPending = false;
     }
 
     tcpState = TCP_STATE_CLOSED;

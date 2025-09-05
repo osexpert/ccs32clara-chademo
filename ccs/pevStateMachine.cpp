@@ -733,7 +733,6 @@ static void stateFunctionWaitForPreChargeResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.PreChargeRes_isUsed)
       {
-         addToTrace(MOD_PEV, "PreCharge aknowledge received.");
          EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
          Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
 

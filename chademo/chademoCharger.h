@@ -127,14 +127,13 @@ enum CarStatus
 
     /// <summary>
     /// 102.5.6
-    /// Unknown. Possibly related to V2X?
+    /// Unknown. Possibly related to V2X? Old Leafs (ZE0) seem to have this set.
     /// </summary>
     UNKNOWN_102_5_6 = 0x40,
 
     /// <summary>
     /// 102.5.7
     /// car is V2X compatible (can deliver power to grid)
-    /// If you set this flag without also sending messages 208/209, car will fail/ERROR.
     /// </summary>
     DISCHARGE_COMPATIBLE = 0x80,
 };
@@ -331,7 +330,7 @@ struct msg109
             uint8_t ProtocolNumber;
             uint16_t PresentVoltage;
             uint8_t PresentChargingCurrent;
-            uint8_t DischargeCompatible;
+            uint8_t DischargeCompatible; // If you set this to true without also sending messages 208/209, car will fail/ERROR.
             uint8_t Status;
             uint8_t RemainingChargingTime10s;
             uint8_t RemainingChargingTimeMinutes;
@@ -632,6 +631,7 @@ public:
         bool _msg102_recieved = false;
         bool _discovery = true;
         bool _preChargeDoneButStalled = false;
+        uint8_t _idleAskingAmps = 0;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;

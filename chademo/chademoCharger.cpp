@@ -187,7 +187,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent);
         }
 
-        _dischargeActivated = _chargerData.DischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE);
+        _dischargeActivated = _chargerData.DischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
         _msg102_recieved = true;
     }
     if (_msg110_pending)
@@ -276,8 +276,22 @@ bool ChademoCharger::HasElapsedSec(uint16_t sec)
     return (_cyclesInState > (sec * CHA_CYCLES_PER_SEC));
 }
 
+// car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-)
+static const int offsets[] = { 20, 0, -20, 0 };
+static int offset_index = 0;
+
+static int GetCyclicOffset()
+{
+    int result = offsets[offset_index];
+    offset_index = (offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
+    return result;
+}
+
 void ChademoCharger::RunStateMachine()
 {
+    _chargerData.DischargeCurrent = 0; // reset every iteration
+    _chargerData.RemainingDischargeTime = 0; // reset every iteration
+
     _cyclesInState++;
 
     if (_state < ChargerState::ChargingLoop)
@@ -326,8 +340,10 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
-        if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
+        if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
+            _idleAskingAmps = _carData.AskingAmps; // iMiev ask for 1A from the start
+
             // Spec is confusing, but MinimumBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinimumBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
             if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
@@ -362,6 +378,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_preChargeDoneButStalled)
         {
+            // d2 = true is telling the car, you can close contactors now, so precharge voltage must be battery voltage at this point (or close).
             SetSwitchD2(true);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
@@ -371,9 +388,10 @@ void ChademoCharger::RunStateMachine()
     {
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
             // cha 0.9 does not use the flag (or it is unreliable?) so use askingamps as trigger
-            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > 0)
+            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > _idleAskingAmps)
             // cha 0. iMiev ask for 1A from the start and won't ask for more until contactor is closed. It is suggested that iMiev need ~ 1 second after D2:true.
-            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(3)))
+            // Otoh, in the spec 1.0.0, I see that timeout between switch D2=true and CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE is 4 seconds, so give it at least that:
+            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(4)))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             // iMiev seems to ask for amps (>1) approx 1 second after CloseAdapterContactor(), so...iMiev asking amps (>1) seems to be triggered by sensing high voltage at the inlet?
@@ -388,7 +406,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
     {
-        if (_carData.AskingAmps > 0)
+        if (_carData.AskingAmps > _idleAskingAmps)
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING);
@@ -431,24 +449,29 @@ void ChademoCharger::RunStateMachine()
             // Not sure if this is good for anything...if it triggers anything...
             // Possibly this is also a way to get more time, without asking for DischargeCurrent. Not tried it.
 
-            _chargerData.DischargeCurrent = 0; // reset every iteration
-            if (_dischargeActivated && _carData.MaxDischargeCurrent > 0)
+            if (_dischargeActivated)
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_chargingVoltageMirrorsTarget();
                 if (chargerIsDischarger)
                 {
+                    printf("test: discharge\r\n");
                     // one discharger is observed to mirror asked amps as delivered amps.
                     // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps...)
                     _chargerData.OutputCurrent = 0;
                     _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
+                    _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
+                    _chargerData.RemainingDischargeTime = 5; // seen in canlog. not sure what it does...possibly MaxDischargeCurrent can sometimes be 0 but we still want to defeat the 4 second timeouit?
                 }
                 // 3 seconds passed without amps delivered? We are living dangerously. Try to buy us more time!
                 else if (_cyclesInState > (CHA_CYCLES_PER_SEC * 3) && _chargerData.OutputCurrent == 0)
                 {
+                    printf("test: buy time\r\n");
                     // this will/should put the car into discharge mode, where it no longer care about if amps are delivered
                     // (allthou the car will still ask for plenty, it will be happy with getting none)
-                    _chargerData.DischargeCurrent = 1;
+                    _chargerData.DischargeCurrent = min((uint8_t)1, _carData.MaxDischargeCurrent);
+                    _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
+                    _chargerData.RemainingDischargeTime = 5; // seen in canlog. not sure what it does...possibly MaxDischargeCurrent can sometimes be 0 but we still want to defeat the 4 second timeouit?
                 }
             }
         }
