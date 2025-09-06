@@ -12,7 +12,7 @@ extern global_data _global;
 
 void ChademoCharger::SetSwitchD2(bool set)
 {
-    printf("[cha] set switch (d2) %d\r\n", set);
+    printf("[cha] set switch (d2) -> %d\r\n", set);
 
     if (set)
         DigIo::switch_d2_out_inverted.Clear(); // 0: on
@@ -22,7 +22,7 @@ void ChademoCharger::SetSwitchD2(bool set)
 
 void ChademoCharger::SetSwitchD1(bool set)
 {
-    printf("[cha] set switch (d1) %d\r\n", set);
+    printf("[cha] set switch (d1) -> %d\r\n", set);
 
     if (set)
         DigIo::switch_d1_out.Set();
