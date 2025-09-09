@@ -119,7 +119,7 @@ void RunMainStateMachine()
     }
     else if (_state == MainState::WaitForPreChargeStart)
     {
-        if (_global.ccsPreChargeStartedTrigger)
+        if (Param::GetInt(Param::checkpoint) >= 570)
         {
             ledBlinker->setPattern(blink_3);
             _state = MainState::WaitForPreChargeDoneButStalled;
@@ -135,7 +135,7 @@ void RunMainStateMachine()
     }
     else if (_state == MainState::WaitForCurrentDemandLoop)
     {
-        if (_global.ccsCurrentDemandStartedTrigger)
+        if (Param::GetInt(Param::checkpoint) >= 700)
         {
             // barely noticable, removed blink
             _state = MainState::WaitForDeliveringAmps;
@@ -205,7 +205,7 @@ bool ccs_isPowerOffOk()
 {
     // plug is unlocked right after welding detection, so can't use it reliably.
 
-    if (chademoInterface_isCcsInStateEnd()) {
+    if (chademoInterface_ccsInEndState()) {
         // if ended, power off is ok
         return true;
     }
@@ -436,11 +436,9 @@ static void Ms30Task()
 #ifdef CHADEMO_STANDALONE_TESTING
 
     static int delay = 100;
-    delay--;
-    if (delay == 0)
+    if (delay > 0 && --delay == 0)
     {
         chademoInterface_preChargeCompleted();
-        _global.ccsPreChargeStartedTrigger = true;
     }
     return;
 #endif
@@ -461,7 +459,7 @@ static void Ms30Task()
 
     ErrorMessage::SetTime(rtc_get_ms());
 
-    _global.ccsEnded = chademoInterface_isCcsInStateEnd();
+    _global.ccsEnded = chademoInterface_ccsInEndState();
     if (_global.ccsEnded)
         tcp_disconnect(); // kill the last connection, if any
 }

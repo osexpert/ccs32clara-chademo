@@ -632,6 +632,8 @@ public:
         bool _discovery = true;
         bool _preChargeDoneButStalled = false;
         uint8_t _idleAskingAmps = 0;
+        bool _dischargeUnit = false;
+        bool _dischargeSimulation = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;

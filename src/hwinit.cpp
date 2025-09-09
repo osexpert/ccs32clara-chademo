@@ -167,7 +167,7 @@ void can_setup(void) {
         true                // Enable filter
     );
 
-#if false
+#if true
 
     // Match 0x200 and 0x201
     can_filter_id_mask_32bit_init(

@@ -320,7 +320,11 @@ void ChademoCharger::RunStateMachine()
 
     if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart)
     {
-        if (_global.ccsPreChargeStartedTrigger)
+#ifdef CHADEMO_STANDALONE_TESTING
+        if (true)
+#else
+        if (chademoInterface_ccsInPreChargeOrLater())
+#endif
         {
             SetState(ChargerState::Start);
         }
@@ -449,31 +453,36 @@ void ChademoCharger::RunStateMachine()
             // Not sure if this is good for anything...if it triggers anything...
             // Possibly this is also a way to get more time, without asking for DischargeCurrent. Not tried it.
 
+            bool dischargeUnit = false;
+            bool dischargeSimulation = false;
             if (_dischargeActivated)
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
-                bool chargerIsDischarger = chademoInterface_chargingVoltageMirrorsTarget();
+                bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();
                 if (chargerIsDischarger)
                 {
-                    printf("test: discharge\r\n");
                     // one discharger is observed to mirror asked amps as delivered amps.
                     // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps...)
                     _chargerData.OutputCurrent = 0;
                     _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
                     _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
                     _chargerData.RemainingDischargeTime = 5; // seen in canlog. not sure what it does...possibly MaxDischargeCurrent can sometimes be 0 but we still want to defeat the 4 second timeouit?
+                    dischargeUnit = true;
                 }
                 // 3 seconds passed without amps delivered? We are living dangerously. Try to buy us more time!
                 else if (_cyclesInState > (CHA_CYCLES_PER_SEC * 3) && _chargerData.OutputCurrent == 0)
                 {
-                    printf("test: buy time\r\n");
                     // this will/should put the car into discharge mode, where it no longer care about if amps are delivered
                     // (allthou the car will still ask for plenty, it will be happy with getting none)
                     _chargerData.DischargeCurrent = min((uint8_t)1, _carData.MaxDischargeCurrent);
-                    _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
+                    //dont think cycliv voltage make any sense when buying time. now the contactors are already closed and voltages met anyways
+//                    _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
                     _chargerData.RemainingDischargeTime = 5; // seen in canlog. not sure what it does...possibly MaxDischargeCurrent can sometimes be 0 but we still want to defeat the 4 second timeouit?
+                    dischargeSimulation = true;
                 }
             }
+            COMPARE_SET(dischargeUnit, _dischargeUnit, "[cha] DischargeUnit changed %d -> %d\r\n");
+            COMPARE_SET(dischargeSimulation, _dischargeSimulation, "[cha] DischargeSimulation changed %d -> %d\r\n");
         }
     }
     else if (_state == ChargerState::Stopping_Start)
@@ -540,16 +549,48 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
+static bool PrechargeLongerSoWeCanMeasureBatteryVoltageForDiagnosis = false;
+
 bool ChademoCharger::PreChargeCompleted()
 {
     _preChargeDoneButStalled = true;
     _global.ccsPreChargeDoneButStalledTrigger = true;
 
-    // keep it hanging until car contactors closed
-    bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
-    if (!carContactorsClosed)
-        printf("[cha] PreCharge stalled until car contactors closed\r\n");
-    return carContactorsClosed;
+    if (PrechargeLongerSoWeCanMeasureBatteryVoltageForDiagnosis)
+    {
+        bool carAskingAmps = _state > ChargerState::WaitForCarAskingAmps;
+        if (carAskingAmps)
+        {
+            // did not work for starcharge. so...would need to make sure that...we wait until we recieved a precharge result after carAskingAmps entered.
+            // but....................how do we know this is not after?????????????????????????????????????????
+            //if (_preChargeDoneAndCarAskingForAmpsTrigger)
+            {
+                SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
+
+                printf("[cha] Estimated battery voltage deviation:%d\r\n", _chargerData.OutputVoltage - _carData.EstimatedBatteryVoltage);
+
+                //return true; // we have been here once before, meaning this is the first precharge result after carAskingAmps (PreChargeCompleted called in precharge response handler)
+            }
+
+            //_preChargeDoneAndCarAskingForAmpsTrigger = true;
+        }
+        else
+        {
+            printf("[cha] PreCharge stalled until car asking for amps\r\n");
+        }
+            
+        return carAskingAmps;
+    }
+    else
+    {
+        // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
+        // Possibly we could hold on to precharge until ChargingLoop, but the only advantage would be we could, if we are lucky, see the precharge voltage reading of the battery,
+        // but this may be interesting during diagnose!
+        bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
+        if (!carContactorsClosed)
+            printf("[cha] PreCharge stalled until car contactors closed\r\n");
+        return carContactorsClosed;
+    }
 }
 
 extern "C" bool chademoInterface_preChargeCompleted()

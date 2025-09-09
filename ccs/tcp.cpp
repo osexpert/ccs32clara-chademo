@@ -344,7 +344,6 @@ void tcp_disconnect(void)
     }
     else if (tcpState == TCP_STATE_SYN_SENT) {
         tcp_sendRst();
-        finPending = peerFinPending = false;
     }
 
     tcpState = TCP_STATE_CLOSED;

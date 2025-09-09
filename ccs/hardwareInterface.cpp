@@ -7,9 +7,7 @@ extern global_data _global;
 
 int16_t hardwareInterface_getInletVoltage(void)
 {
-    // only called in precharge, so we can abuse it as trigger
-    _global.ccsPreChargeStartedTrigger = true;
-
+    // only called in precharge
     _global.auto_power_off_timer_count_up_ms = 0;
 
     // we have no inlet voltage sensor. 
@@ -28,9 +26,7 @@ int16_t hardwareInterface_getChargingTargetVoltage(void)
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
-    // only called in CurrentDemand, so abuse it as trigger
-    _global.ccsCurrentDemandStartedTrigger = true;
-
+    // only called in CurrentDemand
     _global.auto_power_off_timer_count_up_ms = 0;
 
     return Param::GetInt(Param::ChargeCurrent);

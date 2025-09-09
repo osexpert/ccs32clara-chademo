@@ -1131,10 +1131,15 @@ void pevStateMachine_Mainfunction(void)
    pev_runFsm();
 }
 
-bool chademoInterface_isCcsInStateEnd(){
-    return Param::GetInt(Param::opmode) == PEV_STATE_End;
+bool chademoInterface_ccsInEndState(){
+    return pev_state  == PEV_STATE_End;
 }
 
-int chademoInterface_chargingVoltageMirrorsTarget() {
+int chademoInterface_ccsChargingVoltageMirrorsTarget() {
     return ChargingVoltageDifferentFromTarget_isSet && ChargingVoltageDifferentFromTarget == false;
 }
+
+bool chademoInterface_ccsInPreChargeOrLater() {
+    return pev_state >= PEV_STATE_WaitForPreChargeResponse;
+}
+
