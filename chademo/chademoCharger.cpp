@@ -569,30 +569,20 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
-static bool PrechargeLongerSoWeCanMeasureBatteryVoltageForDiagnosis = false;
+static bool Precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
 
 bool ChademoCharger::PreChargeCompleted()
 {
     _preChargeDoneButStalled = true;
     _global.ccsPreChargeDoneButStalledTrigger = true;
 
-    if (PrechargeLongerSoWeCanMeasureBatteryVoltageForDiagnosis)
+    if (Precharge_Longer_So_We_Can_Measure_Battery_Voltage)
     {
         bool carAskingAmps = _state > ChargerState::WaitForCarAskingAmps;
         if (carAskingAmps)
         {
-            // did not work for starcharge. so...would need to make sure that...we wait until we recieved a precharge result after carAskingAmps entered.
-            // but....................how do we know this is not after?????????????????????????????????????????
-            //if (_preChargeDoneAndCarAskingForAmpsTrigger)
-            {
-                SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
-
-                printf("[cha] Estimated battery voltage deviation:%d\r\n", _chargerData.OutputVoltage - _carData.EstimatedBatteryVoltage);
-
-                //return true; // we have been here once before, meaning this is the first precharge result after carAskingAmps (PreChargeCompleted called in precharge response handler)
-            }
-
-            //_preChargeDoneAndCarAskingForAmpsTrigger = true;
+            SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
+            printf("[cha] Estimated battery voltage deviation:%d\r\n", _chargerData.OutputVoltage - _carData.EstimatedBatteryVoltage);
         }
         else
         {
@@ -604,8 +594,6 @@ bool ChademoCharger::PreChargeCompleted()
     else
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
-        // Possibly we could hold on to precharge until ChargingLoop, but the only advantage would be we could, if we are lucky, see the precharge voltage reading of the battery,
-        // but this may be interesting during diagnose!
         bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
         if (!carContactorsClosed)
             printf("[cha] PreCharge stalled until car contactors closed\r\n");
