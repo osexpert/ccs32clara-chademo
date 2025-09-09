@@ -1032,7 +1032,7 @@ static void stateFunctionSequenceTimeout(void)
    addToTrace(MOD_PEV, "Safe-shutdown-sequence: setting state B");
    setCheckpoint(1100);
    hardwareInterface_setStateB(); /* setting CP line to B disables in the charger the current flow. */
-   tcp_disconnect(); /* Once signaled B, the session is dead: no further valid messages can happen. Close tcp. */
+   tcp_disconnect(); /* Set StateB is our last communication with the charger during safe shutdown, so close tcp as well. */
    pev_DelayCycles = 66; /* 66*30ms=2s for charger shutdown */
    pev_enterState(PEV_STATE_SafeShutDownWaitForChargerShutdown);
 }
