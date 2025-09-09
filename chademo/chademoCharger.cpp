@@ -43,20 +43,22 @@ extern global_data _global;
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-static float GetEstimatedBatteryVoltage(float target, float soc)
+static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0)
 {
     float maxVolt = target - 10;
 
-    float nomVolt;
-    if (target < 410)
+    if (nomVolt == 0)
     {
-        // Low segment: iMiev 370 -> 330 and meets high segment at 410
-        nomVolt = 0.625f * target + 98.75f;
-    }
-    else
-    {
-        // High segment: Leaf 40: 410 -> 355, BMW i5 M60: 450 -> 400
-        nomVolt = 1.125f * target - 106.25f;
+        if (target < 410)
+        {
+            // Low segment: iMiev 370 -> 330 and meets high segment at 410
+            nomVolt = 0.625f * target + 98.75f;
+        }
+        else
+        {
+            // High segment: Leaf 40: 410 -> 355, BMW i5 M60: 450 -> 400
+            nomVolt = 1.125f * target - 106.25f;
+        }
     }
 
     float minVolt = nomVolt - (maxVolt - nomVolt);
@@ -106,6 +108,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         _carData.MinimumChargeCurrent = _msg100.m.MinimumChargeCurrent;
         _carData.MaxBatteryVoltage = _msg100.m.MaximumBatteryVoltage;
+        _carData.MaximumChargeCurrent = _msg100.m.MaximumChargeCurrent;
     }
     if (_msg101_pending)
     {
@@ -184,7 +187,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.SocPercent = 100;
             }
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent);
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent, _nomVoltOverride);
         }
 
         _dischargeActivated = _chargerData.DischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
@@ -346,6 +349,19 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
+            if (_carData.ProtocolNumber == 2
+                && _carData.BatteryCapacityKwh == 0
+                && _carData.TargetBatteryVoltage == 410
+                && _carData.MaxBatteryVoltage == 435
+                && _carData.MaximumChargeCurrent > 0
+                && _carData.MinimumChargeCurrent == 0
+                && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
+                )
+            {
+                printf("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.\r\n");
+                _nomVoltOverride = 380;
+            }
+
             _idleAskingAmps = _carData.AskingAmps; // iMiev ask for 1A from the start
 
             // Spec is confusing, but MinimumBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
@@ -380,6 +396,10 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
+        // TODO: if we start ccs precharge when we enter WaitForPreChargeDone, how long time can we use, after car is ready to charge and before we set d2, without chademo timeout?
+		// If chademo allows for enough time, entering state WaitForPreChargeDone could trigger ccs precharge start (allthou we would loose some seconds where things could be run in parlell).
+		// Alternative: add 2 seconds (or more?) delay between cableCheck done and ccs preCharge start.
+
         if (_preChargeDoneButStalled)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be battery voltage at this point (or close).

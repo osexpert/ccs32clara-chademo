@@ -496,6 +496,7 @@ struct CarData
 
     uint16_t CyclesSinceCarLastAskingAmps;
 
+    uint8_t MaximumChargeCurrent;
     uint8_t MinimumChargeCurrent;
     uint8_t AskingAmps;
 
@@ -632,6 +633,7 @@ public:
         bool _discovery = true;
         bool _preChargeDoneButStalled = false;
         uint8_t _idleAskingAmps = 0;
+        int _nomVoltOverride = 0;
         bool _dischargeUnit = false;
         bool _dischargeSimulation = false;
 

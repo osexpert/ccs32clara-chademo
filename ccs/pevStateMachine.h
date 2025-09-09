@@ -15,6 +15,7 @@ extern "C" {
 /* pev state machine */
 extern void pevStateMachine_Mainfunction(void);
 
+// naming: _ccsXxx if the method is impemented in ccs. Else in chademo.
 extern bool chademoInterface_preChargeCompleted();
 extern bool chademoInterface_carContactorsOpened();
 extern bool chademoInterface_ccsInEndState();
