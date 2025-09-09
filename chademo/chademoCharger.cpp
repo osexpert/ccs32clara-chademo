@@ -490,6 +490,7 @@ void ChademoCharger::RunStateMachine()
                     dischargeUnit = true;
                 }
                 // 3 seconds passed without amps delivered? We are living dangerously. Try to buy us more time!
+                // Consider: what if output current drops to 0 _during_ charging? I guess...we should buy time as usual?
                 else if (_cyclesInState > (CHA_CYCLES_PER_SEC * 3) && _chargerData.OutputCurrent == 0)
                 {
                     // this will/should put the car into discharge mode, where it no longer care about if amps are delivered
