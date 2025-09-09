@@ -323,7 +323,7 @@ void ChademoCharger::RunStateMachine()
 #ifdef CHADEMO_STANDALONE_TESTING
         if (true)
 #else
-        if (chademoInterface_ccsInPreChargeOrLater())
+        if (chademoInterface_ccsCableCheckDone())
 #endif
         {
             SetState(ChargerState::Start);

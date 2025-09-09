@@ -1139,7 +1139,7 @@ int chademoInterface_ccsChargingVoltageMirrorsTarget() {
     return ChargingVoltageDifferentFromTarget_isSet && ChargingVoltageDifferentFromTarget == false;
 }
 
-bool chademoInterface_ccsInPreChargeOrLater() {
-    return pev_state >= PEV_STATE_WaitForPreChargeResponse;
+bool chademoInterface_ccsCableCheckDone() {
+    return pev_state > PEV_STATE_WaitForCableCheckResponse;
 }
 

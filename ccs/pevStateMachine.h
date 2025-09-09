@@ -19,7 +19,7 @@ extern bool chademoInterface_preChargeCompleted();
 extern bool chademoInterface_carContactorsOpened();
 extern bool chademoInterface_ccsInEndState();
 extern int chademoInterface_ccsChargingVoltageMirrorsTarget();
-extern bool chademoInterface_ccsInPreChargeOrLater();
+extern bool chademoInterface_ccsCableCheckDone();
 
 #ifdef __cplusplus
 }
