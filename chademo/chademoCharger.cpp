@@ -570,7 +570,7 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
-static bool Precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
+static bool Precharge_Longer_So_We_Can_Measure_Battery_Voltage = true;
 
 bool ChademoCharger::PreChargeCompleted()
 {
