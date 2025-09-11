@@ -22,7 +22,7 @@
    STATE_ENTRY(WaitForCurrentDownAfterStateB, WaitCurrentDown, 0) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
-   STATE_ENTRY(SequenceTimeout, Timeout, 0) \
+   STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
    STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0) \
    STATE_ENTRY(SafeShutDownWaitForContactorsOpen, WaitForContactorsOpen, 0) \
    STATE_ENTRY(End, End, 0)
@@ -560,7 +560,7 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
             if (pev_numberOfContractAuthenticationReq>=120)   // approx 120 seconds, maybe the user searches two minutes for his RFID card...
             {
                addToTrace(MOD_PEV, "Authentication lasted too long. Giving up.");
-               pev_enterState(PEV_STATE_SequenceTimeout);
+               pev_enterState(PEV_STATE_SafeShutDown);
             }
             else
             {
@@ -632,7 +632,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                    ... The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from
                        https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
                addToTrace(MOD_PEV, "ChargeParameterDiscovery lasted too long:%d Giving up.", pev_numberOfChargeParameterDiscoveryReq);
-               pev_enterState(PEV_STATE_SequenceTimeout);
+               pev_enterState(PEV_STATE_SafeShutDown);
             }
             else
             {
@@ -701,7 +701,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
             if (pev_numberOfCableCheckReq>60)   /* approx 60s should be sufficient for cable check. The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
             {
                addToTrace(MOD_PEV, "CableCheck lasted too long:%d Giving up.", pev_numberOfCableCheckReq);
-               pev_enterState(PEV_STATE_SequenceTimeout);
+               pev_enterState(PEV_STATE_SafeShutDown);
             }
             else
             {
@@ -800,15 +800,23 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
          // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
          // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
          // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
-         addToTrace(MOD_PEV, "PowerDeliveryRes ResponseCode:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+         //addToTrace(MOD_PEV, "PowerDeliveryRes ResponseCode:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
 
          if (pev_wasPowerDeliveryRequestedOn)
          {
-            publishStatus("PwrDelvy ON success", "");
-            addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
-            setCheckpoint(700);
-            pev_sendCurrentDemandReq();
-            pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+            if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
+            {
+               publishStatus("PwrDelvy ON success", "");
+               addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
+               setCheckpoint(700);
+               pev_sendCurrentDemandReq();
+               pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
+            }
+            else
+            {
+               addToTrace(MOD_PEV, "PowerDelivery failed:%d.", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+               pev_enterState(PEV_STATE_SafeShutDown);
+            }
          }
          else
          {
@@ -1024,10 +1032,10 @@ static void stateFunctionWaitForSessionStopResponse(void)
    }
 }
 
-static void stateFunctionSequenceTimeout(void)
+static void stateFunctionSafeShutDown(void)
 {
-   /* Here we end, if we run into a timeout in the state machine. */
-   publishStatus("ERROR Timeout", "");
+   /* Here we end, if we run into a timeout in the state machine (or other error before we reach CurrentDemand). */
+   publishStatus("ERROR Safe-shutdown", "");
    /* Initiate the safe-shutdown-sequence. */
    addToTrace(MOD_PEV, "Safe-shutdown-sequence: setting state B");
    setCheckpoint(1100);
@@ -1115,7 +1123,7 @@ static void pev_runFsm(void)
    if (pev_isTooLong())
    {
       addToTrace(MOD_PEV, "Timeout in dispatcher.");
-      pev_enterState(PEV_STATE_SequenceTimeout);
+      pev_enterState(PEV_STATE_SafeShutDown);
    }
 }
 
