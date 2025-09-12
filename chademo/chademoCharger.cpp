@@ -190,7 +190,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent, _nomVoltOverride);
         }
 
-        _dischargeActivated = _chargerData.DischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
+        _dischargeActivated = _dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
         _msg102_recieved = true;
     }
     if (_msg110_pending)
@@ -570,14 +570,12 @@ void ChademoCharger::RunStateMachine()
     }
 }
 
-static bool Precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
-
 bool ChademoCharger::PreChargeCompleted()
 {
     _preChargeDoneButStalled = true;
     _global.ccsPreChargeDoneButStalledTrigger = true;
 
-    if (Precharge_Longer_So_We_Can_Measure_Battery_Voltage)
+    if (_precharge_Longer_So_We_Can_Measure_Battery_Voltage)
     {
         bool carAskingAmps = _state > ChargerState::WaitForCarAskingAmps;
         if (carAskingAmps)

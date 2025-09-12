@@ -567,7 +567,7 @@ struct ChargerData
     uint8_t MaxDischargeCurrent = 20; 
     uint16_t RemainingDischargeTime;
 
-    bool DischargeEnabled = false;// safe to have this on for all?
+    //bool DischargeEnabled = false;// safe to have this on for all?
 
     // initial value from car, charger count it down
     uint16_t RemainingChargeTimeSec;
@@ -616,6 +616,15 @@ public:
         return _stopReason;
     }
 
+    void EnableDischarge()
+    {
+        _dischargeEnabled = true;
+    }
+    void EnableLongerPrecharge()
+    {
+        _precharge_Longer_So_We_Can_Measure_Battery_Voltage = true;
+    }
+
     void LockChargingPlug() {
         _chargingPlugLockedTrigger = true;
     }
@@ -634,8 +643,10 @@ public:
         bool _preChargeDoneButStalled = false;
         uint8_t _idleAskingAmps = 0;
         int _nomVoltOverride = 0;
+        bool _dischargeEnabled = false;
         bool _dischargeUnit = false;
         bool _dischargeSimulation = false;
+        bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;

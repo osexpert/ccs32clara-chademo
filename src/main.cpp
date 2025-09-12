@@ -47,7 +47,7 @@
 #include "led_blinker.h"
 #include "main.h"
 #include "stm32scheduler.h"
-
+#include "special_modes.h"
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
@@ -65,7 +65,7 @@ volatile uint32_t system_millis;
 #define CCS_TRACE_EVERY_MS 1000 // 1 sec
 #define SYSINFO_EVERY_MS 2000 // 2 sec
 
-enum MainState
+enum MainProgress
 {
     Init,
     WaitForCcsStarted,
@@ -79,93 +79,100 @@ enum MainState
     Stop
 };
 
-MainState _state = MainState::Init;
+MainProgress _state = MainProgress::Init;
 
-void RunMainStateMachine()
+void RunMainProgressStateMachine()
 {
-    if (_global.powerOffPending && _state != MainState::Stop)
+    if (_global.powerOffPending && _state != MainProgress::Stop)
     {
         ledBlinker->setPattern(blink_stop);
-        _state = MainState::Stop;
+        _state = MainProgress::Stop;
     }
 
-    if (_state == MainState::Init)
+    if (_state == MainProgress::Init)
     {
         ledBlinker->setPattern(blink_start);
-        _state = MainState::WaitForCcsStarted;
+        _state = MainProgress::WaitForCcsStarted;
     }
-    else if (_state == MainState::WaitForCcsStarted)
+    else if (_state == MainProgress::WaitForCcsStarted)
     {
         if (_global.ccsKickoff)
         {
-            _state = MainState::WaitForSlacDone;
+            _state = MainProgress::WaitForSlacDone;
         }
     }
-    else if (_state == MainState::WaitForSlacDone)
+    else if (_state == MainProgress::WaitForSlacDone)
     {
         if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
         {
             ledBlinker->setPattern(blink_1);
-            _state = MainState::WaitForTcpConnected;
+            _state = MainProgress::WaitForTcpConnected;
         }
     }
-    else if (_state == MainState::WaitForTcpConnected)
+    else if (_state == MainProgress::WaitForTcpConnected)
     {
         if (Param::GetInt(Param::checkpoint) >= 303) // tcp connected
         {
             ledBlinker->setPattern(blink_2);
-            _state = MainState::WaitForPreChargeStart;
+            _state = MainProgress::WaitForPreChargeStart;
         }
     }
-    else if (_state == MainState::WaitForPreChargeStart)
+    else if (_state == MainProgress::WaitForPreChargeStart)
     {
         if (Param::GetInt(Param::checkpoint) >= 570)
         {
             ledBlinker->setPattern(blink_3);
-            _state = MainState::WaitForPreChargeDoneButStalled;
+            _state = MainProgress::WaitForPreChargeDoneButStalled;
         }
     }
-    else if (_state == MainState::WaitForPreChargeDoneButStalled)
+    else if (_state == MainProgress::WaitForPreChargeDoneButStalled)
     {
         if (_global.ccsPreChargeDoneButStalledTrigger)
         {
             ledBlinker->setPattern(blink_4);
-            _state = MainState::WaitForCurrentDemandLoop;
+            _state = MainProgress::WaitForCurrentDemandLoop;
         }
     }
-    else if (_state == MainState::WaitForCurrentDemandLoop)
+    else if (_state == MainProgress::WaitForCurrentDemandLoop)
     {
         if (Param::GetInt(Param::checkpoint) >= 700)
         {
             // barely noticable, removed blink
-            _state = MainState::WaitForDeliveringAmps;
+            _state = MainProgress::WaitForDeliveringAmps;
         }
     }
-    else if (_state == MainState::WaitForDeliveringAmps)
+    else if (_state == MainProgress::WaitForDeliveringAmps)
     {
         if (Param::GetInt(Param::EvseCurrent) > 0)
         {
             ledBlinker->setPattern(blink_working);
-            _state = MainState::Charging;
+            _state = MainProgress::Charging;
         }
     }
-    else if (_state == MainState::Charging)
+    else if (_state == MainProgress::Charging)
     {
 
     }
 }
 
+void led_on()
+{
+    DigIo::internal_led_out_inverted.Clear();
+    DigIo::external_led_out_inverted.Clear();
+}
+void led_off()
+{
+    DigIo::internal_led_out_inverted.Set();
+    DigIo::external_led_out_inverted.Set();
+}
+
 void LedBlinker::applyLed(bool set)
 {
-    if (set)
-    {
-        DigIo::internal_led_out_inverted.Clear();
-        DigIo::external_led_out_inverted.Clear();
+    if (set) {
+        led_on();
     }
-    else
-    {
-        DigIo::internal_led_out_inverted.Set();
-        DigIo::external_led_out_inverted.Set();
+    else {
+        led_off();
     }
 }
 
@@ -192,8 +199,7 @@ void power_off_no_return(const char* reason)
 
     DigIo::power_on_out.Clear();
 
-    DigIo::external_led_out_inverted.Set(); // led off
-    DigIo::internal_led_out_inverted.Set(); // led off
+    led_off();
 
     while (true)
     {
@@ -231,7 +237,7 @@ void power_off_check()
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
-        if (buttonPressedBriefly && _state != MainState::WaitForSlacDone)
+        if (buttonPressedBriefly && _state != MainProgress::WaitForSlacDone && special_modes_selection_pending() == false)
         {
             _global.powerOffPending = true;
             printf("Stop button pressed briefly and slac not pending. Power off pending...\r\n");
@@ -391,21 +397,40 @@ static void print_ccs_trace()
     }
 }
 
+void special_mode_selected(enum SpecialMode mode)
+{
+    printf("Special mode selected:%d\r\n", mode);
+
+    if (mode == SpecialMode::Discharge)
+        chademoCharger->EnableDischarge();
+    else if (mode == SpecialMode::LongerPrecharge)
+        chademoCharger->EnableLongerPrecharge();
+}
+
 static void Ms100Task(void)
 {
-    if (_global.relayUnweldingAttempt)
-        DigIo::contactor_out.Toggle();
+    bool stopPressed = DigIo::stop_button_in_inverted.Get() == false;
+    special_modes_tick_100ms(stopPressed);
+    if (special_modes_selection_pending())
+    {
+        // waiting...
+    }
     else
-        chademoCharger->Run();
+    {
+        RunMainProgressStateMachine();
+        ledBlinker->tick(); // 100 ms tick
+
+        if (special_modes_get_selected() == SpecialMode::Unwelding)
+            DigIo::contactor_out.Toggle();
+        else
+            chademoCharger->Run();
+    }
 
     _global.auto_power_off_timer_count_up_ms += 100;
 
-    RunMainStateMachine();
-    ledBlinker->tick(); // 100 ms tick
-
     iwdg_reset();
 
-    if (DigIo::stop_button_in_inverted.Get() == false) {
+    if (stopPressed) {
         _global.stopButtonCounter++;
     }
     else {
@@ -420,9 +445,6 @@ static void Ms100Task(void)
 
 static void Ms30Task()
 {
-    if (_global.relayUnweldingAttempt)
-        return;
-
     if (!_global.ccsKickoff)
     {
         // chademo will set these and then ccs can start
@@ -554,13 +576,8 @@ extern "C" int main(void)
     printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
-    if (DigIo::stop_button_in_inverted.Get() == false)
-    {
-        _global.relayUnweldingAttempt = true;
-        DigIo::contactor_out.Toggle();
-        printf("Relay unwelding attempt: hold stop while power on. When you hear contactor close, release stop (before 1sec has passed)\r\n");
-        msleep(1000);
-    }
+    bool stopPressed = DigIo::stop_button_in_inverted.Get() == false;
+    special_modes_init(stopPressed);
 
     systick_setup();
     can_setup();
