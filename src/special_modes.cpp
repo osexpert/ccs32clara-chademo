@@ -73,6 +73,14 @@ void special_modes_tick_100ms(bool button)
             button_released = true;
         }
 
+        // Reflect negative button state on LED, but not until first press
+        if (button && press_count > 0) {
+            led_off();
+        }
+        else {
+            led_on();
+        }
+
         // Count inactivity to start final flash sequence
         if (press_count > 0) {
             gap_ticks++;
