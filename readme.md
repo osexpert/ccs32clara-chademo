@@ -82,8 +82,7 @@ Now press stop button as many times as the mode you want to select:
 - 2: Longer precharge (diagnostics for measuring battery voltage)
 - 3: Contactor unwelding attempt
 
-The led will negatively flag when you press the button.
-When 2 seconds has elapsed since last button press, you will see as many negative flashes as button presses (you may check that negative flashes matches the number of presses you aimed for) and adapter will continue startup.
+When 2 seconds has elapsed since last button press, you will see as many flashes as button presses (in case you want to check they matches the number of presses you aimed for) and adapter will continue startup.
 If you select a mode that does not exist, it will continue with normal startup.
 
 ### Special mode 1: Discharge support
