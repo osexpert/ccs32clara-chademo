@@ -77,13 +77,14 @@ When stop/power off pending, fast blinking [*_]
 ## Special modes
 Hold stop button down while power on to activate special mode. Led will be constantly on. Release stop button after activation.
 If nothing is done within 10 seconds, it will continue with normal startup.
-Now press stop button as many times as the mode you want to activate:
+Now press stop button as many times as the mode you want to select:
 - 1: Discharge support
 - 2: Longer precharge (diagnostics for measuring battery voltage)
 - 3: Contactor unwelding attempt
 
-When 2 seconds has elapsed since last button press, you will see as many negative flashes as selected mode, and adapter will continue startup.
-Button state is read every 100ms, its a chance if you press very fast, it will not catch it. You can verify that the negative flashes matches the number of presses you aimed for:-)
+The led will negatively flag when you press the button.
+When 2 seconds has elapsed since last button press, you will see as many negative flashes as button presses (you may check that negative flashes matches the number of presses you aimed for) and adapter will continue startup.
+If you select a mode that does not exist, it will continue with normal startup.
 
 ### Special mode 1: Discharge support
 Enable discharge support. It will try to detect discharge units and support discharge. It will also simulate discharge, to extend timeout in chademo current loop beyond 4 sec.
