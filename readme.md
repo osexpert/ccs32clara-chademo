@@ -66,10 +66,10 @@ Since the adapter does not have physical locks, to be safe, never unplug the ccs
 ## Led
 <pre>
 Initially, slow blinking [***************_______________]
-When SLAC is done, one blink [***_________]
-When tcp connected, two blinks [***___***_________]
-When PreCharge started, three blinks [***___***___***_________]
-When PreCharge is done, but stalled waiting for chademo, four blinks [***___***___***___***_________]
+When SLAC is done, one blink [**_________]
+When tcp connected, two blinks [**___**_________]
+When PreCharge started, three blinks [**___**___**_________]
+When PreCharge is done, but stalled waiting for chademo, four blinks [**___**___**___**_________]
 When delivering amps, medium blinking [*****_____]
 When stop/power off pending, fast blinking [*_]
 </pre>
