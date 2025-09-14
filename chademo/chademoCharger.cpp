@@ -407,6 +407,10 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
+        else if (IsTimeoutSec(30))
+        {
+            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
+        }
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
