@@ -60,12 +60,12 @@ As soon as SLAC is done, the logic reverts to "shortly pressing".
 When power off is pending, adapter should power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
 Power off pending is set after charging is done and adapter should normally auto power off shortly after charging is stopped.
 Power off pending is set after 3 minutes of inactivity (not being inside ccs PreCharge or CurrentDemand loop).
-When nothing else works, there is a hard power off mode, where a 30 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
+When nothing else works, there is a hard power off mode, where a 10 sec. stop button press will just kill the power. Only do this as last resort, it may hurt the contactors if charging is active.
 Since the adapter does not have physical locks, to be safe, never unplug the ccs plug or the adapter until the adapter/led is permanently off.
 
 ## Led
 <pre>
-Initially, slow blinking [***************_______________]
+Initially, slow blinking [**********__________]
 When SLAC is done, one blink [**_________]
 When tcp connected, two blinks [**___**_________]
 When PreCharge started, three blinks [**___**___**_________]

@@ -187,7 +187,7 @@ void power_off_no_return(const char* reason)
 {
     printf("Power off: %s. Bye!\r\n", reason);
 
-    // In case of emergency shutdown (stop button for 30 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
+    // In case of emergency shutdown (stop button for 10 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
     // Its better to sacrefice the adapter instead of the car, so power off adapter contactor explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
@@ -223,10 +223,10 @@ bool ccs_isPowerOffOk()
 
 void power_off_check()
 {
-    bool buttonPressed30Seconds = _global.stopButtonCounter > 10 * 30; // 30 seconds
-    if (buttonPressed30Seconds)
+    bool buttonPressed10Seconds = _global.stopButtonCounter > 10 * 10; // 10 seconds
+    if (buttonPressed10Seconds)
     {
-        power_off_no_return("Stop pressed for 30sec -> force off");
+        power_off_no_return("Stop pressed for 10sec -> force off");
     }
 
     // Power off pending detector

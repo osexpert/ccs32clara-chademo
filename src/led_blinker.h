@@ -9,7 +9,7 @@ static const  uint8_t blink_3[] = { 2, 3, 2, 3, 2, 9, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_2[] = { 2, 3, 2, 9, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_1[] = { 2, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_working[] = { 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-static const  uint8_t blink_start[] = { 15, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_start[] = { 10, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_stop[] = { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 class LedBlinker
