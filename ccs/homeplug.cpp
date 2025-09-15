@@ -383,7 +383,6 @@ static void evaluateSlacMatchCnf(void)
           composeSetKey();
           addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint170: transmitting CM_SET_KEY.REQ");
           setCheckpoint(170);
-          publishStatus("SLAC", "set key");
           myEthTransmit();
           if (pevSequenceState==STATE_WAITING_FOR_SLAC_MATCH_CNF)   // we were waiting for finishing the SLAC_MATCH.CNF and SET_KEY.REQ
           {
@@ -457,7 +456,6 @@ static void evaluateSetKeyCnf(void)
    else
    {
       addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says %d, this is formally 'rejected', but indeed ok.", result);
-      publishStatus("modem is", "restarting");
       connMgr_SlacOk();
    }
 }
@@ -589,7 +587,6 @@ void runSlacSequencer(void)
    }
    if (pevSequenceState==STATE_READY_FOR_SLAC)
    {
-      publishStatus("Starting SLAC", "");
       addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
       setCheckpoint(100);
       composeSlacParamReq();
@@ -697,7 +694,6 @@ void runSlacSequencer(void)
          return;
       }
       composeSlacMatchReq();
-      publishStatus("SLAC", "match req");
       addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...");
       setCheckpoint(150);
       myEthTransmit();
@@ -792,7 +788,6 @@ void runSdpStateMachine(void)
    if (sdp_state==0)
    {
       // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
-      publishStatus("SDP ongoing", "");
       addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
       setCheckpoint(200);
       pevSequenceDelayCycles=0;

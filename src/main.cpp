@@ -420,7 +420,7 @@ static void Ms100Task(void)
         RunMainProgressStateMachine();
         ledBlinker->tick(); // 100 ms tick
 
-        if (special_modes_get_selected() == SpecialMode::Unwelding)
+        if (special_modes_is_selected(SpecialMode::Unwelding))
             DigIo::contactor_out.Toggle();
         else
             chademoCharger->Run();

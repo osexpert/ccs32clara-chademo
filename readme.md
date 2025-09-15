@@ -84,6 +84,7 @@ Now press stop button as many times as the mode you want to select:
 
 When 2 seconds has elapsed since last button press, you will see as many flashes as button presses (in case you want to check they matches the number of presses you aimed for) and adapter will continue startup.
 If you select a mode that does not exist, it will continue with normal startup.
+After you have selected a mode, it is possible to combine it with another mode, by holding stop button down for ca. 1 second, until led turns on. Now select additional mode.
 
 ### Special mode 1: Discharge support
 Enable discharge support. It will try to detect discharge units and support discharge. It will also simulate discharge, to extend timeout in chademo current loop beyond 4 sec.

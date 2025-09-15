@@ -82,7 +82,6 @@ void evaluateUdpPayload(void) {
                      evseMac[i] = myethreceivebuffer[6+i]; // source MAC starts at offset 6
                   }
                }
-               publishStatus("SDP finished", "");
                addToTrace(MOD_SDP, "[SDP] Now we know the chargers IP.");
                readModemVersions(); /* read the software versions from our modem and from the chargers modem. Just for information/logging. */
                connMgr_SdpOk();

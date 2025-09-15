@@ -9,7 +9,6 @@ void modemFinder_Mainfunction(void) {
   if ((connMgr_getConnectionLevel()==CONNLEVEL_5_ETH_LINK_PRESENT) && (mofi_state==0)) {
     /* We want the modem search only, if no connection is present at all. */
     addToTrace(MOD_MODEMFINDER, "[ModemFinder] Starting modem search");
-    publishStatus("Modem search", "");
     composeGetSwReq();
     myEthTransmit();
     setCheckpoint(6); /* "checking for local modem presence" */
@@ -26,7 +25,6 @@ void modemFinder_Mainfunction(void) {
     }
     /* waiting time is expired. Lets look how many responses we got. */
     addToTrace_bytes(MOD_MODEMFINDER, "[ModemFinder] Number of modems:", &numberOfSoftwareVersionResponses, 1);
-    publishStatus("Modems:", String(numberOfSoftwareVersionResponses));
     if (numberOfSoftwareVersionResponses>0) {
       connMgr_ModemFinderOk(numberOfSoftwareVersionResponses);
     }

@@ -396,9 +396,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        // TODO: if we start ccs precharge when we enter WaitForPreChargeDone, how long time can we use, after car is ready to charge and before we set d2, without chademo timeout?
-		// If chademo allows for enough time, entering state WaitForPreChargeDone could trigger ccs precharge start (allthou we would loose some seconds where things could be run in parlell).
-		// Alternative: add 2 seconds (or more?) delay between cableCheck done and ccs preCharge start.
+        // TODO: if we start ccs precharge when we enter WaitForPreChargeDone, how long time can we use, after car is ready to charge and before we set d2, without chademo timeout? I think the spec says 20-22sec.
+		// If chademo allows for enough time, entering state WaitForPreChargeDone could trigger ccs precharge start (allthou we would loose some seconds where things could be run in paralell).
+		// Alternative: add 2 seconds delay between cableCheck done and ccs preCharge start.
 
         if (_preChargeDoneButStalled)
         {
@@ -414,7 +414,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false)
+        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) // ca. 2 seconds after D2
             // cha 0.9 does not use the flag (or it is unreliable?) so use askingamps as trigger
             || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > _idleAskingAmps)
             // cha 0. iMiev ask for 1A from the start and won't ask for more until contactor is closed. It is suggested that iMiev need ~ 1 second after D2:true.
@@ -434,7 +434,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarAskingAmps)
     {
-        if (_carData.AskingAmps > _idleAskingAmps)
+        if (_carData.AskingAmps > _idleAskingAmps) // 1-2 sec after 102.5.3
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING);

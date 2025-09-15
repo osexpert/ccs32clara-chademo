@@ -21,4 +21,4 @@ enum SpecialMode
 };
 
 // Returns the selected mode number (press count), or 0 if none yet.
-enum SpecialMode special_modes_get_selected(void);
+bool special_modes_is_selected(SpecialMode mode);
