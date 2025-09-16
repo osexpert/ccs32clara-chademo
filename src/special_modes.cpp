@@ -22,8 +22,9 @@ typedef enum {
 static bool mode_active = false;
 static mode_state_t mode_state = MODE_WAIT_PRESS;
 
-static uint8_t press_count = 0;
-static bool button_released = true;
+static uint8_t click_count = 0;
+static bool button_pressed = false;
+static bool button_released = false;
 
 static uint16_t idle_ticks = 0;
 static uint16_t gap_ticks = 0;
@@ -41,29 +42,11 @@ static uint8_t inter_pause_ticks = 0; // << declared and used in pause state
 
 // ------------------------------------------------------
 
-void special_modes_init(bool button_pressed)
+void special_modes_init(bool button)
 {
-    if (button_pressed) {
+    if (button) {
         mode_active = true;
-        mode_state = MODE_WAIT_PRESS;
-        press_count = 0;
-        idle_ticks = 0;
-        gap_ticks = 0;
-        press_ticks = 0;
-        command_index = 0;
-        current_command = 0;
-        flash_phase = 0;
-        flash_ticks = 0;
-        current_flashes_remaining = 0;
-        inter_pause_ticks = 0;
         led_on();
-        button_released = false; // wait for release before counting
-    }
-    else {
-        mode_active = false;
-        command_index = 0;
-        led_off();
-        button_released = true;
     }
 }
 
@@ -77,50 +60,51 @@ void special_modes_tick_100ms(bool button)
 
     case MODE_WAIT_PRESS:
         // Detect presses and long-press-stored-commands
-        if (button) {
-            if (button_released) {
-                // new press edge
-                press_count++;
+        if (button) 
+        {
+            if (button_released)
+            {
+                button_pressed = true;
                 gap_ticks = 0;
                 idle_ticks = 0;
-                press_ticks = 0;
-                button_released = false;
-            }
-            else {
+
                 // button held
                 press_ticks++;
-                if (press_count > 0 && press_ticks >= LONG_PRESS_TICKS) {
+                if (click_count > 0 && press_ticks >= LONG_PRESS_TICKS) {
                     // store previous command and prepare for next
                     if (command_index < MAX_COMMANDS) {
-                        command_list[command_index++] = press_count - 1; // important: need to remove the initial press_count added in the if (button_released) first time around
+                        command_list[command_index++] = click_count;
                     }
-                    press_count = 0;
-                    gap_ticks = 0;
-                    idle_ticks = 0;
+                    click_count = 0;
                     press_ticks = 0;
+                    button_pressed = false; // prevent this from being registered as a click when button is released
+                    button_released = false; // prevent button_pressed = true, above, after if (button_released) check. will also prevent led from tuning off.
                     led_on(); // indicate ready for next command
                 }
             }
         }
-        else {
+        else // button not pressed (released)
+        {
+            if (button_pressed) {
+                click_count++;
+                button_pressed = false;
+            }
             button_released = true;
             press_ticks = 0;
         }
 
-        // Reflect button state on LED (only meaningful when press_count>0)
-        if (press_count > 0) {
-            if (button) led_off();
-            else led_on();
-        }
+        // Reflect button state on LED (inverted)
+        if (button && button_pressed) led_off();
+        else if (!button) led_on();
 
-        // Inactivity ends current command & starts final sequence
-        if (press_count > 0) {
+        if (click_count > 0) {
+            // Inactivity ends current command & starts final sequence
             gap_ticks++;
             if (gap_ticks >= PRESS_GAP_TICKS) {
                 if (command_index < MAX_COMMANDS) {
-                    command_list[command_index++] = press_count;
+                    command_list[command_index++] = click_count;
                 }
-                press_count = 0;
+                click_count = 0;
                 mode_state = MODE_FINAL_NEXT_COMMAND;
                 current_command = 0;
             }
