@@ -232,7 +232,7 @@ void ChademoCharger::HandlePendingCarMessages()
 bool ChademoCharger::IsDiscoveryCompleted()
 {
     // if discovery, we go here when done
-    return _state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart;
+    return _state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
 }
 
 void ChademoCharger::Run()
@@ -321,7 +321,7 @@ void ChademoCharger::RunStateMachine()
         _chargerData.RemainingChargeTimeCycles = _chargerData.RemainingChargeTimeSec * CHA_CYCLES_PER_SEC;
     }
 
-    if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart)
+    if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone)
     {
 #ifdef CHADEMO_STANDALONE_TESTING
         if (true)
@@ -377,7 +377,7 @@ void ChademoCharger::RunStateMachine()
                 _discovery = false;
                 printf("[cha] Discovery completed\r\n");
 
-                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForPreChargeStart);
+                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone);
             }
             else
             {
@@ -414,12 +414,11 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) // ca. 2 seconds after D2
+        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
             // cha 0.9 does not use the flag (or it is unreliable?) so use askingamps as trigger
             || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > _idleAskingAmps)
             // cha 0. iMiev ask for 1A from the start and won't ask for more until contactor is closed. It is suggested that iMiev need ~ 1 second after D2:true.
-            // Otoh, in the spec 1.0.0, I see that timeout between switch D2=true and CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE is 4 seconds, so give it at least that:
-            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(4)))
+            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(1)))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             // iMiev seems to ask for amps (>1) approx 1 second after CloseAdapterContactor(), so...iMiev asking amps (>1) seems to be triggered by sensing high voltage at the inlet?

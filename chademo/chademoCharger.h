@@ -201,7 +201,7 @@ enum class StopReason
 
 
 #define CHARGER_STATE_LIST \
-    CHARGER_STATE(PreStart_DiscoveryCompleted_WaitForPreChargeStart) \
+    CHARGER_STATE(PreStart_DiscoveryCompleted_WaitForCableCheckDone) \
     CHARGER_STATE(Start) \
     CHARGER_STATE(WaitForCarReadyToCharge) \
     CHARGER_STATE(WaitForPreChargeDone) \
