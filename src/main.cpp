@@ -405,6 +405,8 @@ void special_mode_selected(enum SpecialMode mode)
         chademoCharger->EnableDischarge();
     else if (mode == SpecialMode::LongerPrecharge)
         chademoCharger->EnableLongerPrecharge();
+    else if (mode == SpecialMode::MoreLogging)
+        _global.moreLogging = true;
 }
 
 static void Ms100Task(void)

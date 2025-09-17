@@ -1,6 +1,9 @@
 #include "ccs32_globals.h"
 #include "projectExiConnector.h"
 
+#include "main.h"
+extern global_data _global;
+
 /* The Charging State Machine for the car */
 //STATE_ENTRY(internalName, friendlyName, timeout in s)
 #define STATE_LIST \
@@ -152,9 +155,11 @@ static void encodeAndTransmit(void)
    projectExiConnector_encode_DinExiDocument();
    //addToTrace("after: g_errn=%d", g_errn);
    //addToTrace("global_streamEncPos=%d", global_streamEncPos);
-#ifdef VERBOSE_EXI_DECODER
-   showAsHex(global_streamEnc.data, global_streamEncPos, "encoded exi");
-#endif
+//#ifdef VERBOSE_EXI_DECODER
+   if (_global.moreLogging) {
+       showAsHex(global_streamEnc.data, global_streamEncPos, "encoded exi");
+   }
+//#endif
    addV2GTPHeaderAndTransmit(global_streamEnc.data, global_streamEncPos);
 }
 
@@ -167,9 +172,11 @@ static void routeDecoderInputData(void)
    */
    global_streamDec.data = &tcp_rxdata[V2GTP_HEADER_SIZE];
    global_streamDec.size = tcp_rxdataLen - V2GTP_HEADER_SIZE;
-#ifdef VERBOSE_EXI_DECODER
-   showAsHex(global_streamDec.data, global_streamDec.size, "decoder will see");
-#endif
+//#ifdef VERBOSE_EXI_DECODER
+   if (_global.moreLogging) {
+       showAsHex(global_streamDec.data, global_streamDec.size, "decoder will see");
+   }
+//#endif
    /* We have something to decode, this is a good sign that the connection is fine.
       Inform the ConnectionManager that everything is fine. */
    connMgr_ApplOk(10);

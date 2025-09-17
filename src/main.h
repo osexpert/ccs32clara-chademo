@@ -42,6 +42,7 @@ struct global_data
     bool ccsKickoff = false;
     bool powerOffPending = false;
     bool ccsEnded = false;
+    bool moreLogging = false;
 
     bool ccsPreChargeDoneButStalledTrigger = false;
     bool ccsConnectorLockingTrigger = false;

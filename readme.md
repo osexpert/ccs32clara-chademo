@@ -79,8 +79,9 @@ Hold stop button down while power on to activate special mode. Led will be const
 If nothing is done within 10 seconds, it will continue with normal startup.
 Now press stop button as many times as the mode you want to select:
 - 1: Discharge support
-- 2: Longer precharge (diagnostics for measuring battery voltage)
+- 2: Read battery voltage via longer precharge
 - 3: Contactor unwelding attempt
+- 4: More logging
 
 When 2 seconds has elapsed since last button press, you will see as many flashes as button presses (in case you want to check they matches the number of presses you aimed for) and adapter will continue startup.
 If you select a mode that does not exist, it will continue with normal startup.
@@ -89,13 +90,16 @@ After you have selected a mode, it is possible to combine it with another mode, 
 ### Special mode 1: Discharge support
 Enable discharge support. It will try to detect discharge units and support discharge. It will also simulate discharge, to extend timeout in chademo current loop beyond 4 sec.
 
-### Special mode 2: Longer precharge
+### Special mode 2: Read battery voltage via longer precharge
 Extend ccs precharge until after car/adapter contactors are closed, so we may get a voltage reading of the battery voltage (diagnostics).
 
 ### Special mode 3: Contactor unwelding attempt
 The contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the process, to see if the contactor becomes unstuck again.
 What to test: with the adapter buttons up, facing the ccs socket, the bottom right pin will be DC+ (you should see markings). DC+ pin should be always connected to the chademo pin on the same side. The DC- pin on the left goes thru a contactor and should be normally open.
 My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
+
+### Special mode 4: More logging
+Will log binary Exi-data sent and recieved.
 
 ## Other
 There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hung.
