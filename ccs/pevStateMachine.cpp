@@ -415,7 +415,6 @@ static void stateFunctionWaitForSupportedApplicationProtocolResponse(void)
                 aphsDoc.supportedAppProtocolRes.ResponseCode,
                 aphsDoc.supportedAppProtocolRes.SchemaID_isUsed,
                 aphsDoc.supportedAppProtocolRes.SchemaID);
-         publishStatus("Schema negotiated", "");
          addToTrace(MOD_PEV, "Checkpoint403: Schema negotiated. And Checkpoint500: Will send SessionSetupReq");
          setCheckpoint(500);
          projectExiConnector_prepare_DinExiDocument();
@@ -466,7 +465,6 @@ static void stateFunctionWaitForSessionSetupResponse(void)
          sessionIdLen = dinDocDec.V2G_Message.Header.SessionID.bytesLen; /* store the received SessionID, we will need it later. */
          addToTrace_bytes(MOD_PEV, "Checkpoint506: The Evse decided for SessionId", sessionId, sessionIdLen);
          setCheckpoint(506);
-         publishStatus("Session established", "");
          addToTrace(MOD_PEV, "Will send ServiceDiscoveryReq");
          projectExiConnector_prepare_DinExiDocument();
          dinDocEnc.V2G_Message.Body.ServiceDiscoveryReq_isUsed = 1u;
@@ -488,7 +486,6 @@ static void stateFunctionWaitForServiceDiscoveryResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.ServiceDiscoveryRes_isUsed)
       {
-         publishStatus("ServDisc done", "");
          addToTrace(MOD_PEV, "Will send ServicePaymentSelectionReq");
          projectExiConnector_prepare_DinExiDocument();
          dinDocEnc.V2G_Message.Body.ServicePaymentSelectionReq_isUsed = 1u;
@@ -514,7 +511,6 @@ static void stateFunctionWaitForServicePaymentSelectionResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.ServicePaymentSelectionRes_isUsed)
       {
-         publishStatus("ServPaySel done", "");
          addToTrace(MOD_PEV, "Checkpoint530: Will send ContractAuthenticationReq");
          setCheckpoint(530);
          projectExiConnector_prepare_DinExiDocument();
@@ -547,7 +543,6 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
          // Or, the authorization is finished. This is shown by EVSEProcessing=Finished.
          if (dinDocDec.V2G_Message.Body.ContractAuthenticationRes.EVSEProcessing == dinEVSEProcessingType_Finished)
          {
-            publishStatus("Auth finished", "");
             addToTrace(MOD_PEV, "Checkpoint538 and 540: Auth is Finished. Will send ChargeParameterDiscoveryReq");
             setCheckpoint(540);
             pev_sendChargeParameterDiscoveryReq();
@@ -566,7 +561,6 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
             {
                // Try again.
                pev_numberOfContractAuthenticationReq += 1; // count the number of tries.
-               publishStatus("Waiting f Auth", "");
                addToTrace(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq #%d", pev_numberOfContractAuthenticationReq);
                encodeAndTransmit();
                // We just stay in the same state, until the timeout elapses.
@@ -597,7 +591,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
          // (B) The charger finished to tell the charge parameters.
          if (dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.EVSEProcessing == dinEVSEProcessingType_Finished)
          {
-            publishStatus("ChargeParams discovered", "");
             addToTrace(MOD_PEV, "Checkpoint550: ChargeParams are discovered.. Will change to state C.");
 #define dcparm dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.DC_EVSEChargeParameter
             int evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
@@ -638,7 +631,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             {
                // Try again.
                pev_numberOfChargeParameterDiscoveryReq += 1; // count the number of tries.
-               publishStatus("disc ChargeParams", "");
                addToTrace(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq #%d", pev_numberOfChargeParameterDiscoveryReq);
                pev_sendChargeParameterDiscoveryReq();
                // we stay in the same state
@@ -687,7 +679,6 @@ static void stateFunctionWaitForCableCheckResponse(void)
          // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
          if ((proc==dinEVSEProcessingType_Finished) && (rc==dinresponseCodeType_OK))
          {
-            publishStatus("CbleChck done", "");
             addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
             addToTrace(MOD_PEV, "Will send PreChargeReq");
             setCheckpoint(570);
@@ -707,7 +698,6 @@ static void stateFunctionWaitForCableCheckResponse(void)
             {
                // cable check not yet finished or finished with bad result -> try again
                pev_numberOfCableCheckReq += 1;
-               publishStatus("CbleChck ongoing", "");
                addToTrace(MOD_PEV, "Will again send CableCheckReq");
                pev_sendCableCheckReq();
                // stay in the same state
@@ -743,7 +733,6 @@ static void stateFunctionWaitForPreChargeResponse(void)
          if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && chademoInterface_preChargeCompleted())
          {
             addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
-            publishStatus("PreCharge done", "");
             // Turn the power relay on.
             hardwareInterface_setPowerRelayOn();
             pev_DelayCycles = 15; /* 15*30ms, explanation see below */
@@ -751,7 +740,6 @@ static void stateFunctionWaitForPreChargeResponse(void)
           }
          else
          {
-            publishStatus("PreChrge ongoing", String(u) + "V");
             addToTrace(MOD_PEV, "Difference too big. Continuing PreCharge.");
             pev_sendPreChargeReq();
             pev_DelayCycles=15; // wait with the next evaluation approx half a second
@@ -806,7 +794,6 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
          {
             if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
             {
-               publishStatus("PwrDelvy ON success", "");
                addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
                setCheckpoint(700);
                pev_sendCurrentDemandReq();
@@ -824,7 +811,6 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
             When we received this response, the charger had up to 1.5s time to ramp down
             the current. On Compleo, there are really 1.5s until we get this response.
             See https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
-            publishStatus("PwrDelvry OFF success", "");
             setCheckpoint(810);
             /* set the CP line to B */
             hardwareInterface_setStateB(); /* ISO Figure 107: The PEV shall set stateB after receiving PowerDeliveryRes and before WeldingDetectionReq */
@@ -908,18 +894,15 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
          {
             if (pev_isAccuFull)
             {
-               publishStatus("Accu full", "");
                addToTrace(MOD_PEV, "Accu is full. Sending PowerDeliveryReq Stop.");
                Param::SetInt(Param::StopReason, STOP_REASON_ACCU_FULL);
             }
             else if (pev_isUserStopRequestOnCarSide)
             {
-               publishStatus("User req stop on car side", "");
                addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
             }
             else if (pev_isUserStopRequestOnChargerSide)
             {
-               publishStatus("User req stop on charger side", "");
                addToTrace(MOD_PEV, "User requested stop on charger side. Sending PowerDeliveryReq Stop.");
             }
 
@@ -933,7 +916,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             /* continue charging loop */
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
             uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
-            //publishStatus("Charging", String(u) + "V", String(hardwareInterface_getSoc()) + "%");
+
             Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
             Param::SetInt(Param::EvseCurrent, evsePresentCurrent);
 
@@ -968,8 +951,6 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
           addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", EVSEPresentVoltage);
           bool voltageIsLow = EVSEPresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
           if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
-
-              publishStatus("WeldingDet done", "");
 
               if (voltageIsLow == false) {
                   if (EVSEPresentVoltage == LastChargingVoltage) {
@@ -1025,7 +1006,6 @@ static void stateFunctionWaitForSessionStopResponse(void)
       if (dinDocDec.V2G_Message.Body.SessionStopRes_isUsed)
       {
          tcp_disconnect();
-         publishStatus("Stopped normally", "");
          addToTrace(MOD_PEV, "Charging is finished");
          pev_enterState(PEV_STATE_End);
       }
@@ -1035,7 +1015,6 @@ static void stateFunctionWaitForSessionStopResponse(void)
 static void stateFunctionSafeShutDown(void)
 {
    /* Here we end, if we run into a timeout in the state machine (or other error before we reach CurrentDemand). */
-   publishStatus("ERROR Safe-shutdown", "");
    /* Initiate the safe-shutdown-sequence. */
    addToTrace(MOD_PEV, "Safe-shutdown-sequence: setting state B");
    setCheckpoint(1100);
