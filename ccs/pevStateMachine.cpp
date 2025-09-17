@@ -78,7 +78,7 @@ static pevstates pev_state=PEV_STATE_NotYetInitialized;
 static uint16_t pev_numberOfContractAuthenticationReq;
 static uint16_t pev_numberOfChargeParameterDiscoveryReq;
 static uint16_t pev_numberOfCableCheckReq;
-static uint8_t pev_wasPowerDeliveryRequestedOn;
+static bool pev_wasPowerDeliveryRequestedOn;
 static int EVSEPresentVoltage;
 static int LastChargingVoltage;
 static uint8_t numberOfWeldingDetectionRounds;
@@ -268,7 +268,7 @@ static void pev_sendPreChargeReq(void)
    encodeAndTransmit();
 }
 
-static void pev_sendPowerDeliveryReq(uint8_t isOn)
+static void pev_sendPowerDeliveryReq(bool isOn)
 {
    pev_wasPowerDeliveryRequestedOn = isOn;
    if (isOn) {
@@ -303,7 +303,6 @@ static void pev_sendPowerDeliveryReq(uint8_t isOn)
 
 static void pev_sendCurrentDemandReq(void)
 {
-   uint16_t UTarget, EVMaximumVoltageLimit;
    projectExiConnector_prepare_DinExiDocument();
    dinDocEnc.V2G_Message.Body.CurrentDemandReq_isUsed = 1u;
    init_dinCurrentDemandReqType(&dinDocEnc.V2G_Message.Body.CurrentDemandReq);
@@ -314,15 +313,12 @@ static void pev_sendCurrentDemandReq(void)
    st.EVRESSSOC = hardwareInterface_getSoc();
 #undef st
    // EVTargetVoltage
-   UTarget = hardwareInterface_getChargingTargetVoltage(); /* The charging target. Scaling is 1V. */
-   EVMaximumVoltageLimit = Param::GetInt(Param::MaxVoltage);
-   if ((UTarget+1>EVMaximumVoltageLimit) && (EVMaximumVoltageLimit>1)) {
-       /* Some chargers run into emergency shutdown, if the requested or actual voltage is above the
-          announced EVMaximumVoltageLimit. That's why we limit here the request. Nevertheless, this
-          is more a workaround than a solution, because a physical overshoot may still lead to
-          emergency shutdown. The solution is to choose an appropriate value of Param::MaxVoltage. */
-       UTarget=EVMaximumVoltageLimit-1;
-       addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is near to EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
+   uint16_t UTarget = hardwareInterface_getChargingTargetVoltage(); /* The charging target. Scaling is 1V. */
+   uint16_t EVMaximumVoltageLimit = Param::GetInt(Param::MaxVoltage);
+   if (EVMaximumVoltageLimit > 1 && UTarget > EVMaximumVoltageLimit) {
+       /* Some chargers run into emergency shutdown, if the requested or actual voltage is above the announced EVMaximumVoltageLimit. */
+       UTarget=EVMaximumVoltageLimit;
+       addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is above EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
               UTarget, EVMaximumVoltageLimit);
    }
 #define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
@@ -759,7 +755,7 @@ static void stateFunctionWaitForContactorsClosed(void)
       return;
    }
    addToTrace(MOD_PEV, "Contactors assumingly finished closing. Sending PowerDeliveryReq.");
-   pev_sendPowerDeliveryReq(1); /* 1 is ON */
+   pev_sendPowerDeliveryReq(true); /* true is ON */
    setCheckpoint(600);
    pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
 }
@@ -902,7 +898,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             }
 
             setCheckpoint(800);
-            pev_sendPowerDeliveryReq(0); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
+            pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                             sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
             pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
          }
