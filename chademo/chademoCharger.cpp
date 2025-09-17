@@ -418,7 +418,7 @@ void ChademoCharger::RunStateMachine()
             // cha 0.9 does not use the flag (or it is unreliable?) so use askingamps as trigger
             || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > _idleAskingAmps)
             // cha 0. iMiev ask for 1A from the start and won't ask for more until contactor is closed. It is suggested that iMiev need ~ 1 second after D2:true.
-            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(1)))
+            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(2)))
         {
             // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
             // iMiev seems to ask for amps (>1) approx 1 second after CloseAdapterContactor(), so...iMiev asking amps (>1) seems to be triggered by sensing high voltage at the inlet?

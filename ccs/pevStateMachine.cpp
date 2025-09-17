@@ -18,6 +18,7 @@ extern global_data _global;
    STATE_ENTRY(WaitForChargeParameterDiscoveryResponse, ChargeParameterDiscovery, 5) /* On some charger models, the chargeParameterDiscovery needs more than a second. Wait at least 5s. */ \
    STATE_ENTRY(WaitForConnectorLock, ConnectorLock, 2) \
    STATE_ENTRY(WaitForCableCheckResponse, CableCheck, 30) \
+   STATE_ENTRY(PreChargeWait, PreChargeWait, 0) \
    STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 30) \
    STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 5) \
    STATE_ENTRY(WaitForPowerDeliveryResponse, PowerDelivery, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
@@ -677,12 +678,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
          if ((proc==dinEVSEProcessingType_Finished) && (rc==dinresponseCodeType_OK))
          {
             addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
-            addToTrace(MOD_PEV, "Will send PreChargeReq");
-            setCheckpoint(570);
-            pev_sendPreChargeReq();
-            connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
-                                (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
-            pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+            pev_enterState(PEV_STATE_PreChargeWait);
          }
          else
          {
@@ -703,6 +699,22 @@ static void stateFunctionWaitForCableCheckResponse(void)
          }
       }
    }
+}
+
+static void stateFunctionPreChargeWait(void)
+{
+    // wait 1-2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 1-2 :-)
+    // Its "impossible" that chademo uses less than 1-2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 1-2 sec here
+    // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
+    if (pev_cyclesInState > 45)
+    {
+        addToTrace(MOD_PEV, "Will send PreChargeReq");
+        setCheckpoint(570);
+        pev_sendPreChargeReq();
+        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
+        //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
+        pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+    }
 }
 
 static void stateFunctionWaitForPreChargeResponse(void)
