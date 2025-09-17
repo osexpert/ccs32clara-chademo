@@ -81,7 +81,6 @@ static uint16_t pev_numberOfCableCheckReq;
 static uint8_t pev_wasPowerDeliveryRequestedOn;
 static int EVSEPresentVoltage;
 static int LastChargingVoltage;
-static uint16_t EVSEMinimumVoltage;
 static uint8_t numberOfWeldingDetectionRounds;
 
 static bool ChargingVoltageDifferentFromTarget;
@@ -595,26 +594,22 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
 #define dcparm dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.DC_EVSEChargeParameter
             int evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
             int evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
-            EVSEMinimumVoltage = combineValueAndMultiplier(dcparm.EVSEMinimumVoltageLimit);
+            int evseMinimumVoltage = combineValueAndMultiplier(dcparm.EVSEMinimumVoltageLimit);
 #undef dcparm
             Param::SetInt(Param::EvseMaxVoltage, evseMaxVoltage);
             Param::SetInt(Param::EvseMaxCurrent, evseMaxCurrent);
+
+            if (hardwareInterface_getAccuVoltage() < evseMinimumVoltage) {
+                // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
+                addToTrace(MOD_PEV, "Warning: evseMinimumVoltage:%d is less than battery voltage:%d", evseMinimumVoltage, hardwareInterface_getAccuVoltage());
+            }
 
             setCheckpoint(550);
             // pull the CP line to state C here:
             hardwareInterface_setStateC();
             addToTrace(MOD_PEV, "Checkpoint555: Locking the connector.");
             hardwareInterface_triggerConnectorLocking();
-            //If we are not ready for charging, don't go past this state -> will time out
-            if (hardwareInterface_stopChargeRequested())
-            {
-               addToTrace(MOD_PEV, "Stopping due to stoprequest.");
-               pev_enterState(PEV_STATE_WaitForServiceDiscoveryResponse);
-            }
-            else
-            {
-               pev_enterState(PEV_STATE_WaitForConnectorLock);
-            }
+            pev_enterState(PEV_STATE_WaitForConnectorLock);
          }
          else
          {
@@ -729,8 +724,8 @@ static void stateFunctionWaitForPreChargeResponse(void)
          uint16_t inletVtg = hardwareInterface_getInletVoltage();
          uint16_t batVtg = hardwareInterface_getAccuVoltage();
 
-         addToTrace(MOD_PEV, "PreCharge aknowledge received. Inlet %dV, accu %dV, uMin %dV", inletVtg, batVtg, EVSEMinimumVoltage);
-         if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && (batVtg > EVSEMinimumVoltage) && chademoInterface_preChargeCompleted())
+         addToTrace(MOD_PEV, "PreCharge aknowledge received. Inlet %dV, accu %dV", inletVtg, batVtg);
+         if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && chademoInterface_preChargeCompleted())
          {
             addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
             // Turn the power relay on.
