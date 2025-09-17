@@ -77,7 +77,7 @@
     VALUE_ENTRY(opmode,             pevSttString,    2000 ) \
 /*    VALUE_ENTRY(version,            VERSTR,          2001 ) \ */ \
 /*    VALUE_ENTRY(lasterr,            errorListString, 2002 ) \ */ \
-    VALUE_ENTRY(PortState,          PORTSTAT,        2030 ) \
+/*    VALUE_ENTRY(PortState,          PORTSTAT,        2030 ) */ \
 /*     VALUE_ENTRY(BasicAcCharging,    OFFON,           2031 ) \ */ \
     VALUE_ENTRY(EvseVoltage,        "V",             2006 ) \
     VALUE_ENTRY(EvseCurrent,        "A",             2010 ) \

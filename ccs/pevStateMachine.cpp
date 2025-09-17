@@ -574,7 +574,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
    }
    if (tcp_rxdataLen>V2GTP_HEADER_SIZE)
    {
-	  Param::SetInt(Param::PortState, PS_CHARGING_DC);  //Set Port state to DC Fastcharging -as this is an attempt !!! TBC if this is the right place for it.
       addToTrace(MOD_PEV, "In state WaitForChargeParameterDiscoveryResponse");
       routeDecoderInputData();
       projectExiConnector_decode_DinExiDocument();
@@ -664,7 +663,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
          rc = dinDocDec.V2G_Message.Body.CableCheckRes.ResponseCode;
          proc = dinDocDec.V2G_Message.Body.CableCheckRes.EVSEProcessing;
          Param::SetInt(Param::EvseVoltage, 0);
-         //addToTrace("The CableCheck result is %d %d", rc, proc);
+         //addToTrace(MOD_PEV, "The CableCheck result is %d %d", rc, proc);
          // We have two cases here:
          // 1) The charger says "cable check is finished and cable ok", by setting ResponseCode=OK and EVSEProcessing=Finished.
          // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
@@ -771,16 +770,6 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
       tcp_rxdataLen = 0; /* mark the input data as "consumed" */
       if (dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed)
       {
-         // FAILED_PowerDeliveryNotApplied (17) seen in cases where precharge voltage was < 20V less than battery voltage,
-         // even if precharge is continued and the precharge voltage rised to battery voltage. This is strange
-         // (not that it is failing, it may create huge inrush current against the charger, when precharge voltage is lower),
-         // but it is strange that it is not failing during the precharge itself, but during PowerDelivery. This made it harder
-         // to guess why it failed, but after experimenting, this seems to be the most likely cause.
-         // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
-         // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
-         // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
-         //addToTrace(MOD_PEV, "PowerDeliveryRes ResponseCode:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
-
          if (pev_wasPowerDeliveryRequestedOn)
          {
             if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
@@ -792,6 +781,14 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
             }
             else
             {
+               // FAILED_PowerDeliveryNotApplied (17) seen in cases where precharge voltage was < 20V less than battery voltage,
+               // even if precharge is continued and the precharge voltage rised to battery voltage. This is strange
+               // (not that it is failing, it may create huge inrush current against the charger, when precharge voltage is lower),
+               // but it is strange that it is not failing during the precharge itself, but during PowerDelivery. This made it harder
+               // to guess why it failed, but after experimenting, this seems to be the most likely cause.
+               // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
+               // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
+               // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
                addToTrace(MOD_PEV, "PowerDelivery failed:%d.", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
                pev_enterState(PEV_STATE_SafeShutDown);
             }
