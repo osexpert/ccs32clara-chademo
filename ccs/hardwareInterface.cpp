@@ -46,23 +46,23 @@ uint8_t hardwareInterface_getIsAccuFull(void)
 
 void hardwareInterface_setPowerRelayOn(void)
 {
-    printf("hardwareInterface_setPowerRelayOn\r\n");
+    println("hardwareInterface_setPowerRelayOn");
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
-    printf("hardwareInterface_setPowerRelayOff\r\n");
+    println("hardwareInterface_setPowerRelayOff");
 }
 
 void hardwareInterface_setStateB(void)
 {
-   printf("hardwareInterface_setStateB\r\n");
+   println("hardwareInterface_setStateB");
    DigIo::state_c_out_inverted.Set();
 }
 
 void hardwareInterface_setStateC(void)
 {
-   printf("hardwareInterface_setStateC\r\n");
+   println("hardwareInterface_setStateC");
    DigIo::state_c_out_inverted.Clear();
 }
 

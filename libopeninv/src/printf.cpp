@@ -217,6 +217,21 @@ int printf(const char *format, ...)
    return print( &pc, format, args );
 }
 
+void println(const char* format, ...)
+{
+	ExternPutChar pc;
+	va_list args;
+	va_start(args, format);
+	print(&pc, format, args);
+	println();
+}
+
+void println()
+{
+	putchar('\r');
+	putchar('\n');
+}
+
 int sprintf(char *out, const char *format, ...)
 {
    StringPutChar pc(out);

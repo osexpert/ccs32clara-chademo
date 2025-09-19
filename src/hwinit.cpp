@@ -105,19 +105,19 @@ void gpio_print_speed(const char* str,uint32_t gpioport, uint16_t gpio)
     switch (res)
     {
     case GPIO_OSPEED_2MHZ:
-        printf("gpio %s speed GPIO_OSPEED_2MHZ\r\n", str);
+        println("gpio %s speed GPIO_OSPEED_2MHZ", str);
         break;
     case GPIO_OSPEED_25MHZ:
-        printf("gpio %s speed GPIO_OSPEED_25MHZ\r\n", str);
+        println("gpio %s speed GPIO_OSPEED_25MHZ", str);
         break;
     case GPIO_OSPEED_50MHZ:
-        printf("gpio %s speed GPIO_OSPEED_50MHZ\r\n", str);
+        println("gpio %s speed GPIO_OSPEED_50MHZ", str);
         break;
     case GPIO_OSPEED_100MHZ:
-        printf("gpio %s speed GPIO_OSPEED_100MHZ\r\n", str);
+        println("gpio %s speed GPIO_OSPEED_100MHZ", str);
         break;
     default:
-        printf("gpio %s speed UNKNOWN\r\n");
+        println("gpio %s speed UNKNOWN");
         break;
     }
 }

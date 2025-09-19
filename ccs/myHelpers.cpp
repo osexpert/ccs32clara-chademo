@@ -17,8 +17,7 @@ void addToTrace(enum Module module, const char* format, ...) {
         va_list args;
         va_start(args, format);
         vprintf(format, args);
-
-        printf("\r\n");
+        println();
     }
 }
 
@@ -27,7 +26,7 @@ void addToTrace_bytes(enum Module module, const char * s, uint8_t* data, uint16_
       printf("%s ", s);
       for (uint16_t i = 0; i < len; i++)
          printf("%02x", data[i]);
-      printf("\r\n");
+      println();
    }
 }
 
@@ -37,7 +36,7 @@ void showAsHex(uint8_t* arr, uint16_t len, const char* info)
     for (uint16_t i = 0; i < len; ++i) {
         printf("%02X", arr[i]);
     }
-    printf("\r\n");
+    println();
 }
 
 void sanityCheck(const char*) {

@@ -121,7 +121,7 @@ static void spiQCA7000DemoReadSignature(void) {
   sig = mySpiRxBuffer[2];
   sig <<= 8;
   sig += mySpiRxBuffer[3];
-  printf("QCA7000 sig is 0x%X\r\n", sig); /* should be AA 55  */
+  println("QCA7000 sig is 0x%X", sig); /* should be AA 55  */
 }
 
 void qca7000setup()
@@ -267,7 +267,7 @@ bool spiQCA7000checkForReceivedData(void) {
   if (availBytes==0) {
      return false; /* nothing to do */
   }
-  //printf("avail rx bytes: %d\r\n", availBytes);
+  //println("avail rx bytes: %d", availBytes);
   if (availBytes<4000) {
       /* in case we would see more then 4000 bytes, this is most likely an error in SPI transmission. We ignore this and in the next
         loop maybe we read a better value */
@@ -387,7 +387,7 @@ void demoQCA7000(void) {
   {
       if (spiQCA7000checkForReceivedData())
       {
-          //printf("QCA: recieved data after %d attempts\r\n", i + 1);
+          //println("QCA: recieved data after %d attempts", i + 1);
           break;
       }
   }

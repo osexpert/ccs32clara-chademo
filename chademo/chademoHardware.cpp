@@ -12,7 +12,7 @@ extern global_data _global;
 
 void ChademoCharger::SetSwitchD2(bool set)
 {
-    printf("[cha] set switch (d2) -> %d\r\n", set);
+    println("[cha] set switch (d2) -> %d", set);
 
     if (set)
         DigIo::switch_d2_out_inverted.Clear(); // 0: on
@@ -22,7 +22,7 @@ void ChademoCharger::SetSwitchD2(bool set)
 
 void ChademoCharger::SetSwitchD1(bool set)
 {
-    printf("[cha] set switch (d1) -> %d\r\n", set);
+    println("[cha] set switch (d1) -> %d", set);
 
     if (set)
         DigIo::switch_d1_out.Set();
@@ -51,14 +51,14 @@ bool ChademoCharger::GetSwitchK()
 /// </summary>
 void ChademoCharger::CloseAdapterContactor()
 {
-    printf("[cha] Adapter contactor closing\r\n");
+    println("[cha] Adapter contactor closing");
 
     DigIo::contactor_out.Set();
 };
 
 void ChademoCharger::OpenAdapterContactor()
 {
-    printf("[cha] Adapter contactor opening\r\n");
+    println("[cha] Adapter contactor opening");
 
     DigIo::contactor_out.Clear();
 };

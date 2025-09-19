@@ -38,5 +38,7 @@ int printf(const char *format, ...);
 int sprintf(char *out, const char *format, ...);
 int fprintf(IPutChar* put, const char *format, ...);
 int vprintf(const char* format, va_list args);
+void println(const char* format, ...);
+void println();
 
 #endif // PRINTF_H_INCLUDED

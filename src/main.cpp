@@ -185,14 +185,14 @@ static void msleep(uint32_t delay)
 
 void power_off_no_return(const char* reason)
 {
-    printf("Power off: %s. Bye!\r\n", reason);
+    println("Power off: %s. Bye!", reason);
 
     // In case of emergency shutdown (stop button for 10 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
     // Its better to sacrefice the adapter instead of the car, so power off adapter contactor explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
     if (DigIo::contactor_out.Get())
     {
-        printf("Contactor was closed! This may be bad...\r\n");
+        println("Contactor was closed! This may be bad...");
         DigIo::contactor_out.Clear();
         msleep(100);
     }
@@ -240,37 +240,37 @@ void power_off_check()
         if (buttonPressedBriefly && _state != MainProgress::WaitForSlacDone && special_modes_selection_pending() == false)
         {
             _global.powerOffPending = true;
-            printf("Stop button pressed briefly and slac not pending. Power off pending...\r\n");
+            println("Stop button pressed briefly and slac not pending. Power off pending...");
         }
         if (buttonPressed5Seconds)
         {
             _global.powerOffPending = true;
-            printf("Stop button pressed for 5 seconds. Power off pending...\r\n");
+            println("Stop button pressed for 5 seconds. Power off pending...");
         }
         if (inactivity)
         {
             _global.powerOffPending = true;
-            printf("Inactivity. Power off pending...\r\n");
+            println("Inactivity. Power off pending...");
         }
 
         if (_global.ccsEnded)
         {
             _global.powerOffPending = true;
-            printf("Ccs ended. Power off pending...\r\n");
+            println("Ccs ended. Power off pending...");
         }
 
         int ccsStopReason = Param::GetInt(Param::StopReason);
         if (ccsStopReason != STOP_REASON_NONE)
         {
             _global.powerOffPending = true;
-            printf("Ccs stop reason 0x%x. Power off pending...\r\n", ccsStopReason);
+            println("Ccs stop reason 0x%x. Power off pending...", ccsStopReason);
         }
 
         StopReason chaStopReason = chademoCharger->GetStopReason();
         if (chaStopReason != StopReason::NONE)
         {
             _global.powerOffPending = true;
-            printf("Chademo stop reason 0x%x. Power off pending...\r\n", chaStopReason);
+            println("Chademo stop reason 0x%x. Power off pending...", chaStopReason);
         }
     }
 
@@ -353,7 +353,7 @@ void print_sysinfo()
         // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
         // during charging car, vcc12 seen between 12.19-12.31V
         // Min values seen and working: vcc4:3.78V vcc12:11.46V
-        printf("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d\r\n",
+        println("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d",
             system_millis / 1000,
             &adc_4_volt, // bypass float to double promotion by passing as reference
             &adc_12_volt, // bypass float to double promotion by passing as reference
@@ -378,7 +378,7 @@ static void print_ccs_trace()
         int state = Param::GetInt(Param::opmode);
         const char* label = pevSttLabels[state];
 
-        printf("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA\r\n",
+        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
             label,
             tcp_getTotalNumberOfRetries(),
             Param::GetInt(Param::EvseVoltage),
@@ -399,7 +399,7 @@ static void print_ccs_trace()
 
 void special_mode_selected(enum SpecialMode mode)
 {
-    printf("Special mode selected:%d\r\n", mode);
+    println("Special mode selected:%d", mode);
 
     if (mode == SpecialMode::Discharge)
         chademoCharger->EnableDischarge();
@@ -454,7 +454,7 @@ static void Ms30Task()
         if (!_global.ccsKickoff)
             return;
 
-        printf("[cha] discovery completed => ccs kickoff\r\n");
+        println("[cha] discovery completed => ccs kickoff");
     }
 
 #ifdef CHADEMO_STANDALONE_TESTING
@@ -496,7 +496,7 @@ static void SetMacAddress()
     mac[1] = DESIG_UNIQUE_ID0 & 0xFF;
     *((uint32_t*)&mac[2]) = DESIG_UNIQUE_ID2;
 
-    printf("Our MAC address: %02x:xx:xx:xx:xx:%02x\r\n", mac[0], mac[5]);
+    println("Our MAC address: %02x:xx:xx:xx:xx:%02x", mac[0], mac[5]);
     //more info: https://community.st.com/t5/stm32-mcus/how-to-obtain-and-use-the-stm32-96-bit-uid/ta-p/621443
     setOurMac(mac);
 }
@@ -508,7 +508,7 @@ static void SetRandomStartPort()
     rng_disable(); // Disable RNG when finished to save power
 
     uint16_t start_port = setStartPort(rand_num);
-    printf("Random start port:%u\r\n", start_port);
+    println("Random start port:%u", start_port);
 }
 
 /* Called when systick fires */
@@ -573,10 +573,10 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    printf("ccs32clara-chademo %s\r\n", GITHUB_VERSION);
-    //printf("experiment: {experiment info here}\r\n");
+    println("ccs32clara-chademo %s", GITHUB_VERSION);
+    //println("experiment: {experiment info here}");
 
-    printf("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d\r\n", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
+    println("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
     bool stopPressed = DigIo::stop_button_in_inverted.Get() == false;
@@ -644,23 +644,21 @@ extern "C" void* memset(void* ptr, int value, size_t num) {
 
 extern "C" void print_crash_info(const char* type, uint32_t* stack)
 {
-    printf("\r\n--- ");
-    printf(type);
-    printf(" ---\r\n");
+    println("--- %s ---", type);
 
-    printf("R0  : 0x%x\r\n", stack[0]);
-    printf("R1  : 0x%x\r\n", stack[1]);
-    printf("R2  : 0x%x\r\n", stack[2]);
-    printf("R3  : 0x%x\r\n", stack[3]);
-    printf("R12 : 0x%x\r\n", stack[4]);
-    printf("LR  : 0x%x\r\n", stack[5]);
-    printf("PC  : 0x%x\r\n", stack[6]);
-    printf("xPSR: 0x%x\r\n", stack[7]);
+    println("R0  : 0x%x", stack[0]);
+    println("R1  : 0x%x", stack[1]);
+    println("R2  : 0x%x", stack[2]);
+    println("R3  : 0x%x", stack[3]);
+    println("R12 : 0x%x", stack[4]);
+    println("LR  : 0x%x", stack[5]);
+    println("PC  : 0x%x", stack[6]);
+    println("xPSR: 0x%x", stack[7]);
 
-    printf("CFSR : 0x%x\r\n", SCB_CFSR);
-    printf("HFSR : 0x%x\r\n", SCB_HFSR);
-    printf("MMFAR: 0x%x\r\n", SCB_MMFAR);
-    printf("BFAR : 0x%x\r\n", SCB_BFAR);
+    println("CFSR : 0x%x", SCB_CFSR);
+    println("HFSR : 0x%x", SCB_HFSR);
+    println("MMFAR: 0x%x", SCB_MMFAR);
+    println("BFAR : 0x%x", SCB_BFAR);
 
     power_off_no_return("fault");
 }

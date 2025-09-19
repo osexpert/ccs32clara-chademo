@@ -34,7 +34,7 @@ Stm32Scheduler::Stm32Scheduler(uint32_t timer)
 
     /* Set prescaler to count at 100 kHz. Most timers run at 2xAPB1 frequency */
     uint32_t clk = rcc_get_timer_clk_freq(timer);
-    printf("Clock for scheduler timer: %d\r\n", clk);
+    println("Clock for scheduler timer: %d", clk);
     //timer_set_prescaler(timer, (rcc_apb2_frequency) / 100000 - 1);
     timer_set_prescaler(timer, (clk / 100000) - 1);
 
@@ -52,12 +52,12 @@ void Stm32Scheduler::AddTask(void (*function)(void), uint16_t period)
 {
     if (nextTask >= MAX_TASKS)
     {
-        printf("can't add more than MAX_TASK!");
+        println("can't add more than MAX_TASK!");
         return;
     }
 
     if (period > 655)
-        printf("period is more than max 655 and will run faster!");
+        println("period is more than max 655 and will run faster!");
 
     /* Disable timer */
     timer_disable_counter(timer);
