@@ -96,15 +96,15 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg100_pending = false;
 
-        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent changed %d -> %d\r\n");
-        COMPARE_SET(_msg100.m.MaximumChargeCurrent, _msg100_isr.m.MaximumChargeCurrent, "[cha] 100.MaximumChargeCurrent changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "[cha] 100.MinimumChargeCurrent %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MaximumChargeCurrent, _msg100_isr.m.MaximumChargeCurrent, "[cha] 100.MaximumChargeCurrent %d -> %d\r\n");
 
-        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage changed %d -> %d\r\n");
-        COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "[cha] 100.MinimumBatteryVoltage %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "[cha] 100.MaximumBatteryVoltage %d -> %d\r\n");
 
-        COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "[cha] 100.SocPercentConstant changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "[cha] 100.SocPercentConstant %d -> %d\r\n");
         
-        COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "[cha] 100.Unused7 changed %d -> %d\r\n");
+        COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "[cha] 100.Unused7 %d -> %d\r\n");
 
         _carData.MinimumChargeCurrent = _msg100.m.MinimumChargeCurrent;
         _carData.MaxBatteryVoltage = _msg100.m.MaximumBatteryVoltage;
@@ -114,14 +114,14 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg101_pending = false;
 
-        COMPARE_SET(_msg101.m.MaximumChargingTime10s, _msg101_isr.m.MaximumChargingTime10s, "[cha] 101.MaximumChargingTime10s changed %d -> %d\r\n");
-        COMPARE_SET(_msg101.m.MaximumChargingTimeMinutes, _msg101_isr.m.MaximumChargingTimeMinutes, "[cha] 101.MaximumChargingTimeMinutes changed %d -> %d\r\n");
-        COMPARE_SET(_msg101.m.EstimatedChargingTimeMinutes, _msg101_isr.m.EstimatedChargingTimeMinutes, "[cha] 101.EstimatedChargingTimeMins changed %d -> %d\r\n");
-        COMPARE_SET(_msg101.m.BatteryCapacity, _msg101_isr.m.BatteryCapacity, "[cha] 101.BatteryCapacity changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.MaximumChargingTime10s, _msg101_isr.m.MaximumChargingTime10s, "[cha] 101.MaximumChargingTime10s %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.MaximumChargingTimeMinutes, _msg101_isr.m.MaximumChargingTimeMinutes, "[cha] 101.MaximumChargingTimeMinutes %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.EstimatedChargingTimeMinutes, _msg101_isr.m.EstimatedChargingTimeMinutes, "[cha] 101.EstimatedChargingTimeMins %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.BatteryCapacity, _msg101_isr.m.BatteryCapacity, "[cha] 101.BatteryCapacity %d -> %d\r\n");
 
-        COMPARE_SET(_msg101.m.Unused0, _msg101_isr.m.Unused0, "[cha] 101.Unused0 changed %d -> %d\r\n");
-        COMPARE_SET(_msg101.m.Unused4, _msg101_isr.m.Unused4, "[cha] 101.Unused4 changed %d -> %d\r\n");
-        COMPARE_SET(_msg101.m.Unused7, _msg101_isr.m.Unused7, "[cha] 101.Unused7 changed %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.Unused0, _msg101_isr.m.Unused0, "[cha] 101.Unused0 %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.Unused4, _msg101_isr.m.Unused4, "[cha] 101.Unused4 %d -> %d\r\n");
+        COMPARE_SET(_msg101.m.Unused7, _msg101_isr.m.Unused7, "[cha] 101.Unused7 %d -> %d\r\n");
 
         _carData.EstimatedChargingTimeMins = _msg101.m.EstimatedChargingTimeMinutes;
 
@@ -137,13 +137,13 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg102_pending = false;
 
-        COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "[cha] 102.ProtocolNumber changed %d -> %d\r\n");
-        COMPARE_SET(_msg102.m.TargetBatteryVoltage, _msg102_isr.m.TargetBatteryVoltage, "[cha] 102.TargetBatteryVoltage changed %d -> %d\r\n");
-        COMPARE_SET(_msg102.m.ChargingCurrentRequest, _msg102_isr.m.ChargingCurrentRequest, "[cha] 102.ChargingCurrentRequest changed %d -> %d\r\n");
-        COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "[cha] 102.Faults changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "[cha] 102.Status changed 0x%x -> 0x%x\r\n");
-        COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "[cha] 102.SocPercent changed %d -> %d\r\n");
-        COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "[cha] 102.Unused7 changed %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "[cha] 102.ProtocolNumber %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.TargetBatteryVoltage, _msg102_isr.m.TargetBatteryVoltage, "[cha] 102.TargetBatteryVoltage %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.ChargingCurrentRequest, _msg102_isr.m.ChargingCurrentRequest, "[cha] 102.ChargingCurrentRequest %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "[cha] 102.Faults 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "[cha] 102.Status 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "[cha] 102.SocPercent %d -> %d\r\n");
+        COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "[cha] 102.Unused7 %d -> %d\r\n");
 
         _carData.CyclesSinceCarLastAskingAmps = 0; // for timeout
         _carData.Faults = (CarFaults)_msg102.m.Faults;
@@ -197,7 +197,7 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg110_pending = false;
 
-        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "[cha] 110.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
+        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "[cha] 110.ExtendedFunction1 0x%x -> 0x%x\r\n");
 
         ExtendedFunction1 extFun = (ExtendedFunction1)_msg110.m.ExtendedFunction1;
         _carData.SupportDynamicAvailableOutputCurrent = has_flag(extFun, ExtendedFunction1::DYNAMIC_CONTROL);
@@ -206,13 +206,13 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg200_pending = false;
 
-        COMPARE_SET(_msg200.m.MaxDischargeCurrentInverted, _msg200_isr.m.MaxDischargeCurrentInverted, "[cha] 200.MaxDischargeCurrentInverted changed %d -> %d\r\n");
-        COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "[cha] 200.Unused1 changed %d -> %d\r\n");
-        COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "[cha] 200.Unused2 changed %d -> %d\r\n");
-        COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "[cha] 200.Unused3 changed %d -> %d\r\n");
-        COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "[cha] 200.MinimumDischargeVoltage changed %d -> %d\r\n");
-        COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "[cha] 200.MinimumBatteryDischargeLevel changed %d -> %d\r\n");
-        COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "[cha] 200.MaxRemainingCapacityForCharging changed %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MaxDischargeCurrentInverted, _msg200_isr.m.MaxDischargeCurrentInverted, "[cha] 200.MaxDischargeCurrentInverted %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "[cha] 200.Unused1 %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "[cha] 200.Unused2 %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "[cha] 200.Unused3 %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "[cha] 200.MinimumDischargeVoltage %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "[cha] 200.MinimumBatteryDischargeLevel %d -> %d\r\n");
+        COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "[cha] 200.MaxRemainingCapacityForCharging %d -> %d\r\n");
 
         _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaxDischargeCurrentInverted;
     }
@@ -220,12 +220,12 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg201_pending = false;
 
-        COMPARE_SET(_msg201.m.ProtocolNumber, _msg201_isr.m.ProtocolNumber, "[cha] 201.ProtocolNumber changed %d -> %d\r\n");
-        COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "[cha] 201.ApproxDischargeCompletionTime changed %d -> %d\r\n");
-        COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "[cha] 201.AvailableVehicleEnergy changed %d -> %d\r\n");
-        COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "[cha] 201.Unused5 changed %d -> %d\r\n");
-        COMPARE_SET(_msg201.m.Unused6, _msg201_isr.m.Unused6, "[cha] 201.Unused6 changed %d -> %d\r\n");
-        COMPARE_SET(_msg201.m.Unused7, _msg201_isr.m.Unused7, "[cha] 201.Unused7 changed %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.ProtocolNumber, _msg201_isr.m.ProtocolNumber, "[cha] 201.ProtocolNumber %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "[cha] 201.ApproxDischargeCompletionTime %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "[cha] 201.AvailableVehicleEnergy %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "[cha] 201.Unused5 %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.Unused6, _msg201_isr.m.Unused6, "[cha] 201.Unused6 %d -> %d\r\n");
+        COMPARE_SET(_msg201.m.Unused7, _msg201_isr.m.Unused7, "[cha] 201.Unused7 %d -> %d\r\n");
     }
 }
 
@@ -238,7 +238,7 @@ bool ChademoCharger::IsDiscoveryCompleted()
 void ChademoCharger::Run()
 {
     // HandlePendingMessages uses _switch_k
-    COMPARE_SET(_switch_k, GetSwitchK(), "[cha] switch(k) changed %d -> %d\r\n");
+    COMPARE_SET(_switch_k, GetSwitchK(), "[cha] switch(k) %d -> %d\r\n");
 
     SetChargerDataFromCcsParams();
     HandlePendingCarMessages();
@@ -505,8 +505,8 @@ void ChademoCharger::RunStateMachine()
                     dischargeSimulation = true;
                 }
             }
-            COMPARE_SET(dischargeUnit, _dischargeUnit, "[cha] DischargeUnit changed %d -> %d\r\n");
-            COMPARE_SET(dischargeSimulation, _dischargeSimulation, "[cha] DischargeSimulation changed %d -> %d\r\n");
+            COMPARE_SET(dischargeUnit, _dischargeUnit, "[cha] DischargeUnit %d -> %d\r\n");
+            COMPARE_SET(dischargeSimulation, _dischargeSimulation, "[cha] DischargeSimulation %d -> %d\r\n");
         }
     }
     else if (_state == ChargerState::Stopping_Start)
@@ -863,19 +863,19 @@ void ChademoCharger::SendChargerMessages()
 
 void ChademoCharger::UpdateChargerMessages()
 {
-    COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "[cha] 108.WeldingDetection changed %d -> %d\r\n");
-    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.AvailableOutputCurrent, "[cha] 108.AvailableOutputCurrent changed %d -> %d\r\n");
-    COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "[cha] 108.AvailableOutputVoltage changed %d -> %d\r\n");
-    COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "[cha] 108.ThresholdVoltage changed %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "[cha] 108.WeldingDetection %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.AvailableOutputCurrent, "[cha] 108.AvailableOutputCurrent %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "[cha] 108.AvailableOutputVoltage %d -> %d\r\n");
+    COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "[cha] 108.ThresholdVoltage %d -> %d\r\n");
 
-    COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber changed %d -> %d\r\n");
-    COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "[cha] 109.ProtocolNumber %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "[cha] 109.OutputCurrent %d -> %d\r\n");
 
-    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeActivated, "[cha] 109.DischargeCompatible changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeActivated, "[cha] 109.DischargeCompatible %d -> %d\r\n");
 
     // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
     uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
-    COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "[cha] 109.OutputVoltage changed %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "[cha] 109.OutputVoltage %d -> %d\r\n");
 
     uint8_t remainingChargingTime10s = 0;
     uint8_t remainingChargingTimeMins = 0;
@@ -890,28 +890,28 @@ void ChademoCharger::UpdateChargerMessages()
         remainingChargingTimeMins = _chargerData.RemainingChargeTimeSec / 60;
     }
 
-    COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "[cha] 109.RemainingChargingTime10s changed %d -> %d\r\n");
-    COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "[cha] 109.RemainingChargingTimeMinutes changed %d -> %d\r\n");
-    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "[cha] 109.Status changed 0x%x -> 0x%x\r\n");
+    COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "[cha] 109.RemainingChargingTime10s %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "[cha] 109.RemainingChargingTimeMinutes %d -> %d\r\n");
+    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "[cha] 109.Status 0x%x -> 0x%x\r\n");
 
     ExtendedFunction1 extFun = {};
     if (_chargerData.SupportDynamicAvailableOutputCurrent) set_flag(&extFun, ExtendedFunction1::DYNAMIC_CONTROL);
-    COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "[cha] 118.ExtendedFunction1 changed 0x%x -> 0x%x\r\n");
+    COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "[cha] 118.ExtendedFunction1 0x%x -> 0x%x\r\n");
 
     if (_dischargeActivated)
     {
-        COMPARE_SET(_msg208.m.MaxDischargeCurrentInverted, 0xff - _chargerData.MaxDischargeCurrent, "[cha] 208.MaxDischargeCurrentInverted changed %d -> %d\r\n"); // 15
+        COMPARE_SET(_msg208.m.MaxDischargeCurrentInverted, 0xff - _chargerData.MaxDischargeCurrent, "[cha] 208.MaxDischargeCurrentInverted %d -> %d\r\n"); // 15
         
-        COMPARE_SET(_msg208.m.PresentDischargeCurrentInverted, 0xff - _chargerData.DischargeCurrent, "[cha] 208.PresentDischargeCurrentInverted changed %d -> %d\r\n"); // 0
+        COMPARE_SET(_msg208.m.PresentDischargeCurrentInverted, 0xff - _chargerData.DischargeCurrent, "[cha] 208.PresentDischargeCurrentInverted %d -> %d\r\n"); // 0
 
         // todo: use _chargerData.AvailableOutputVoltage??
-        COMPARE_SET(_msg208.m.MaxDischargeVoltage, 500, "[cha] 208.MaxDischargeVoltage changed %d -> %d\r\n"); // same
+        COMPARE_SET(_msg208.m.MaxDischargeVoltage, 500, "[cha] 208.MaxDischargeVoltage %d -> %d\r\n"); // same
         // 250...seems random...I think this is something inverted, eg. 255 - 250 = 5. And maybe amps instead of volts...
-        COMPARE_SET(_msg208.m.MinimimDischargeVoltage, 250, "[cha] 208.MinimimDischargeVoltage changed %d -> %d\r\n");
+        COMPARE_SET(_msg208.m.MinimimDischargeVoltage, 250, "[cha] 208.MinimimDischargeVoltage %d -> %d\r\n");
 
-        COMPARE_SET(_msg209.m.RemainingDischargeTime, _chargerData.RemainingDischargeTime, "[cha] 209.RemainingDischargeTime changed %d -> %d\r\n");
+        COMPARE_SET(_msg209.m.RemainingDischargeTime, _chargerData.RemainingDischargeTime, "[cha] 209.RemainingDischargeTime %d -> %d\r\n");
 
-        COMPARE_SET(_msg209.m.ProtocolNumber, _chargerData.DischargeProtocolNumber, "[cha] 209.ProtocolNumber changed %d -> %d\r\n");
+        COMPARE_SET(_msg209.m.ProtocolNumber, _chargerData.DischargeProtocolNumber, "[cha] 209.ProtocolNumber %d -> %d\r\n");
     }
 }
 
