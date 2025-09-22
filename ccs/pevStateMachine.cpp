@@ -703,10 +703,10 @@ static void stateFunctionWaitForCableCheckResponse(void)
 
 static void stateFunctionPreChargeWait(void)
 {
-    // wait 1-2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 1-2 :-)
-    // Its "impossible" that chademo uses less than 1-2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 1-2 sec here
+    // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 2 :-)
+    // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
-    if (pev_cyclesInState > 45)
+    if (pev_cyclesInState > 66) /* 66*30ms=2s */
     {
         addToTrace(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);
@@ -959,7 +959,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
           bool voltageIsLow = EVSEPresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
           if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
 
-              if (voltageIsLow == false) {
+              if (not voltageIsLow) {
                   if (EVSEPresentVoltage == LastChargingVoltage) {
                       // Charger still says it has the same voltage as when we were last charging.
                       // If we were welded, the measured voltage should be battery voltage, and its very unlikely that this would be exactly the same as last charging voltage.
@@ -1130,7 +1130,7 @@ bool chademoInterface_ccsInEndState(){
 }
 
 int chademoInterface_ccsChargingVoltageMirrorsTarget() {
-    return ChargingVoltageDifferentFromTarget_isSet && ChargingVoltageDifferentFromTarget == false;
+    return ChargingVoltageDifferentFromTarget_isSet && not ChargingVoltageDifferentFromTarget;
 }
 
 bool chademoInterface_ccsCableCheckDone() {

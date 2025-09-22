@@ -107,7 +107,7 @@ void evaluateTcpPacket(void)
    }
 
    /* It is no connection setup. We can have the following situations here: */
-   if (tcpState == TCP_STATE_CLOSED && peerFinPending == false)
+   if (tcpState == TCP_STATE_CLOSED && not peerFinPending)
    {
        /* received something while the connection is closed. Just ignore it. */
        addToTrace(MOD_TCP, "[TCP] ignore, not connected.");

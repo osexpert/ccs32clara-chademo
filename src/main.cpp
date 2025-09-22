@@ -217,7 +217,7 @@ bool ccs_isPowerOffOk()
     }
     else {
         // if not ended (maybe not even started), power off ok if plug was never locked
-        return _global.ccsConnectorLockingTrigger == false;
+        return not _global.ccsConnectorLockingTrigger;
     }
 }
 
@@ -237,7 +237,7 @@ void power_off_check()
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
-        if (buttonPressedBriefly && _state != MainProgress::WaitForSlacDone && special_modes_selection_pending() == false)
+        if (buttonPressedBriefly && _state != MainProgress::WaitForSlacDone && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
             println("Stop button pressed briefly and slac not pending. Power off pending...");
@@ -411,7 +411,7 @@ void special_mode_selected(enum SpecialMode mode)
 
 static void Ms100Task(void)
 {
-    bool stopPressed = DigIo::stop_button_in_inverted.Get() == false;
+    bool stopPressed = not DigIo::stop_button_in_inverted.Get();
     special_modes_tick_100ms(stopPressed);
     if (special_modes_selection_pending())
     {
@@ -579,7 +579,7 @@ extern "C" int main(void)
     println("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
-    bool stopPressed = DigIo::stop_button_in_inverted.Get() == false;
+    bool stopPressed = not DigIo::stop_button_in_inverted.Get();
     special_modes_init(stopPressed);
 
     systick_setup();

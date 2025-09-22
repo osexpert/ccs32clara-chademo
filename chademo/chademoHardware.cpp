@@ -34,7 +34,7 @@ void ChademoCharger::SetSwitchD1(bool set)
 
 bool ChademoCharger::GetSwitchK()
 {
-    return DigIo::switch_k_in_inverted.Get() == false; // inverted...0 = on
+    return not DigIo::switch_k_in_inverted.Get(); // inverted...0 = on
 };
 
 

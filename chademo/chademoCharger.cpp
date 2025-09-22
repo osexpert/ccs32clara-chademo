@@ -350,16 +350,24 @@ void ChademoCharger::RunStateMachine()
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
             if (_carData.ProtocolNumber == 2
-                && _carData.BatteryCapacityKwh == 0
                 && _carData.TargetBatteryVoltage == 410
-                && _carData.MaxBatteryVoltage == 435
-                && _carData.MaximumChargeCurrent > 0
-                && _carData.MinimumChargeCurrent == 0
-                && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
-                )
+                && _carData.MaxBatteryVoltage == 435)
             {
-                println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
-                _nomVoltOverride = 380;
+                if (_carData.BatteryCapacityKwh == 0
+                    && _carData.MaximumChargeCurrent > 0
+                    && _carData.MinimumChargeCurrent == 0
+                    && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6))
+                {
+                    println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
+                    _nomVoltOverride = 380;
+                }
+                else if (_carData.BatteryCapacityKwh > 0
+                    && _carData.MaximumChargeCurrent == 0
+                    && _carData.MinimumChargeCurrent > 0
+                    && not has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6))
+                {
+                    println("[cha] Traits: Looks like a Leaf ZE1?");
+                }
             }
 
             _idleAskingAmps = _carData.AskingAmps; // iMiev ask for 1A from the start
@@ -414,14 +422,14 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) == false) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // cha 0.9 does not use the flag (or it is unreliable?) so use askingamps as trigger
-            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0_9 && _carData.AskingAmps > _idleAskingAmps)
-            // cha 0. iMiev ask for 1A from the start and won't ask for more until contactor is closed. It is suggested that iMiev need ~ 1 second after D2:true.
-            || (_carData.ProtocolNumber == ProtocolNumber::Chademo_0 && HasElapsedSec(2)))
+        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
+            // chademo 0.9 (and earlier) did not have the flag, use askingamps as trigger
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > _idleAskingAmps)
+            )
         {
-            // Car seems to demand 0 volt on the wire when D2=true, else it wont close....at least not easily!!! This hack makes it work reliably.
-            // iMiev seems to ask for amps (>1) approx 1 second after CloseAdapterContactor(), so...iMiev asking amps (>1) seems to be triggered by sensing high voltage at the inlet?
+            // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
+            // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
+            // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarAskingAmps);
@@ -457,8 +465,8 @@ void ChademoCharger::RunStateMachine()
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reasons
         if (_carData.CyclesSinceCarLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
-        if (_switch_k == false) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
-        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE) == false) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
+        if (not _switch_k) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
+        if (not has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reasons
@@ -925,7 +933,7 @@ bool ChademoCharger::IsPowerOffOk()
     }
     else {
         // not stopped (maybe not even started), then power off ok if plug was never locked
-        return _chargingPlugLockedTrigger == false;
+        return not _chargingPlugLockedTrigger;
     }
 }
 
