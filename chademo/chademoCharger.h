@@ -206,7 +206,7 @@ enum class StopReason
     CHARGER_STATE(WaitForCarReadyToCharge) \
     CHARGER_STATE(WaitForPreChargeDone) \
     CHARGER_STATE(WaitForCarContactorsClosed) \
-    CHARGER_STATE(WaitForCarAskingAmps) \
+    CHARGER_STATE(WaitForCarRequestCurrent) \
     CHARGER_STATE(ChargingLoop) \
     CHARGER_STATE(Stopping_Start) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
@@ -274,7 +274,7 @@ struct msg102
         struct {
             uint8_t ProtocolNumber;
             uint16_t TargetVoltage;
-            uint8_t AskingAmps; // TODO: rename RequestCurrent?
+            uint8_t RequestCurrent;
             uint8_t Faults;
             uint8_t Status;
             uint8_t SocPercent;
@@ -494,11 +494,11 @@ struct CarData
     uint16_t TargetVoltage;
     uint16_t EstimatedBatteryVoltage;
 
-    uint16_t CyclesSinceCarLastAskingAmps;
+    uint16_t CyclesSinceCarLastRequestCurrent;
 
     uint8_t MinCurrent;
     uint8_t MaxCurrent;
-    uint8_t AskingAmps;
+    uint8_t RequestCurrent;
 
     // PS: unstable before switch (k)
     uint8_t SocPercent;
@@ -641,7 +641,7 @@ public:
         bool _msg102_recieved = false;
         bool _discovery = true;
         bool _preChargeDoneButStalled = false;
-        uint8_t _idleAskingAmps = 0;
+        uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
         bool _dischargeEnabled = false;
         bool _dischargeUnit = false;

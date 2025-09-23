@@ -140,13 +140,13 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
-        COMPARE_SET(_msg102.m.AskingAmps, _msg102_isr.m.AskingAmps, "102.AskingAmps %d -> %d");
+        COMPARE_SET(_msg102.m.RequestCurrent, _msg102_isr.m.RequestCurrent, "102.RequestCurrent %d -> %d");
         COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%x -> 0x%x");
         COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "102.Status 0x%x -> 0x%x");
         COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "102.SocPercent %d -> %d");
         COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "102.Unused7 %d -> %d");
 
-        _carData.CyclesSinceCarLastAskingAmps = 0; // for timeout
+        _carData.CyclesSinceCarLastRequestCurrent = 0; // for timeout
         _carData.Faults = (CarFaults)_msg102.m.Faults;
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
@@ -161,14 +161,14 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.AskingAmps > _chargerData.MaxAvailableOutputCurrent)
+        if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
         {
-            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.AskingAmps, _chargerData.MaxAvailableOutputCurrent);
+            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
         {
-            _carData.AskingAmps = _msg102.m.AskingAmps;
+            _carData.RequestCurrent = _msg102.m.RequestCurrent;
         }
 
         // soc and the constant both unstable before switch(k)
@@ -259,7 +259,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
 
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
-    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 0);
+    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
 
     Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
 }
@@ -371,7 +371,7 @@ void ChademoCharger::RunStateMachine()
                 }
             }
 
-            _idleAskingAmps = _carData.AskingAmps; // iMiev ask for 1A from the start
+            _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
 
             // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
@@ -424,8 +424,8 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // chademo 0.9 (and earlier) did not have the flag, use askingamps as trigger
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.AskingAmps > _idleAskingAmps)
+            // chademo 0.9 (and earlier) did not have the flag, use RequestCurrent as trigger
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.RequestCurrent > _idleRequestCurrent)
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
@@ -433,16 +433,16 @@ void ChademoCharger::RunStateMachine()
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
             CloseAdapterContactor();
 
-            SetState(ChargerState::WaitForCarAskingAmps);
+            SetState(ChargerState::WaitForCarRequestCurrent);
         }
         else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
-    else if (_state == ChargerState::WaitForCarAskingAmps)
+    else if (_state == ChargerState::WaitForCarRequestCurrent)
     {
-        if (_carData.AskingAmps > _idleAskingAmps) // 1-2 sec after 102.5.3
+        if (_carData.RequestCurrent > _idleRequestCurrent) // 1-2 sec after 102.5.3
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING);
@@ -465,7 +465,7 @@ void ChademoCharger::RunStateMachine()
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reasons
-        if (_carData.CyclesSinceCarLastAskingAmps++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
+        if (_carData.CyclesSinceCarLastRequestCurrent++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
         if (not _switch_k) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
         if (not has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
@@ -589,7 +589,7 @@ bool ChademoCharger::PreChargeCompleted()
 
     if (_precharge_Longer_So_We_Can_Measure_Battery_Voltage)
     {
-        bool carAskingAmps = _state > ChargerState::WaitForCarAskingAmps;
+        bool carAskingAmps = _state > ChargerState::WaitForCarRequestCurrent;
         if (carAskingAmps)
         {
             SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
@@ -663,11 +663,11 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
-    // If difference between AskingAmps and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
+    // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
     // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.AskingAmps > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.SupportDynamicAvailableOutputCurrent)
+    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.SupportDynamicAvailableOutputCurrent)
         _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
     else
         _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
@@ -686,7 +686,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
         SetChargerData(ADAPTER_MAX_VOLTS, 
             ADAPTER_MAX_AMPS, 
             _carData.EstimatedBatteryVoltage,
-            0 //_carData.AskingAmps
+            0 //_carData.RequestCurrent
         );
     }
 #endif
@@ -719,7 +719,7 @@ void ChademoCharger::Log(bool force)
             _chargerData.ThresholdVoltage,
             _chargerData.Status,
 
-            _carData.AskingAmps,
+            _carData.RequestCurrent,
             &_carData.BatteryCapacityKwh,  // bypass float to double promotion by passing as reference
             _carData.EstimatedChargingTimeMins,
             _carData.Faults,
