@@ -96,26 +96,27 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg100_pending = false;
 
-        COMPARE_SET(_msg100.m.MinimumChargeCurrent, _msg100_isr.m.MinimumChargeCurrent, "100.MinimumChargeCurrent %d -> %d");
-        COMPARE_SET(_msg100.m.MaximumChargeCurrent, _msg100_isr.m.MaximumChargeCurrent, "100.MaximumChargeCurrent %d -> %d");
+        COMPARE_SET(_msg100.m.MinCurrent, _msg100_isr.m.MinCurrent, "100.MinCurrent %d -> %d");
+        COMPARE_SET(_msg100.m.MaxCurrent, _msg100_isr.m.MaxCurrent, "100.MaxCurrent %d -> %d");
 
-        COMPARE_SET(_msg100.m.MinimumBatteryVoltage, _msg100_isr.m.MinimumBatteryVoltage, "100.MinimumBatteryVoltage %d -> %d");
-        COMPARE_SET(_msg100.m.MaximumBatteryVoltage, _msg100_isr.m.MaximumBatteryVoltage, "100.MaximumBatteryVoltage %d -> %d");
+        COMPARE_SET(_msg100.m.MinVoltage, _msg100_isr.m.MinVoltage, "100.MinVoltage %d -> %d");
+        COMPARE_SET(_msg100.m.MaxVoltage, _msg100_isr.m.MaxVoltage, "100.MaxVoltage %d -> %d");
 
         COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "100.SocPercentConstant %d -> %d");
         
         COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "100.Unused7 %d -> %d");
 
-        _carData.MinimumChargeCurrent = _msg100.m.MinimumChargeCurrent;
-        _carData.MaxBatteryVoltage = _msg100.m.MaximumBatteryVoltage;
-        _carData.MaximumChargeCurrent = _msg100.m.MaximumChargeCurrent;
+        _carData.MaxVoltage = _msg100.m.MaxVoltage;
+
+        _carData.MinCurrent = _msg100.m.MinCurrent;
+        _carData.MaxCurrent = _msg100.m.MaxCurrent;
     }
     if (_msg101_pending)
     {
         _msg101_pending = false;
 
-        COMPARE_SET(_msg101.m.MaximumChargingTime10s, _msg101_isr.m.MaximumChargingTime10s, "101.MaximumChargingTime10s %d -> %d");
-        COMPARE_SET(_msg101.m.MaximumChargingTimeMinutes, _msg101_isr.m.MaximumChargingTimeMinutes, "101.MaximumChargingTimeMinutes %d -> %d");
+        COMPARE_SET(_msg101.m.MaxChargingTime10s, _msg101_isr.m.MaxChargingTime10s, "101.MaxChargingTime10s %d -> %d");
+        COMPARE_SET(_msg101.m.MaxChargingTimeMinutes, _msg101_isr.m.MaxChargingTimeMinutes, "101.MaxChargingTimeMinutes %d -> %d");
         COMPARE_SET(_msg101.m.EstimatedChargingTimeMinutes, _msg101_isr.m.EstimatedChargingTimeMinutes, "101.EstimatedChargingTimeMins %d -> %d");
         COMPARE_SET(_msg101.m.BatteryCapacity, _msg101_isr.m.BatteryCapacity, "101.BatteryCapacity %d -> %d");
 
@@ -125,10 +126,10 @@ void ChademoCharger::HandlePendingCarMessages()
 
         _carData.EstimatedChargingTimeMins = _msg101.m.EstimatedChargingTimeMinutes;
 
-        if (_msg101.m.MaximumChargingTime10s == 0xff)
-            _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTimeMinutes * 60;
+        if (_msg101.m.MaxChargingTime10s == 0xff)
+            _carData.MaxChargingTimeSec = _msg101.m.MaxChargingTimeMinutes * 60;
         else
-            _carData.MaxChargingTimeSec = _msg101.m.MaximumChargingTime10s * 10;
+            _carData.MaxChargingTimeSec = _msg101.m.MaxChargingTime10s * 10;
 
         // Unstable before switch(k).
         _carData.BatteryCapacityKwh = _msg101.m.BatteryCapacity * 0.1f;
@@ -138,8 +139,8 @@ void ChademoCharger::HandlePendingCarMessages()
         _msg102_pending = false;
 
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
-        COMPARE_SET(_msg102.m.TargetBatteryVoltage, _msg102_isr.m.TargetBatteryVoltage, "102.TargetBatteryVoltage %d -> %d");
-        COMPARE_SET(_msg102.m.ChargingCurrentRequest, _msg102_isr.m.ChargingCurrentRequest, "102.ChargingCurrentRequest %d -> %d");
+        COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
+        COMPARE_SET(_msg102.m.AskingAmps, _msg102_isr.m.AskingAmps, "102.AskingAmps %d -> %d");
         COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%x -> 0x%x");
         COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "102.Status 0x%x -> 0x%x");
         COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "102.SocPercent %d -> %d");
@@ -150,24 +151,24 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
+        if (_state == ChargerState::ChargingLoop && _msg102.m.TargetVoltage > _chargerData.AvailableOutputVoltage)
         {
-            println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+            println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
         {
-            _carData.TargetBatteryVoltage = _msg102.m.TargetBatteryVoltage;
+            _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.ChargingCurrentRequest > _chargerData.MaxAvailableOutputCurrent)
+        if (_state == ChargerState::ChargingLoop && _msg102.m.AskingAmps > _chargerData.MaxAvailableOutputCurrent)
         {
-            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.ChargingCurrentRequest, _chargerData.MaxAvailableOutputCurrent);
+            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.AskingAmps, _chargerData.MaxAvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
         {
-            _carData.AskingAmps = _msg102.m.ChargingCurrentRequest;
+            _carData.AskingAmps = _msg102.m.AskingAmps;
         }
 
         // soc and the constant both unstable before switch(k)
@@ -187,7 +188,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.SocPercent = 100;
             }
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetBatteryVoltage, _carData.SocPercent, _nomVoltOverride);
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride);
         }
 
         _dischargeActivated = _dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
@@ -210,8 +211,8 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "200.Unused1 %d -> %d");
         COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "200.Unused2 %d -> %d");
         COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "200.Unused3 %d -> %d");
-        COMPARE_SET(_msg200.m.MinimumDischargeVoltage, _msg200_isr.m.MinimumDischargeVoltage, "200.MinimumDischargeVoltage %d -> %d");
-        COMPARE_SET(_msg200.m.MinimumBatteryDischargeLevel, _msg200_isr.m.MinimumBatteryDischargeLevel, "200.MinimumBatteryDischargeLevel %d -> %d");
+        COMPARE_SET(_msg200.m.MinDischargeVoltage, _msg200_isr.m.MinDischargeVoltage, "200.MinDischargeVoltage %d -> %d");
+        COMPARE_SET(_msg200.m.MinBatteryDischargeLevel, _msg200_isr.m.MinBatteryDischargeLevel, "200.MinBatteryDischargeLevel %d -> %d");
         COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "200.MaxRemainingCapacityForCharging %d -> %d");
 
         _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaxDischargeCurrentInverted;
@@ -252,15 +253,15 @@ void ChademoCharger::Run()
 void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
-    // TODO: use _carData.MaxBatteryVoltage? But what is the point? We always just ask for target voltage anyways...
-    Param::SetInt(Param::MaxVoltage, _carData.TargetBatteryVoltage + 1);
+    // TODO: use _carData.MaxVoltage? But what is the point? We always just ask for target voltage anyways...
+    Param::SetInt(Param::MaxVoltage, _carData.TargetVoltage + 1);
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
 
-    // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for minimum 1A regardless)
+    // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
     Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.AskingAmps : 0);
 
-    Param::SetInt(Param::TargetVoltage, _carData.TargetBatteryVoltage);
+    Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t sec)
@@ -316,7 +317,7 @@ void ChademoCharger::RunStateMachine()
             SetState(ChargerState::Stopping_Start, stopReason);
         }
 
-        _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxBatteryVoltage);
+        _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxVoltage);
         _chargerData.RemainingChargeTimeSec = _carData.MaxChargingTimeSec;
         _chargerData.RemainingChargeTimeCycles = _chargerData.RemainingChargeTimeSec * CHA_CYCLES_PER_SEC;
     }
@@ -350,20 +351,20 @@ void ChademoCharger::RunStateMachine()
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
             if (_carData.ProtocolNumber == 2
-                && _carData.TargetBatteryVoltage == 410
-                && _carData.MaxBatteryVoltage == 435)
+                && _carData.TargetVoltage == 410
+                && _carData.MaxVoltage == 435)
             {
                 if (_carData.BatteryCapacityKwh == 0
-                    && _carData.MaximumChargeCurrent > 0
-                    && _carData.MinimumChargeCurrent == 0
+                    && _carData.MaxCurrent > 0
+                    && _carData.MinCurrent == 0
                     && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6))
                 {
                     println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
                     _nomVoltOverride = 380;
                 }
                 else if (_carData.BatteryCapacityKwh > 0
-                    && _carData.MaximumChargeCurrent == 0
-                    && _carData.MinimumChargeCurrent > 0
+                    && _carData.MaxCurrent == 0
+                    && _carData.MinCurrent > 0
                     && not has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6))
                 {
                     println("[cha] Traits: Looks like a Leaf ZE1?");
@@ -372,11 +373,11 @@ void ChademoCharger::RunStateMachine()
 
             _idleAskingAmps = _carData.AskingAmps; // iMiev ask for 1A from the start
 
-            // Spec is confusing, but MinimumBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
-            // and MinimumBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
-            if (_carData.TargetBatteryVoltage > _chargerData.AvailableOutputVoltage)
+            // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
+            // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
+            if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
             {
-                println("[cha] car TargetBatteryVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetBatteryVoltage, _chargerData.AvailableOutputVoltage);
+                println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
                 set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
             else if (_discovery)
@@ -722,13 +723,13 @@ void ChademoCharger::Log(bool force)
             &_carData.BatteryCapacityKwh,  // bypass float to double promotion by passing as reference
             _carData.EstimatedChargingTimeMins,
             _carData.Faults,
-            _carData.MaxBatteryVoltage,
+            _carData.MaxVoltage,
             _carData.MaxChargingTimeSec,
-            _carData.MinimumChargeCurrent,
+            _carData.MinCurrent,
             _carData.SocPercent,
             _carData.Status,
             _carData.ProtocolNumber,
-            _carData.TargetBatteryVoltage,
+            _carData.TargetVoltage,
             _carData.EstimatedBatteryVoltage
         );
 
@@ -915,7 +916,7 @@ void ChademoCharger::UpdateChargerMessages()
         // todo: use _chargerData.AvailableOutputVoltage??
         COMPARE_SET(_msg208.m.MaxDischargeVoltage, 500, "208.MaxDischargeVoltage %d -> %d"); // same
         // 250...seems random...I think this is something inverted, eg. 255 - 250 = 5. And maybe amps instead of volts...
-        COMPARE_SET(_msg208.m.MinimimDischargeVoltage, 250, "208.MinimimDischargeVoltage %d -> %d");
+        COMPARE_SET(_msg208.m.MinDischargeVoltage, 250, "208.MinDischargeVoltage %d -> %d");
 
         COMPARE_SET(_msg209.m.RemainingDischargeTime, _chargerData.RemainingDischargeTime, "209.RemainingDischargeTime %d -> %d");
 

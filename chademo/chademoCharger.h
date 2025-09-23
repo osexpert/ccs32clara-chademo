@@ -234,10 +234,10 @@ struct msg100
 {
     union {
         struct {
-            uint8_t MinimumChargeCurrent; // added in cha 1.0
-            uint8_t MaximumChargeCurrent; // added in cha 1.0? but only seen on some cars. 0->240->correctValue. unstable before switch(k).
-            uint16_t MinimumBatteryVoltage; // added in cha 1.0
-            uint16_t MaximumBatteryVoltage;
+            uint8_t MinCurrent; // added in cha 1.0
+            uint8_t MaxCurrent; // added in cha 1.0? but only seen on some cars. 0->240->correctValue. unstable before switch(k).
+            uint16_t MinVoltage; // added in cha 1.0
+            uint16_t MaxVoltage;
             /// <summary>
             /// Leaf 40kwh: always start out as 240. When car discover changer chademo version, it changes to 100 if >= chademo 1.0, or 255 if chademo 0.9. Weird stuff.
             /// </summary>
@@ -255,8 +255,8 @@ struct msg101
     union {
         struct {
             uint8_t Unused0;
-            uint8_t MaximumChargingTime10s;
-            uint8_t MaximumChargingTimeMinutes;
+            uint8_t MaxChargingTime10s;
+            uint8_t MaxChargingTimeMinutes;
             uint8_t EstimatedChargingTimeMinutes; // added in cha 1.0
             uint8_t Unused4;
             uint16_t BatteryCapacity; // added in cha 1.0?
@@ -273,8 +273,8 @@ struct msg102
     union {
         struct {
             uint8_t ProtocolNumber;
-            uint16_t TargetBatteryVoltage;
-            uint8_t ChargingCurrentRequest;
+            uint16_t TargetVoltage;
+            uint8_t AskingAmps; // TODO: rename RequestCurrent?
             uint8_t Faults;
             uint8_t Status;
             uint8_t SocPercent;
@@ -380,12 +380,12 @@ struct msg200
             /// trace: 250v make no sense...310v is absolute minimum, so what does this really mean?
             /// I think it is inverted and means 5 amps, but 5 amps what?
             /// </summary>
-            uint16_t MinimumDischargeVoltage; // FA 00
+            uint16_t MinDischargeVoltage; // FA 00
             /// <summary>
             /// trace: SOC%? But 69% seems very high? Can it be 100-69=31%?
             /// Or kwh? 31kwh?
             /// </summary>
-            uint8_t MinimumBatteryDischargeLevel; // 1A
+            uint8_t MinBatteryDischargeLevel; // 1A
             /// <summary>
             /// kwh?
             /// </summary>
@@ -442,7 +442,7 @@ struct msg208
             uint8_t MaxDischargeCurrentInverted; // FF
             uint8_t Unused4; // 00
             uint8_t Unused5; // 00
-            uint16_t MinimimDischargeVoltage; // AA 00
+            uint16_t MinDischargeVoltage; // AA 00
         } m;
         uint8_t bytes[8];
         uint32_t pair[2];
@@ -486,18 +486,18 @@ struct msg209
 struct CarData
 {
     // valid after kswitch
-    uint16_t MaxBatteryVoltage;
+    uint16_t MaxVoltage;
 
     uint16_t MaxChargingTimeSec;
 
     // Valid after kSwitch
-    uint16_t TargetBatteryVoltage;
+    uint16_t TargetVoltage;
     uint16_t EstimatedBatteryVoltage;
 
     uint16_t CyclesSinceCarLastAskingAmps;
 
-    uint8_t MaximumChargeCurrent;
-    uint8_t MinimumChargeCurrent;
+    uint8_t MinCurrent;
+    uint8_t MaxCurrent;
     uint8_t AskingAmps;
 
     // PS: unstable before switch (k)
