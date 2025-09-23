@@ -184,7 +184,7 @@ enum ChargerStatus
 enum class StopReason
 {
     NONE = 0x0,
-    CAR_CAN_AMPS_TIMEOUT = 0x1,
+    CAR_REQUEST_CURRENT_TIMEOUT = 0x1,
     CHARGING_TIME = 0x2, // out of time
     CAR_NOT_READY_TO_CHARGE = 0x4,
     CAR_NOT_IN_PARK = 0x8,

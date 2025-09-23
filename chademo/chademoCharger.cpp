@@ -34,7 +34,7 @@ extern volatile uint32_t system_millis;
 extern global_data _global;
 
 
-#define LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
+#define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
 /// <summary>
 /// get estimated battery volt from target and soc.
@@ -465,7 +465,7 @@ void ChademoCharger::RunStateMachine()
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reasons
-        if (_carData.CyclesSinceCarLastRequestCurrent++ > LAST_ASKING_FOR_AMPS_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_CAN_AMPS_TIMEOUT);
+        if (_carData.CyclesSinceCarLastRequestCurrent++ > LAST_REQUEST_CURRENT_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_REQUEST_CURRENT_TIMEOUT);
         if (not _switch_k) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
         if (not has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
