@@ -603,7 +603,7 @@ public:
 
     void CloseAdapterContactor();
    
-    void Log(bool force = false);
+    void Log();
 
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);

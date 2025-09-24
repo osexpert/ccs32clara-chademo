@@ -637,9 +637,6 @@ void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
     set_flag(&_stopReason, stopReason);
     if (_stopReason != StopReason::NONE)
         println("[cha] Stopping: 0x%x", _stopReason);
-
-    // force log on state change
-    Log(true);
 };
 
 const char* ChademoCharger::GetStateName()
@@ -702,35 +699,32 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     }
 }
 
-void ChademoCharger::Log(bool force)
+void ChademoCharger::Log()
 {
-    if (force || _logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
+    if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
-        // every second or when forced
-        println("[cha] state:%s cycles:%d charger: out:%dV/%dA avail:%dV/%dA/%dA rem_t:%ds thres=%dV st=0x%x car: ask:%dA cap=%fkWh est_t:%dm err:0x%x max:%dV max_t:%ds min:%dA soc:%d%% st:0x%x pn:%d target:%dV batt:%dV",
+        // every second
+        println("[cha] state:%s cycles:%d out:%dV/%dA avail:%dV/%dA max:%dA rem_t:%ds st=0x%x car: req:%dA est_t:%dm max_t:%ds st:0x%x err:0x%x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
-            _chargerData.MaxAvailableOutputCurrent,
             _chargerData.AvailableOutputCurrent,
+            _chargerData.MaxAvailableOutputCurrent,
             _chargerData.RemainingChargeTimeSec,
-            _chargerData.ThresholdVoltage,
             _chargerData.Status,
 
             _carData.RequestCurrent,
-            &_carData.BatteryCapacityKwh,  // bypass float to double promotion by passing as reference
             _carData.EstimatedChargingTimeMins,
-            _carData.Faults,
-            _carData.MaxVoltage,
             _carData.MaxChargingTimeSec,
-            _carData.MinCurrent,
-            _carData.SocPercent,
             _carData.Status,
-            _carData.ProtocolNumber,
+            _carData.Faults,
             _carData.TargetVoltage,
-            _carData.EstimatedBatteryVoltage
+            _carData.MaxVoltage,
+            _carData.SocPercent,
+            _carData.EstimatedBatteryVoltage,
+            & _carData.BatteryCapacityKwh  // bypass float to double promotion by passing as reference
         );
 
         _logCycleCounter = 0;
