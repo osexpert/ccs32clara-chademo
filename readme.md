@@ -179,8 +179,9 @@ The wire going from pcb(d2) to pin10 need to be cut. The relay coil(+) would be 
 One of the relay switching pins should go to gnd on the pcb (or hook into wire going to pin1) and the other switching pin connects to cut wire going to pin10.
 The problem is, it is very tight inside the adapter, and especially at the end of the chademo plug. It can be done, but not easily.
 
-The alternative is to add a relay inside the car instead. Someone added a button to i-Miev to control the contactors: https://300mpg.org/2021/11/11/chademo-relay-hack-switch-and-testing/ The prodecure will be similar, but instead of adding a button, add a relay that power the contactors by using the car 12v battery. d1 and d2 will now only power the added relay.
+The alternative is to add a relay inside the car instead. Someone added a button to i-Miev to control the contactors: https://300mpg.org/2021/11/11/chademo-relay-hack-switch-and-testing/ and video https://www.youtube.com/watch?v=hBV9CIVN0fs. The prodecure will be similar, but instead of adding a button, add a relay that power the contactors by using the car 12v battery. d1 and d2 will now only power the added relay.
 The bonus with modifying the car is, that the car also work on stubborn chademo chargers that does not follow the spec, as mentioned above (similar findings).
+WARNING: it does not _seem_ like the procedure exposes high voltage wires, but be carefull.
 
 I don't own a i-Miev, so I can not test it. I could modify my adapter, but it would only prove it is possible to add a relay, but this I already know:-)
 
