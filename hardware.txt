@@ -1,0 +1,28 @@
+1 piece relay
+HF49FD-012-1H11
+coil voltage: 12v
+switching max: 5A 30VDC
+Guess: main relay
+
+2 pieces relay
+HFD4/12-S
+coil voltage: 12v
+switching max: 2A 30VDC
+Guess: 1 for adapter contactor, 1 for chademo d1.
+Undersized for chademo d1, its on the edge of the spec: 12V 2A continously. Peak will be a lot higher.
+Small relay closest to battery: d2 (assumed)
+Small relay farthest away from battery: adapter contactor (assumed)
+
+Ultra-wide input voltage dc/dc converter.
+make: ND
+model: NH25-V2S12R6-C
+Input 210-1200V DC
+Output: 12.6V 2A DC
+Can not find this particular make or model, but see similar units by CHRONDA, MORNSUN etc.
+
+Contactor:
+hfz16-250/900-12
+switching: 900VDC 250A 
+coil: 12V dc
+
+
