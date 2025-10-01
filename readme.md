@@ -146,7 +146,7 @@ This firmware emulate chademo 1.0 and is tested on Leaf 40kwh.
 ### i-Miev
 Tests has been made on old i-Miev's but without success. From logs collected, the car ask for amps and the charger gradually increase voltage up to max 370v, but no amps ever flow.
 Meaning, CAN and signalling works, but seem like there is no high voltage contact. I suspected the contactors did not close and added more delay to give more time for contactors to close, but no success.
-I remebered when probing the GPIO's and were testing chademo d1 and d2. I heard a click when activating d1, but nothing when activating d2. Why was d2 not usign a relay? In the chademo circuit schema, d1 and d2 are two equal switches and the chademo spec says charger must be able to continously deliver 12V 2A between pin2(d1) and pin10(d2).
+I remebered when probing the GPIO's and were testing chademo d1 and d2. I heard a click when activating d1, but nothing when activating d2. Why was d2 not using a relay? In the chademo circuit schema, d1 and d2 are two equal switches and the chademo spec says charger must be able to continously deliver 12V 2A between pin2(d1) and pin10(d2).
 So I assumed d2 was a semiconductor. It could still be a solid state relay, but seemed unlikely when a cheaper mechanical relay would have sufficed.
 
 To make sure I tested with a 12V 10W and 12V 21W light bulb:
