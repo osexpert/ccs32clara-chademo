@@ -664,10 +664,15 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.SupportDynamicAvailableOutputCurrent)
+    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS &&
+        (_carData.SupportDynamicAvailableOutputCurrent || has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)) 
+    {
         _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
-    else
+    }
+    else 
+    {
         _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
+    }
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()
