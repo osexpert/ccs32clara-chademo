@@ -200,8 +200,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "110.ExtendedFunction1 0x%x -> 0x%x");
 
-        ExtendedFunction1 extFun = (ExtendedFunction1)_msg110.m.ExtendedFunction1;
-        _carData.SupportDynamicAvailableOutputCurrent = has_flag(extFun, ExtendedFunction1::DYNAMIC_CONTROL);
+        _carData.ExtendedFunction1 = (ExtendedFunction1Flags)_msg110.m.ExtendedFunction1;
     }
     if (_msg200_pending)
     {
@@ -357,7 +356,9 @@ void ChademoCharger::RunStateMachine()
                 if (_carData.BatteryCapacityKwh == 0
                     && _carData.MaxCurrent > 0
                     && _carData.MinCurrent == 0
-                    && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6))
+                    && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
+                    && not has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL)
+                    )
                 {
                     println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
                     _nomVoltOverride = 380;
@@ -365,11 +366,25 @@ void ChademoCharger::RunStateMachine()
                 else if (_carData.BatteryCapacityKwh > 0
                     && _carData.MaxCurrent == 0
                     && _carData.MinCurrent > 0
-                    && not has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6))
+                    && not has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
+                    && has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL)
+                    )
                 {
                     println("[cha] Traits: Looks like a Leaf ZE1?");
                 }
+                else if (_carData.BatteryCapacityKwh > 0
+                    && _carData.MaxCurrent == 0
+                    && _carData.MinCurrent == 0
+                    && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
+                    && not has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL)
+                    )
+                {
+                    println("[cha] Traits: Looks like a e-NV200?");
+                }
             }
+
+            // e-NV200: after discovery, change its mind and remove the flag???? Try to make it a trigger...
+            _carData.DischargeCompatibleTrigger |= has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE);
 
             _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
 
@@ -487,7 +502,7 @@ void ChademoCharger::RunStateMachine()
 
             bool dischargeUnit = false;
             bool dischargeSimulation = false;
-            if (_dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
+            if (_dischargeEnabled && _carData.DischargeCompatibleTrigger)// has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();
@@ -664,7 +679,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.SupportDynamicAvailableOutputCurrent)
+    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL))
         _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
     else
         _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
@@ -896,10 +911,7 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "109.RemainingChargingTime10s %d -> %d");
     COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "109.RemainingChargingTimeMinutes %d -> %d");
     COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status 0x%x -> 0x%x");
-
-    ExtendedFunction1 extFun = {};
-    if (_chargerData.SupportDynamicAvailableOutputCurrent) set_flag(&extFun, ExtendedFunction1::DYNAMIC_CONTROL);
-    COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "118.ExtendedFunction1 0x%x -> 0x%x");
+    COMPARE_SET(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 0x%x -> 0x%x");
 
     if (_dischargeEnabled && !_discovery)
     {
