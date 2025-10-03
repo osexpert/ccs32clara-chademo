@@ -191,7 +191,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride);
         }
 
-        _dischargeActivated = _dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
+        //_dischargeActivated = _dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
         _msg102_recieved = true;
     }
     if (_msg110_pending)
@@ -487,7 +487,7 @@ void ChademoCharger::RunStateMachine()
 
             bool dischargeUnit = false;
             bool dischargeSimulation = false;
-            if (_dischargeActivated)
+            if (_dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();
@@ -854,7 +854,7 @@ void ChademoCharger::SendChargerMessages()
 
         can_transmit_blocking_fifo(CAN1, 0x118, 0x118 > 0x7FF, false, 8, _msg118.bytes);
 
-        if (_dischargeActivated)
+        if (_dischargeEnabled && !_discovery)
         {
             // need to send DC messages if charger declare DC, else car fails
             can_transmit_blocking_fifo(CAN1, 0x208, 0x208 > 0x7FF, false, 8, _msg208.bytes);
@@ -874,7 +874,7 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "109.ProtocolNumber %d -> %d");
     COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "109.OutputCurrent %d -> %d");
 
-    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeActivated, "109.DischargeCompatible %d -> %d");
+    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && !_discovery, "109.DischargeCompatible %d -> %d");
 
     // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
     uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
@@ -901,7 +901,7 @@ void ChademoCharger::UpdateChargerMessages()
     if (_chargerData.SupportDynamicAvailableOutputCurrent) set_flag(&extFun, ExtendedFunction1::DYNAMIC_CONTROL);
     COMPARE_SET(_msg118.m.ExtendedFunction1, extFun, "118.ExtendedFunction1 0x%x -> 0x%x");
 
-    if (_dischargeActivated)
+    if (_dischargeEnabled && !_discovery)
     {
         COMPARE_SET(_msg208.m.MaxDischargeCurrentInverted, 0xff - _chargerData.MaxDischargeCurrent, "208.MaxDischargeCurrentInverted %d -> %d"); // 15
         

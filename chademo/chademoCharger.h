@@ -675,5 +675,5 @@ public:
         CarData _carData = {};
         ChargerData _chargerData = {};
 
-        bool _dischargeActivated = false;
+        //bool _dischargeActivated = false;
 };
