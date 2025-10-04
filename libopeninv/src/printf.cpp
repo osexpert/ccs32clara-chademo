@@ -228,7 +228,6 @@ void println(const char* format, ...)
 
 void println()
 {
-	putchar('\r');
 	putchar('\n');
 }
 
