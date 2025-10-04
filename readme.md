@@ -187,6 +187,8 @@ I don't own a i-Miev, so I can not test it. I could modify my adapter, but it wo
 
 WARNING: there is no guarantee that adding a relay will make it work, you may create new problems and there may be additional problems as well.
 
+Discussion here: https://github.com/osexpert/ccs32clara-chademo/discussions/34
+
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
