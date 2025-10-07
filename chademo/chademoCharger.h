@@ -44,7 +44,7 @@ has_flag(E value, E flag) {
     return (static_cast<U>(value) & static_cast<U>(flag)) != 0;
 }
 
-enum ExtendedFunction1
+enum ExtendedFunction1Flags
 {
     /// <summary>
     /// 110.0.0
@@ -519,7 +519,7 @@ struct CarData
 
     uint8_t EstimatedChargingTimeMins;
 
-    bool SupportDynamicAvailableOutputCurrent;
+    ExtendedFunction1Flags ExtendedFunction1;
 
     uint8_t MaxDischargeCurrent;
 };
@@ -575,7 +575,7 @@ struct ChargerData
 
     uint16_t ThresholdVoltage;
 
-    bool SupportDynamicAvailableOutputCurrent = true;
+    ExtendedFunction1Flags ExtendedFunction1 = ExtendedFunction1Flags::DYNAMIC_CONTROL;
 };
 
 
