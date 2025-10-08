@@ -141,8 +141,8 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
         COMPARE_SET(_msg102.m.RequestCurrent, _msg102_isr.m.RequestCurrent, "102.RequestCurrent %d -> %d");
-        COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%x -> 0x%x");
-        COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "102.Status 0x%x -> 0x%x");
+        COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%02x -> 0x%02x");
+        COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "102.Status 0x%02x -> 0x%02x");
         COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "102.SocPercent %d -> %d");
         COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "102.Unused7 %d -> %d");
 
@@ -198,7 +198,7 @@ void ChademoCharger::HandlePendingCarMessages()
     {
         _msg110_pending = false;
 
-        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "110.ExtendedFunction1 0x%x -> 0x%x");
+        COMPARE_SET(_msg110.m.ExtendedFunction1, _msg110_isr.m.ExtendedFunction1, "110.ExtendedFunction1 0x%02x -> 0x%02x");
 
         _carData.ExtendedFunction1 = (ExtendedFunction1Flags)_msg110.m.ExtendedFunction1;
     }
@@ -632,7 +632,7 @@ void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
 
     set_flag(&_stopReason, stopReason);
     if (_stopReason != StopReason::NONE)
-        println("[cha] Stopping: 0x%x", _stopReason);
+        println("[cha] Stopping: 0x%02x", _stopReason);
 };
 
 const char* ChademoCharger::GetStateName()
@@ -700,7 +700,7 @@ void ChademoCharger::Log()
     if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second
-        println("[cha] state:%s cycles:%d out:%dV/%dA avail:%dV/%dA max:%dA rem_t:%ds st=0x%x car: req:%dA est_t:%dm max_t:%ds st:0x%x err:0x%x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
+        println("[cha] state:%s cycles:%d out:%dV/%dA avail:%dV/%dA max:%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
@@ -822,7 +822,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
     uint32_t start = system_millis;
     while ((CAN_TSR(canport) & rqcp_mask) == 0) {
         if ((system_millis - start) > CAN_TRANSMIT_TIMEOUT_MS) {
-            println("[cha] transmit timeout for ID 0x%x", id);
+            println("[cha] transmit timeout for ID %d", id);
             break;
         }
     }
@@ -891,8 +891,8 @@ void ChademoCharger::UpdateChargerMessages()
 
     COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "109.RemainingChargingTime10s %d -> %d");
     COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "109.RemainingChargingTimeMinutes %d -> %d");
-    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status 0x%x -> 0x%x");
-    COMPARE_SET(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 0x%x -> 0x%x");
+    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status 0x%02x -> 0x%02x");
+    COMPARE_SET(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 0x%02x -> 0x%02x");
 
     if (_dischargeEnabled && !_discovery)
     {
