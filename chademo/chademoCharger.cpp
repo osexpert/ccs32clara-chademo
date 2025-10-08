@@ -407,6 +407,7 @@ void ChademoCharger::RunStateMachine()
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
+            println("[cha] Car progressing to ChargingLoop in its own time");
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
@@ -439,6 +440,7 @@ void ChademoCharger::RunStateMachine()
         if (_carData.RequestCurrent > _idleRequestCurrent) // 1-2 sec after 102.5.3
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
+            // Spec: set these flags <= 0.5sec after RequestCurrent > 0
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING);
             clear_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 

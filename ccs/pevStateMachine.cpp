@@ -808,7 +808,7 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
                // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
                // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
                // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
-               addToTrace(MOD_PEV, "PowerDelivery failed:%d.", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+               addToTrace(MOD_PEV, "PowerDelivery failed:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
                pev_enterState(PEV_STATE_SafeShutDown);
             }
          }
