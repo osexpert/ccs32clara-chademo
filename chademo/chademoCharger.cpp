@@ -106,6 +106,7 @@ void ChademoCharger::HandlePendingCarMessages()
         
         COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "100.Unused7 %d -> %d");
 
+        _carData.MinVoltage = _msg100.m.MinVoltage;
         _carData.MaxVoltage = _msg100.m.MaxVoltage;
 
         _carData.MinCurrent = _msg100.m.MinCurrent;
@@ -351,18 +352,17 @@ void ChademoCharger::RunStateMachine()
         {
             if (_carData.ProtocolNumber == 2
                 && _carData.TargetVoltage == 410
-                && _carData.MaxVoltage == 435)
+                && _carData.BatteryCapacityKwh == 0
+                && _carData.MinCurrent == 0
+                && _carData.MaxCurrent > 0
+                && _carData.MinVoltage == 0
+				&& _carData.MaxVoltage == 435
+                && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
+                && not has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL)
+				)
             {
-                if (_carData.BatteryCapacityKwh == 0
-                    && _carData.MaxCurrent > 0
-                    && _carData.MinCurrent == 0
-                    && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
-                    && not has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL)
-					)
-                {
-                    println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
-                    _nomVoltOverride = 380;
-                }
+                println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
+                _nomVoltOverride = 380;
             }
 
             _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
@@ -810,7 +810,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 
     int mailbox = can_transmit(canport, id, ext, rtr, len, data);
     if (mailbox < 0) {
-        println("[cha] transmit: no mailbox available");
+        println("[cha] can transmit: msg:0x%x no mailbox available", id);
         return;// CAN_TX_NO_MAILBOX;
     }
 
@@ -822,7 +822,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
     uint32_t start = system_millis;
     while ((CAN_TSR(canport) & rqcp_mask) == 0) {
         if ((system_millis - start) > CAN_TRANSMIT_TIMEOUT_MS) {
-            println("[cha] transmit timeout for ID %d", id);
+            println("[cha] can transmit: msg:0x%x timeout", id);
             break;
         }
     }

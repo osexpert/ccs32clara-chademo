@@ -236,7 +236,7 @@ struct msg100
         struct {
             uint8_t MinCurrent; // added in cha 1.0
             uint8_t MaxCurrent; // added in cha 1.0? but only seen on some cars. 0->240->correctValue. unstable before switch(k).
-            uint16_t MinVoltage; // added in cha 1.0
+            uint16_t MinVoltage; // added in cha 1.0. one e-NV200 sat this to 1. For other cars always 0?
             uint16_t MaxVoltage;
             /// <summary>
             /// Leaf 40kwh: always start out as 240. When car discover changer chademo version, it changes to 100 if >= chademo 1.0, or 255 if chademo 0.9. Weird stuff.
@@ -487,6 +487,7 @@ struct CarData
 {
     // valid after kswitch
     uint16_t MaxVoltage;
+    uint16_t MinVoltage;
 
     uint16_t MaxChargingTimeSec;
 
