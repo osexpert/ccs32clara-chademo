@@ -41,7 +41,8 @@ CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/inclu
 EXTRACOMPILERFLAGS := $(shell \
   DATE=$$(date +%Y%m%d); \
   RUN=$${GITHUB_RUN_NUMBER:-0}; \
-  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\""; \
+  AF=$${GITHUB_AF:-0}; \
+  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\" -DGITHUB_AF=$${AF}"; \
 )
 
 LDSCRIPT	  = linker.ld

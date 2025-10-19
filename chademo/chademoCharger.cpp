@@ -350,18 +350,9 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
-            if (_carData.ProtocolNumber == 2
-                && _carData.TargetVoltage == 410
-                && _carData.BatteryCapacityKwh == 0
-                && _carData.MinCurrent == 0
-                && _carData.MaxCurrent > 0
-                && _carData.MinVoltage == 0
-				&& _carData.MaxVoltage == 435
-                && has_flag(_carData.Status, CarStatus::UNKNOWN_102_5_6)
-                && not has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL)
-				)
-            {
-                println("[cha] Traits: Looks like a Leaf ZE0? Use nominal voltage = 380.");
+            if (_global.alternative_function == 1)
+            {   
+                println("[cha] AF1: Target voltage is 410v => use nominal voltage 380v");
                 _nomVoltOverride = 380;
             }
 

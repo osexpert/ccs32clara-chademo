@@ -43,6 +43,7 @@ struct global_data
     bool powerOffPending = false;
     bool ccsEnded = false;
     bool moreLogging = false;
+    int alternative_function = GITHUB_AF;
 
     bool ccsPreChargeDoneButStalledTrigger = false;
     bool ccsConnectorLockingTrigger = false;

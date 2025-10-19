@@ -573,7 +573,11 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    println("ccs32clara-chademo %s", GITHUB_VERSION);
+    if (GITHUB_AF == 0)
+        println("ccs32clara-chademo %s", GITHUB_VERSION);
+    else
+        println("ccs32clara-chademo %s AF%d", GITHUB_VERSION, GITHUB_AF);
+
     //println("experiment: {experiment info here}");
 
     println("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);

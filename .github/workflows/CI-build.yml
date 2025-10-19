@@ -32,9 +32,24 @@ jobs:
         id: set_date
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
+      # --- Normal build ---
+      - name: Build normal firmware
+        run: |
+          make clean all
+
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-firmware-${{ steps.set_date.outputs.date }}-${{ github.run_number }}
+          path: My407ccs2chademo.bin
+
+      # --- AF1 build ---
+      - name: Build AF1 firmware
+        run: |
+          make clean all GITHUB_AF=1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-firmware-${{ steps.set_date.outputs.date }}-${{ github.run_number }} AF1
           path: My407ccs2chademo.bin
 
 # Unit tests are currently broken so don't build and run them for now

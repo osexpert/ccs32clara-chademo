@@ -193,6 +193,9 @@ Discussion here: https://github.com/osexpert/ccs32clara-chademo/discussions/34
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
 
+There are builds/releases named AF#. These are alternative function builds. Currently, these AF-builds exist:
+### AF1: For target voltage 410v, use nominal voltage 380v (355v in regular build). AF1 should be a better match for Leaf (A)ZE0 with 20-30kwh battery.
+
 ## Building
 If you want to compile the software from scratch, you can follow these instructions
 
