@@ -45,7 +45,7 @@ EXTRACOMPILERFLAGS := $(shell \
   if [ "$$AF" -eq 0 ]; then \
     echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\" -DGITHUB_AF=$${AF}"; \
   else \
-    echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN} AF$${AF}\\\" -DGITHUB_AF=$${AF}"; \
+    echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}-AF$${AF}\\\" -DGITHUB_AF=$${AF}"; \
   fi \
 )
 
