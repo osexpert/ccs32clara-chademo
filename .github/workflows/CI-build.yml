@@ -45,7 +45,8 @@ jobs:
       # --- AF1 build ---
       - name: Build AF1 firmware
         run: |
-          make clean all GITHUB_AF=1
+          export GITHUB_AF=1
+          make clean all
 
       - uses: actions/upload-artifact@v4
         with:
