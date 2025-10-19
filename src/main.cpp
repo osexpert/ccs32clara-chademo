@@ -573,10 +573,7 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    if (GITHUB_AF == 0)
-        println("ccs32clara-chademo %s", GITHUB_VERSION);
-    else
-        println("ccs32clara-chademo %s AF%d", GITHUB_VERSION, GITHUB_AF);
+    println("ccs32clara-chademo %s", GITHUB_VERSION);
 
     //println("experiment: {experiment info here}");
 

@@ -42,7 +42,11 @@ EXTRACOMPILERFLAGS := $(shell \
   DATE=$$(date +%Y%m%d); \
   RUN=$${GITHUB_RUN_NUMBER:-0}; \
   AF=$${GITHUB_AF:-0}; \
-  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\" -DGITHUB_AF=$${AF}"; \
+  if [ "$$AF" -eq 0 ]; then \
+    echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\" -DGITHUB_AF=$${AF}"; \
+  else \
+    echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN} AF$${AF}\\\" -DGITHUB_AF=$${AF}"; \
+  fi \
 )
 
 LDSCRIPT	  = linker.ld
