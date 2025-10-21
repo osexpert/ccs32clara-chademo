@@ -350,7 +350,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
-            if (_global.alternative_function == 1)
+            if (_global.alternative_function == 1 && _carData.TargetVoltage == 410)
             {   
                 println("[cha] AF1: Target voltage is 410v => use nominal voltage 380v");
                 _nomVoltOverride = 380;
