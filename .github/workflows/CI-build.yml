@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo firmware ${{ steps.set_date.outputs.date }}-${{ github.run_number }}
+          name: ccs32clara-chademo-firmware-${{ steps.set_date.outputs.date }}-${{ github.run_number }}
           path: My407ccs2chademo.bin
 
       # --- AF1 build ---
@@ -50,7 +50,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo firmware ${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF1
+          name: ccs32clara-chademo-firmware-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF1
           path: My407ccs2chademo.bin
 
 # Unit tests are currently broken so don't build and run them for now
