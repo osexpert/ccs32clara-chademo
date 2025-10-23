@@ -128,8 +128,9 @@ enum CarStatus
     /// <summary>
     /// 102.5.6
     /// Unknown. Possibly related to V2X? Old Leafs (ZE0) seem to have this set.
+    /// At least some ZE0's support support dynamic AvailableOutputCurrent, and they set this flag. For now, assume its not a coincidence:-)
     /// </summary>
-    UNKNOWN_102_5_6 = 0x40,
+    LEGACY_DYNAMIC_CONTROL = 0x40,
 
     /// <summary>
     /// 102.5.7
@@ -676,5 +677,4 @@ public:
         CarData _carData = {};
         ChargerData _chargerData = {};
 
-        //bool _dischargeActivated = false;
 };

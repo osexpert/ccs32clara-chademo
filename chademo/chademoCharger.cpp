@@ -192,7 +192,6 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride);
         }
 
-        //_dischargeActivated = _dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE) && !_discovery; // ZE0 hangs the second time, if discharge enabled during discovery??
         _msg102_recieved = true;
     }
     if (_msg110_pending)
@@ -593,7 +592,7 @@ bool ChademoCharger::PreChargeCompleted()
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
         bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
-        if (!carContactorsClosed)
+        if (not carContactorsClosed)
             println("[cha] PreCharge stalled until car contactors closed");
         return carContactorsClosed;
     }
@@ -651,10 +650,16 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL))
+    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS
+        && (has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(_carData.Status, CarStatus::LEGACY_DYNAMIC_CONTROL))
+        )
+    {
         _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+    }
     else
+    {
         _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
+    }
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()
@@ -841,7 +846,7 @@ void ChademoCharger::SendChargerMessages()
 
         can_transmit_blocking_fifo(CAN1, 0x118, 0x118 > 0x7FF, false, 8, _msg118.bytes);
 
-        if (_dischargeEnabled && !_discovery)
+        if (_dischargeEnabled && not _discovery)
         {
             // need to send DC messages if charger declare DC, else car fails
             can_transmit_blocking_fifo(CAN1, 0x208, 0x208 > 0x7FF, false, 8, _msg208.bytes);
@@ -861,7 +866,8 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.ProtocolNumber, _chargerData.ProtocolNumber, "109.ProtocolNumber %d -> %d");
     COMPARE_SET(_msg109.m.PresentChargingCurrent, _chargerData.OutputCurrent, "109.OutputCurrent %d -> %d");
 
-    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && !_discovery, "109.DischargeCompatible %d -> %d");
+    // ZE0 seems to hangs the second time, if discharge is enabled during discovery
+    COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && not _discovery, "109.DischargeCompatible %d -> %d");
 
     // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
     uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
@@ -885,7 +891,7 @@ void ChademoCharger::UpdateChargerMessages()
     COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status 0x%02x -> 0x%02x");
     COMPARE_SET(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 0x%02x -> 0x%02x");
 
-    if (_dischargeEnabled && !_discovery)
+    if (_dischargeEnabled && not _discovery)
     {
         COMPARE_SET(_msg208.m.MaxDischargeCurrentInverted, 0xff - _chargerData.MaxDischargeCurrent, "208.MaxDischargeCurrentInverted %d -> %d"); // 15
         
