@@ -49,16 +49,10 @@ static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt =
 
     if (nomVolt == 0)
     {
-        if (target < 410)
-        {
-            // Low segment: iMiev 370 -> 330 and meets high segment at 410
-            nomVolt = 0.625f * target + 98.75f;
-        }
-        else
-        {
-            // High segment: Leaf 40: 410 -> 355, BMW i5 M60: 450 -> 400
-            nomVolt = 1.125f * target - 106.25f;
-        }
+        // Based on 2 extreme data points: iMiev 370 -> 330 and BMW i5 M60: 450 -> 400
+        // For 410 -> 365 (leaf 20-30kwh is 380, leaf 40+ is 355, so 365 is not a bad estimate)
+        // PS: For known targets, we set nomVoltOverride, so this will only be used for unknown targets
+        nomVolt = 0.875f * target + 6.25f;
     }
 
     float minVolt = nomVolt - (maxVolt - nomVolt);
@@ -290,6 +284,29 @@ static int GetCyclicOffset()
     return result;
 }
 
+static int GetNomVoltOverride(int target)
+{
+    int nomVolt = 0; // 0 = unknown -> use formula
+
+    // Get nomvolt for some known targets
+    if (target == 370)
+        nomVolt = 330; // iMiev
+    else if (target == 450)
+        nomVolt = 400; // BMW i5 M60 
+    else if (target == 410)
+    {
+        if (_global.alternative_function == 0)
+            nomVolt = 355; // Leaf 40+
+        else if (_global.alternative_function == 1)
+            nomVolt = 380; // Leaf 20-30
+    }
+
+    if (nomVolt != 0)
+        println("[cha] AF%d: nominal voltage %dv for known target %dv", _global.alternative_function, nomVolt, target);
+
+    return nomVolt;
+}
+
 void ChademoCharger::RunStateMachine()
 {
     _chargerData.DischargeCurrent = 0; // reset every iteration
@@ -349,13 +366,8 @@ void ChademoCharger::RunStateMachine()
     {
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
-            if (_global.alternative_function == 1 && _carData.TargetVoltage == 410)
-            {   
-                println("[cha] AF1: Target voltage is 410v => use nominal voltage 380v");
-                _nomVoltOverride = 380;
-            }
-
             _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
+            _nomVoltOverride = GetNomVoltOverride(_carData.TargetVoltage);
 
             // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
