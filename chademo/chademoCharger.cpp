@@ -302,7 +302,7 @@ static int GetNomVoltOverride(int target)
     }
 
     if (nomVolt != 0)
-        println("[cha] AF%d: nominal voltage %dv for known target %dv", _global.alternative_function, nomVolt, target);
+        println("[cha] AF%d: for known target %dv use nominal voltage %dv", _global.alternative_function, target, nomVolt);
 
     return nomVolt;
 }
