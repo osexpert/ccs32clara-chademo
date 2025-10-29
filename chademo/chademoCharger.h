@@ -524,6 +524,11 @@ struct CarData
     ExtendedFunction1Flags ExtendedFunction1;
 
     uint8_t MaxDischargeCurrent;
+
+    // Leaf ZE0 seen to set DISCHARGE_COMPATIBLE flag initially, then remove it after discovery. 
+    // Try to make a note of it, it may support it even if not flagging it. ZE0 generally has a few bugs/problems with the discovery process,
+    // it does not fully reset after D1=false. Guessing it does not fully reset until the proximity detection ends, but we don't have GPIO control over "Connection check" (pin7).
+    bool DischargeCompatibleTrigger;
 };
 
 enum ProtocolNumber

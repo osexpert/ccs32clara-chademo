@@ -368,6 +368,7 @@ void ChademoCharger::RunStateMachine()
         {
             _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
             _nomVoltOverride = GetNomVoltOverride(_carData.TargetVoltage);
+            _carData.DischargeCompatibleTrigger |= has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE);
 
             // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
@@ -485,7 +486,7 @@ void ChademoCharger::RunStateMachine()
 
             bool dischargeUnit = false;
             bool dischargeSimulation = false;
-            if (_dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
+            if (_dischargeEnabled && _carData.DischargeCompatibleTrigger) // has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();
