@@ -43,7 +43,7 @@ extern global_data _global;
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0)
+static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float volt20 = 0)
 {
     float maxVolt = target - 10;
 
@@ -57,12 +57,20 @@ static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt =
 
     float minVolt = nomVolt - (maxVolt - nomVolt);
 
-    float deltaLow = 0.35f * (nomVolt - minVolt);
+    float deltaLow = 0.33f * (nomVolt - minVolt);
     float deltaHigh = 0.55f * (maxVolt - nomVolt);
 
-    float volt20 = nomVolt - deltaLow;
+    if (volt20 == 0)
+	{
+        volt20 = nomVolt - deltaLow;
+	}
+
     float volt80 = nomVolt + deltaHigh;
 
+    //if (soc < 20)
+    //{
+    //    return minVolt + ((soc - 0.0f) / 20.0f) * (volt20 - minVolt);
+    //}
     if (soc < 50.0f)
     {
         return volt20 + ((soc - 20.0f) / 30.0f) * (nomVolt - volt20);
@@ -183,7 +191,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.SocPercent = 100;
             }
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride);
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _volt20Ovveride);
         }
 
         _msg102_recieved = true;
@@ -284,27 +292,38 @@ static int GetCyclicOffset()
     return result;
 }
 
-static int GetNomVoltOverride(int target)
+void ChademoCharger::SetBatteryVoltOverrides()
 {
-    int nomVolt = 0; // 0 = unknown -> use formula
+    bool known = false;
 
     // Get nomvolt for some known targets
-    if (target == 370)
-        nomVolt = 330; // iMiev
-    else if (target == 450)
-        nomVolt = 400; // BMW i5 M60 
-    else if (target == 410)
+    if (_carData.TargetVoltage == 370)
+    {
+        _nomVoltOverride = 330; // iMiev
+        known = true;
+    }
+    else if (_carData.TargetVoltage == 450)
+    {
+        _nomVoltOverride = 400; // BMW i5 M60 
+        known = true;
+    }
+    else if (_carData.TargetVoltage == 410)
     {
         if (_global.alternative_function == 0)
-            nomVolt = 355; // Leaf 40+
+        {
+            _nomVoltOverride = 355; // Leaf 40+
+            known = true;
+        }
         else if (_global.alternative_function == 1)
-            nomVolt = 380; // Leaf 20-30
+        {
+            _nomVoltOverride = 380; // Leaf 20-30
+            _volt20Ovveride = 365; // Leaf 20-30
+            known = true;
+        }
     }
 
-    if (nomVolt != 0)
-        println("[cha] AF%d: for known target %dv use nominal voltage %dv", _global.alternative_function, target, nomVolt);
-
-    return nomVolt;
+    if (known)
+        println("[cha] AF%d: for known target %dv use nomVolt:%dv volt20:%dv", _global.alternative_function, _carData.TargetVoltage, _nomVoltOverride, _volt20Ovveride);
 }
 
 void ChademoCharger::RunStateMachine()
@@ -367,7 +386,7 @@ void ChademoCharger::RunStateMachine()
         if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
             _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
-            _nomVoltOverride = GetNomVoltOverride(_carData.TargetVoltage);
+            SetBatteryVoltOverrides();
 
             // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)

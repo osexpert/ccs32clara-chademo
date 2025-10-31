@@ -602,7 +602,7 @@ public:
     void SetCcsParamsFromCarData();
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
     bool GetSwitchK();
-
+    void SetBatteryVoltOverrides();
     void CloseAdapterContactor();
    
     void Log();
@@ -645,6 +645,7 @@ public:
         bool _preChargeDoneButStalled = false;
         uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
+        int _volt20Ovveride = 0;
         bool _dischargeEnabled = false;
         bool _dischargeUnit = false;
         bool _dischargeSimulation = false;
