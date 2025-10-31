@@ -55,22 +55,20 @@ static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt =
         nomVolt = 0.875f * target + 6.25f;
     }
 
-    float minVolt = nomVolt - (maxVolt - nomVolt);
-
-    float deltaLow = 0.33f * (nomVolt - minVolt);
-    float deltaHigh = 0.55f * (maxVolt - nomVolt);
-
     if (volt20 == 0)
 	{
+        float minVolt = nomVolt - (maxVolt - nomVolt); // symetric
+        float deltaLow = 0.33f * (nomVolt - minVolt); // delta 20-50
         volt20 = nomVolt - deltaLow;
 	}
 
+    float deltaHigh = 0.55f * (maxVolt - nomVolt); // delta 50-80
     float volt80 = nomVolt + deltaHigh;
 
     //if (soc < 20)
     //{
     //    return minVolt + ((soc - 0.0f) / 20.0f) * (volt20 - minVolt);
-    //}
+    //} else
     if (soc < 50.0f)
     {
         return volt20 + ((soc - 20.0f) / 30.0f) * (nomVolt - volt20);
@@ -296,7 +294,7 @@ void ChademoCharger::SetBatteryVoltOverrides()
 {
     bool known = false;
 
-    // Get nomvolt for some known targets
+    // Set for some known targets
     if (_carData.TargetVoltage == 370)
     {
         _nomVoltOverride = 330; // iMiev
@@ -316,14 +314,15 @@ void ChademoCharger::SetBatteryVoltOverrides()
         }
         else if (_global.alternative_function == 1)
         {
-            _nomVoltOverride = 380; // Leaf 20-30
-            _volt20Ovveride = 365; // Leaf 20-30
+            // Leaf 20-30
+            _nomVoltOverride = 380;
+            _volt20Ovveride = 365;
             known = true;
         }
     }
 
     if (known)
-        println("[cha] AF%d: for known target %dv use nomVolt:%dv volt20:%dv", _global.alternative_function, _carData.TargetVoltage, _nomVoltOverride, _volt20Ovveride);
+        println("[cha] AF%d: known target %dv => nomVolt:%dv volt20:%dv (0=auto)", _global.alternative_function, _carData.TargetVoltage, _nomVoltOverride, _volt20Ovveride);
 }
 
 void ChademoCharger::RunStateMachine()
