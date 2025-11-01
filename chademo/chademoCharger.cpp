@@ -43,7 +43,7 @@ extern global_data _global;
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float volt20 = 0)
+static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float minVoltBelow20 = 0)
 {
     float maxVolt = target - 10;
 
@@ -55,21 +55,19 @@ static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt =
         nomVolt = 0.875f * target + 6.25f;
     }
 
-    if (volt20 == 0)
-	{
-        float minVolt = nomVolt - (maxVolt - nomVolt); // symetric
-        float deltaLow = 0.33f * (nomVolt - minVolt); // delta 20-50
-        volt20 = nomVolt - deltaLow;
-	}
+    float minVolt = nomVolt - (maxVolt - nomVolt); // symetric
+
+    float deltaLow = 0.35f * (nomVolt - minVolt); // delta 20-50
+    float volt20 = nomVolt - deltaLow;
 
     float deltaHigh = 0.55f * (maxVolt - nomVolt); // delta 50-80
     float volt80 = nomVolt + deltaHigh;
 
-    //if (soc < 20)
-    //{
-    //    return minVolt + ((soc - 0.0f) / 20.0f) * (volt20 - minVolt);
-    //} else
-    if (soc < 50.0f)
+    if (minVoltBelow20 != 0 && soc < 20)
+    {
+        return minVoltBelow20 + ((soc - 0.0f) / 20.0f) * (volt20 - minVoltBelow20);
+    }
+    else if (soc < 50.0f)
     {
         return volt20 + ((soc - 20.0f) / 30.0f) * (nomVolt - volt20);
     }
@@ -189,7 +187,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.SocPercent = 100;
             }
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _volt20Ovveride);
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _minVoltBelow20);
         }
 
         _msg102_recieved = true;
@@ -309,20 +307,20 @@ void ChademoCharger::SetBatteryVoltOverrides()
     {
         if (_global.alternative_function == 0)
         {
-            _nomVoltOverride = 355; // Leaf 40+
+            _nomVoltOverride = 356; // Leaf 40+
             known = true;
         }
         else if (_global.alternative_function == 1)
         {
             // Leaf 20-30
             _nomVoltOverride = 380;
-            _volt20Ovveride = 365;
+            _minVoltBelow20 = 345;
             known = true;
         }
     }
 
     if (known)
-        println("[cha] AF%d: known target %dv => nomVolt:%dv volt20:%dv (0=auto)", _global.alternative_function, _carData.TargetVoltage, _nomVoltOverride, _volt20Ovveride);
+        println("[cha] AF%d: known target %dv => nomVolt:%dv minVoltBelow20:%dv (0=formula)", _global.alternative_function, _carData.TargetVoltage, _nomVoltOverride, _minVoltBelow20);
 }
 
 void ChademoCharger::RunStateMachine()

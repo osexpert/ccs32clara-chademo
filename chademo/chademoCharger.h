@@ -645,7 +645,7 @@ public:
         bool _preChargeDoneButStalled = false;
         uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
-        int _volt20Ovveride = 0;
+        int _minVoltBelow20 = 0;
         bool _dischargeEnabled = false;
         bool _dischargeUnit = false;
         bool _dischargeSimulation = false;
