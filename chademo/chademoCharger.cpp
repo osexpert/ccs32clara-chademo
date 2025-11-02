@@ -43,7 +43,7 @@ extern global_data _global;
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float steeperBelowSoc = 0, float steeperBelowFactor = 0.7f)
+static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float adjustBelowSoc = 0, float adjustBelowFactor = 0.0f)
 {
     float maxVolt = target - 10;
 
@@ -63,10 +63,10 @@ static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt =
     float deltaHigh = 0.55f * (maxVolt - nomVolt); // delta 50-80
     float volt80 = nomVolt + deltaHigh;
 
-    if (steeperBelowSoc != 0 && soc < steeperBelowSoc)
+    if (adjustBelowSoc != 0 && soc < adjustBelowSoc)
     {
-        float volt0 = minVolt - steeperBelowFactor * (volt20 - minVolt);
-        return volt0 + (soc / steeperBelowSoc) * (volt20 - volt0);
+        float volt0 = minVolt - adjustBelowFactor * (volt20 - minVolt);
+        return volt0 + (soc / adjustBelowSoc) * (volt20 - volt0);
     }
     else if (soc < 50.0f)
     {
@@ -188,7 +188,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.SocPercent = 100;
             }
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _steeperBelowSoc);
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _adjustBelowSoc, _adjustBelowFactor);
         }
 
         _msg102_recieved = true;
@@ -315,13 +315,20 @@ void ChademoCharger::SetBatteryVoltOverrides()
         {
             // Leaf 20-30
             _nomVoltOverride = 380;
-            _steeperBelowSoc = 29;
+            _adjustBelowSoc = 29;
+            _adjustBelowFactor = 0.7f;
             known = true;
         }
     }
 
     if (known)
-        println("[cha] AF%d: known target %dv => nomVolt:%dv steeperBelow:%d% (0=default)", _global.alternative_function, _carData.TargetVoltage, _nomVoltOverride, _steeperBelowSoc);
+        println("[cha] AF%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d% adjustBelowFactor:%f (0=default)", 
+            _global.alternative_function, 
+            _carData.TargetVoltage, 
+            _nomVoltOverride, 
+            _adjustBelowSoc,
+            & _adjustBelowFactor // bypass float to double promotion by passing as reference
+        );
 }
 
 void ChademoCharger::RunStateMachine()
