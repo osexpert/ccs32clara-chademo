@@ -1,0 +1,15 @@
+Older models (approx. 2018–2021): 
+These used a 12 kWh or 13.8 kWh battery, with a total voltage measuring around 300V. Some models feature a nominal voltage of 292V, 
+with a maximum of 328V and a minimum of 220V, according to hybridbatteries.co.nz.
+so...target may be = 340?
+
+Newer models (approx. 2023 and up): 
+These models received a larger 20 kWh lithium-ion battery. The (red: nominal) battery voltage for the 2023 Outlander PHEV is 350V, according to specs from Le Guide de l'auto.
+So with nominal 350...target may be 410v? Or 400?
+
+Recent models (2025 refresh): Some models from 2025 come with a larger 22.7 kWh battery, which also affects the overall voltage.
+
+2023 Outlander PHEV:
+https://www.outlanderforums.com/threads/chademo-fast-charging.568/
+Some screenshot from ODB: 68% 367.6v
+So...target may be 410v?

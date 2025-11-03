@@ -1,0 +1,21 @@
+https://github.com/osexpert/ccs32clara-chademo/issues/18
+https://github.com/osexpert/ccs32clara-chademo/issues/35
+
+ZE0
+7% -> 350
+12% -> 360
+15% -> 361
+17% -> 362
+
+37% 376-378v
+38% -> 378
+
+47% -> 380V
+55% 382v
+73% 383v (only 1 volt from 55 to 73??)
+87% 392-393v
+88% 388v-390v ??
+
+
+
+
