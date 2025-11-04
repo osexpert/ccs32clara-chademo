@@ -116,15 +116,15 @@ Logging works the same way as the original firmware. I use Serial USB Terminal o
 
 Firmware update logic is inside the bootloader, so this is not affected by the firmware:
 With adapter off, plug in usb stick with the firmware.
-Hold power button down and don't let do.
+Hold power button down and don't let go.
 The usb stick led flashes a few times and turns off.
 Firmware update is done and you can let go of the power button.
 Finally, adapter turns on and adapter led is flashing.
 Press the stop button to turn adapter off.
 
 Charging via usb is not part of the software, its only hardware.
-While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, and this is bootloader starting.
-Meaning, charging automatically triggers power on, so adapter will auto power off and then auto power on again by charger, and this goes on forever.
+While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, this is the bootloader starting.
+Meaning, charging automatically triggers power on, then adapter will auto power off due to inactivity and then auto powered on again by charging, and this goes on forever.
 Charging via USB is very slow, and can take up to 10 hours if the internal battery is really empty.
 
 ## Original firmware
