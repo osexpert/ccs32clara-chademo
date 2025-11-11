@@ -106,7 +106,7 @@ There is a 5sec. watchdog that will reset (effectively power off) adapter if the
 
 If charging is started with welded contactor, the car will most likely (at least it did for me), display a warning and say the EV need service, and put car into turtle mode!
 I used LeafSpy Pro to clear the DTCs, else I would probably need to visit a garage! This happened every time until I got the contactor unwelded.
-Not sure why I happened, if it was by chance or if the firmware made a bad move. This was in the early stage of development, maybe the firmware works better now...or maybe not!
+Not sure why it happened, if it was by chance or if the firmware made a bad move. This was in the early stage of development, maybe the firmware works better now...or maybe not!
 In any case, I suggest traveling with a ODB2 BT dongle, LeafSpy Pro and a multimeter, at least I do. Be warned.
 
 This firmware support chademo dynamic current control, if supported by the car (at least Leaf 40kwh does). This allows charging on chargers that deliver a lot less current than
