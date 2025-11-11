@@ -1,17 +1,23 @@
 name: CI
 on:
   push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
       - 'doc/**'
       - 'volts/**'
+      - '.github/**'
   pull_request:
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
       - 'doc/**'
       - 'volts/**'
+      - '.github/**'
 
 jobs:
   build:
