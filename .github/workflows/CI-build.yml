@@ -1,7 +1,17 @@
 name: CI
 on:
   push:
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'doc/**'
+      - 'volts/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'doc/**'
+      - 'volts/**'
 
 jobs:
   build:
