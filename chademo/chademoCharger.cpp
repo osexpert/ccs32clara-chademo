@@ -174,8 +174,6 @@ void ChademoCharger::HandlePendingCarMessages()
         // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
-            // TODO: verify that soc calculation works for chademo 0.9 cars
-
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else

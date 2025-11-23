@@ -369,6 +369,14 @@ static void pev_sendCurrentDemandReq(void)
    req.EVMaximumCurrentLimit.Unit = dinunitSymbolType_A;
    req.EVMaximumCurrentLimit.Unit_isUsed = 1;
    req.EVMaximumCurrentLimit.Value = Param::GetInt(Param::MaxCurrent);
+
+   // Some HYC 150 in Cyprus might require it
+   req.EVMaximumPowerLimit_isUsed = 1; /* The Ioniq sends 1 here. */
+   req.EVMaximumPowerLimit.Value = Param::GetInt(Param::MaxPower) * 10; /* maxpower is kW, then x10 x 100 by Multiplier */
+   req.EVMaximumPowerLimit.Multiplier = 2; /* 10^2 */
+   req.EVMaximumPowerLimit.Unit_isUsed = 1;
+   req.EVMaximumPowerLimit.Unit = dinunitSymbolType_W; /* Watt */
+
 #undef req
    encodeAndTransmit();
 }
