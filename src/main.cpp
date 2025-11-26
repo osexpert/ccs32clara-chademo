@@ -496,7 +496,7 @@ static void SetMacAddress()
     mac[1] = DESIG_UNIQUE_ID0 & 0xFF;
     *((uint32_t*)&mac[2]) = DESIG_UNIQUE_ID2;
 
-    println("Our MAC address: %02x:xx:xx:xx:xx:%02x", mac[0], mac[5]);
+    println("Our MAC address: %02x:%02x:xx:xx:xx:%02x", mac[0], mac[1], mac[5]);
     //more info: https://community.st.com/t5/stm32-mcus/how-to-obtain-and-use-the-stm32-96-bit-uid/ta-p/621443
     setOurMac(mac);
 }

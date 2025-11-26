@@ -308,7 +308,7 @@ void ChademoCharger::SetBatteryVoltOverrides()
     {
         if (_global.alternative_function == 0)
         {
-            _nomVoltOverride = 356; // Leaf 40+
+            _nomVoltOverride = 355; // Leaf 40+
             known = true;
         }
         else if (_global.alternative_function == 1)
@@ -322,12 +322,12 @@ void ChademoCharger::SetBatteryVoltOverrides()
     }
 
     if (known)
-        println("[cha] AF%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d% adjustBelowFactor:%f (0=default)", 
+        println("[cha] AF%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
             _global.alternative_function, 
             _carData.TargetVoltage, 
             _nomVoltOverride, 
             _adjustBelowSoc,
-            & _adjustBelowFactor // bypass float to double promotion by passing as reference
+            &_adjustBelowFactor // bypass float to double promotion by passing as reference
         );
 }
 
@@ -752,7 +752,7 @@ void ChademoCharger::Log()
             _carData.MaxVoltage,
             _carData.SocPercent,
             _carData.EstimatedBatteryVoltage,
-            & _carData.BatteryCapacityKwh  // bypass float to double promotion by passing as reference
+            &_carData.BatteryCapacityKwh  // bypass float to double promotion by passing as reference
         );
 
         _logCycleCounter = 0;
