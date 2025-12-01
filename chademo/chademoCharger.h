@@ -497,11 +497,11 @@ struct CarData
     // Valid after kSwitch
 #ifdef SKIP_DISCOVERY
     uint16_t TargetVoltage = 350; // iMiev
+    uint16_t EstimatedBatteryVoltage = 300; //iMiev min
 #else
     uint16_t TargetVoltage;
-#endif
-
     uint16_t EstimatedBatteryVoltage;
+#endif
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
@@ -698,4 +698,5 @@ public:
         ChargerData _chargerData = {};
 
 };
+
 
