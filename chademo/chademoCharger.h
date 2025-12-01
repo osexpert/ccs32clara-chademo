@@ -3,6 +3,8 @@
 #include <type_traits>
 #include "printf.h"
 
+#define SKIP_DISCOVERY
+
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
@@ -493,7 +495,12 @@ struct CarData
     uint16_t MaxChargingTimeSec;
 
     // Valid after kSwitch
+#ifdef SKIP_DISCOVERY
+    uint16_t TargetVoltage = 300; // iMiev minvolt
+#else
     uint16_t TargetVoltage;
+#endif
+
     uint16_t EstimatedBatteryVoltage;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
@@ -641,7 +648,13 @@ public:
         bool _switch_k = false;
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
+
+#ifdef SKIP_DISCOVERY
+        bool _discovery = false;
+#else
         bool _discovery = true;
+#endif
+
         bool _preChargeDoneButStalled = false;
         uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
@@ -674,7 +687,12 @@ public:
         msg209 _msg209 = {};
 
         StopReason _stopReason = StopReason::NONE;
+
+#ifdef SKIP_DISCOVERY
+        ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
+#else
         ChargerState _state = ChargerState::Start;
+#endif
 
         CarData _carData = {};
         ChargerData _chargerData = {};
