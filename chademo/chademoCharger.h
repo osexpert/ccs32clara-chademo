@@ -495,8 +495,14 @@ struct CarData
 
     uint16_t MaxChargingTimeSec;
 
+#ifdef SKIP_DISCOVERY
+    // Valid after kSwitch, but until then, fake something to make ChargeParameterDiscovery MaxVoltage happy
+    uint16_t TargetVoltage = 410;
+#else
     // Valid after kSwitch
     uint16_t TargetVoltage;
+#endif
+
     uint16_t EstimatedBatteryVoltage;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
