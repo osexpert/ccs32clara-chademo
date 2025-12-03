@@ -496,13 +496,8 @@ struct CarData
     uint16_t MaxChargingTimeSec;
 
     // Valid after kSwitch
-#ifdef SKIP_DISCOVERY
-    uint16_t TargetVoltage = 350; // iMiev
-    uint16_t EstimatedBatteryVoltage = 300; //iMiev min
-#else
     uint16_t TargetVoltage;
     uint16_t EstimatedBatteryVoltage;
-#endif
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
@@ -612,7 +607,7 @@ public:
     bool GetSwitchK();
     void SetBatteryVoltOverrides();
     void CloseAdapterContactor();
-   
+    bool PreChargeCanStart();
     void Log();
 
     const char* GetStateName();

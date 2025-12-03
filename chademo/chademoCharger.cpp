@@ -651,6 +651,20 @@ extern "C" bool chademoInterface_preChargeCompleted()
     return chademoCharger->PreChargeCompleted();
 }
 
+bool ChademoCharger::PreChargeCanStart()
+{
+#ifdef SKIP_DISCOVERY
+    return _state > ChargerState::WaitForCarSwitchK;
+#else
+    return true;
+#endif
+}
+
+extern "C" bool chademoInterface_preChargeCanStart()
+{
+    return chademoCharger->PreChargeCanStart();
+}
+
 bool ChademoCharger::CarContactorsOpened()
 {
     bool contactorsOpened = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
