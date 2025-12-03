@@ -3,7 +3,7 @@
 #include <type_traits>
 #include "printf.h"
 
-#define SKIP_DISCOVERY
+//#define SKIP_DISCOVERY
 
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
