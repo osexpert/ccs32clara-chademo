@@ -511,8 +511,13 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
+#ifdef SKIP_DISCOVERY
+    // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
+    uint8_t SocPercent = 20;
+#else
     // PS: unstable before switch (k)
     uint8_t SocPercent;
+#endif
 
     CarStatus Status;
     CarFaults Faults;
