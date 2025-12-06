@@ -7,41 +7,35 @@ extern global_data _global;
 
 int16_t hardwareInterface_getInletVoltage(void)
 {
-    // only called in precharge
-    _global.auto_power_off_timer_count_up_ms = 0;
-
     // we have no inlet voltage sensor. 
     return Param::GetInt(Param::EvseVoltage);
 }
 
 int16_t hardwareInterface_getAccuVoltage(void)
 {
-   return Param::GetInt(Param::BatteryVoltage);
+    return Param::GetInt(Param::BatteryVoltage);
 }
 
 int16_t hardwareInterface_getChargingTargetVoltage(void)
 {
-   return Param::GetInt(Param::TargetVoltage);
+    return Param::GetInt(Param::TargetVoltage);
 }
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
-    // only called in CurrentDemand
-    _global.auto_power_off_timer_count_up_ms = 0;
-
     return Param::GetInt(Param::ChargeCurrent);
 }
 
 uint8_t hardwareInterface_getSoc(void)
 {
-   /* SOC in percent */
-   return Param::GetInt(Param::soc);
+    /* SOC in percent */
+    return Param::GetInt(Param::soc);
 }
 
 uint8_t hardwareInterface_getIsAccuFull(void)
 {
-   // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
-   return Param::GetInt(Param::soc) == 100;
+    // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
+    return Param::GetInt(Param::soc) == 100;
 }
 
 void hardwareInterface_setPowerRelayOn(void)
@@ -56,14 +50,14 @@ void hardwareInterface_setPowerRelayOff(void)
 
 void hardwareInterface_setStateB(void)
 {
-   println("hardwareInterface_setStateB");
-   DigIo::state_c_out_inverted.Set();
+    println("hardwareInterface_setStateB");
+    DigIo::state_c_out_inverted.Set();
 }
 
 void hardwareInterface_setStateC(void)
 {
-   println("hardwareInterface_setStateC");
-   DigIo::state_c_out_inverted.Clear();
+    println("hardwareInterface_setStateC");
+    DigIo::state_c_out_inverted.Clear();
 }
 
 void hardwareInterface_triggerConnectorLocking(void)
@@ -85,8 +79,8 @@ uint8_t hardwareInterface_isConnectorLocked(void)
 
 uint8_t hardwareInterface_getPowerRelayConfirmation(void)
 {
-   /* todo */
-   return 1;
+    /* todo */
+    return 1;
 }
 
 bool hardwareInterface_stopChargeRequested()
