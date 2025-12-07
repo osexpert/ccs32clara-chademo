@@ -706,7 +706,7 @@ static void stateFunctionPreChargeWait(void)
     // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 2 :-)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
-    if (pev_cyclesInState > 66) /* 66*30ms=2s */
+    if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
     {
         addToTrace(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);

@@ -493,8 +493,14 @@ struct CarData
 
     uint16_t MaxChargingTimeSec;
 
+#ifdef SKIP_DISCOVERY
+    // Valid after kSwitch, but until then, fake something to make ChargeParameterDiscovery MaxVoltage happy
+    uint16_t TargetVoltage = 410;
+#else
     // Valid after kSwitch
     uint16_t TargetVoltage;
+#endif
+
     uint16_t EstimatedBatteryVoltage;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
@@ -503,8 +509,13 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
+#ifdef SKIP_DISCOVERY
+    // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
+    uint8_t SocPercent = 20;
+#else
     // PS: unstable before switch (k)
     uint8_t SocPercent;
+#endif
 
     CarStatus Status;
     CarFaults Faults;
@@ -605,7 +616,7 @@ public:
     bool GetSwitchK();
     void SetBatteryVoltOverrides();
     void CloseAdapterContactor();
-   
+    bool PreChargeCanStart();
     void Log();
 
     const char* GetStateName();
@@ -642,7 +653,13 @@ public:
         bool _switch_k = false;
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
+
+#ifdef SKIP_DISCOVERY
+        bool _discovery = false;
+#else
         bool _discovery = true;
+#endif
+
         bool _preChargeDoneButStalled = false;
         uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
@@ -675,7 +692,12 @@ public:
         msg209 _msg209 = {};
 
         StopReason _stopReason = StopReason::NONE;
+
+#ifdef SKIP_DISCOVERY
+        ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
+#else
         ChargerState _state = ChargerState::Start;
+#endif
 
         CarData _carData = {};
         ChargerData _chargerData = {};
