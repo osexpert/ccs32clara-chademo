@@ -174,8 +174,6 @@ void ChademoCharger::HandlePendingCarMessages()
         // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
-            // TODO: verify that soc calculation works for chademo 0.9 cars
-
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else
@@ -384,14 +382,15 @@ void ChademoCharger::RunStateMachine()
 
         SetSwitchD1(true); // will trigger car sending CAN
 
-        SetState(ChargerState::WaitForCarReadyToCharge);
+        SetState(ChargerState::WaitForCarSwitchK);
     }
-    else if (_state == ChargerState::WaitForCarReadyToCharge)
+    else if (_state == ChargerState::WaitForCarSwitchK)
     {
-        if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
+        if (_switch_k)
         {
-            _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
             SetBatteryVoltOverrides();
+            // refresh EstimatedBatteryVoltage after (potentionally) setting overrides
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _adjustBelowSoc, _adjustBelowFactor);
 
             // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
@@ -410,13 +409,26 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
-                LockChargingPlug();
-                set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
-
-                //PerformInsulationTest();
-
-                SetState(ChargerState::WaitForPreChargeDone);
+                SetState(ChargerState::WaitForCarReadyToCharge);
             }
+        }
+        else if (IsTimeoutSec(20))
+        {
+            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
+        }
+    }
+    else if (_state == ChargerState::WaitForCarReadyToCharge)
+    {
+        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
+        {
+            _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
+
+            LockChargingPlug();
+            set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
+
+            //PerformInsulationTest();
+
+            SetState(ChargerState::WaitForPreChargeDone);
         }
         else if (IsTimeoutSec(20))
         {
