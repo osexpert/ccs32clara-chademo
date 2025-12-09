@@ -3,6 +3,10 @@
 #include <type_traits>
 #include "printf.h"
 
+#if defined(GITHUB_AF) && GITHUB_AF == 10
+#define CHADEMO_SINGLE_SESSION
+#endif
+
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
@@ -493,7 +497,7 @@ struct CarData
 
     uint16_t MaxChargingTimeSec;
 
-#ifdef SKIP_DISCOVERY
+#ifdef CHADEMO_SINGLE_SESSION
     // Valid after kSwitch, but until then, fake something to make ChargeParameterDiscovery MaxVoltage happy
     uint16_t TargetVoltage = 410;
 #else
@@ -509,7 +513,7 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
-#ifdef SKIP_DISCOVERY
+#ifdef CHADEMO_SINGLE_SESSION
     // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
     uint8_t SocPercent = 20;
 #else
@@ -654,7 +658,7 @@ public:
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
 
-#ifdef SKIP_DISCOVERY
+#ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;
 #else
         bool _discovery = true;
@@ -693,7 +697,7 @@ public:
 
         StopReason _stopReason = StopReason::NONE;
 
-#ifdef SKIP_DISCOVERY
+#ifdef CHADEMO_SINGLE_SESSION
         ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
 #else
         ChargerState _state = ChargerState::Start;

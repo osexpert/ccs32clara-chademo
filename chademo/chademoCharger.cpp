@@ -304,17 +304,17 @@ void ChademoCharger::SetBatteryVoltOverrides()
     }
     else if (_carData.TargetVoltage == 410)
     {
-        if (_global.alternative_function == 0)
-        {
-            _nomVoltOverride = 355; // Leaf 40+
-            known = true;
-        }
-        else if (_global.alternative_function == 1)
+        if (_global.alternative_function == 1)
         {
             // Leaf 20-30
             _nomVoltOverride = 380;
             _adjustBelowSoc = 29;
             _adjustBelowFactor = 0.7f;
+            known = true;
+        }
+        else // default
+        {
+            _nomVoltOverride = 355; // Leaf 40+
             known = true;
         }
     }
@@ -664,7 +664,7 @@ extern "C" bool chademoInterface_carContactorsOpened()
 
 bool ChademoCharger::PreChargeCanStart()
 {
-#ifdef SKIP_DISCOVERY
+#ifdef CHADEMO_SINGLE_SESSION
     return _state > ChargerState::WaitForCarSwitchK;
 #else
     return true;
