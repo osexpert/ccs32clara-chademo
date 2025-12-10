@@ -304,7 +304,7 @@ void ChademoCharger::SetBatteryVoltOverrides()
     }
     else if (_carData.TargetVoltage == 410)
     {
-        if (_global.alternative_function == 1)
+        if (_global.alternative_function % 10 == 1) // matches 1, 11, 21, etc.
         {
             // Leaf 20-30
             _nomVoltOverride = 380;

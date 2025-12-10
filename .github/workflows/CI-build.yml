@@ -80,11 +80,23 @@ jobs:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF10
           path: My407ccs2chademo.bin
 
+      # --- AF11 build ---
+      - name: Build AF11 firmware
+        run: |
+          export GITHUB_AF=11
+          make clean all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF11
+          path: My407ccs2chademo.bin
+          
       - name: Add info to summary
         run: |
           echo "### Alternative function builds" >> $GITHUB_STEP_SUMMARY
           echo "- **AF1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AF1 should be a better match for Leaf with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
           echo "- **AF10**: Use a single chademo session, may work better with eg. Lexus." >> $GITHUB_STEP_SUMMARY
+          echo "- **AF11**: Combination of **AF1** and **AF10**." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       
 # Unit tests are currently broken so don't build and run them for now
