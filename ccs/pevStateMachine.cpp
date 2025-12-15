@@ -369,6 +369,13 @@ static void pev_sendCurrentDemandReq(void)
     req.EVMaximumCurrentLimit.Unit = dinunitSymbolType_A;
     req.EVMaximumCurrentLimit.Unit_isUsed = 1;
     req.EVMaximumCurrentLimit.Value = Param::GetInt(Param::MaxCurrent);
+
+    // evgo-vehicle-oem-best-practices.pdf
+    req.EVMaximumPowerLimit_isUsed = 1; /* The Ioniq sends 1 here. */
+    req.EVMaximumPowerLimit.Value = Param::GetInt(Param::MaxPower) * 10; /* maxpower is kW, then x10 x 100 by Multiplier */
+    req.EVMaximumPowerLimit.Multiplier = 2; /* 10^2 */
+    req.EVMaximumPowerLimit.Unit_isUsed = 1;
+    req.EVMaximumPowerLimit.Unit = dinunitSymbolType_W; /* Watt */
 #undef req
     encodeAndTransmit();
 }
@@ -671,11 +678,10 @@ static void stateFunctionWaitForCableCheckResponse(void)
             rc = dinDocDec.V2G_Message.Body.CableCheckRes.ResponseCode;
             proc = dinDocDec.V2G_Message.Body.CableCheckRes.EVSEProcessing;
             Param::SetInt(Param::EvseVoltage, 0);
-            //addToTrace(MOD_PEV, "The CableCheck result is %d %d", rc, proc);
             // We have two cases here:
             // 1) The charger says "cable check is finished and cable ok", by setting ResponseCode=OK and EVSEProcessing=Finished.
             // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
-            if ((proc == dinEVSEProcessingType_Finished) && (rc == dinresponseCodeType_OK))
+            if ((rc == dinresponseCodeType_OK) && (proc == dinEVSEProcessingType_Finished))
             {
                 addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
                 pev_enterState(PEV_STATE_PreChargeWait);
@@ -691,7 +697,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
                 {
                     // cable check not yet finished or finished with bad result -> try again
                     pev_numberOfCableCheckReq += 1;
-                    addToTrace(MOD_PEV, "Will again send CableCheckReq");
+                    addToTrace(MOD_PEV, "Will again send CableCheckReq (rc:%d proc:%d)", rc, proc);
                     pev_sendCableCheckReq();
                     // stay in the same state
                     pev_enterState(PEV_STATE_WaitForCableCheckResponse);
