@@ -166,7 +166,7 @@ void evaluateTcpPacket(void)
        addToTrace(MOD_TCP, "[TCP] FIN received, sending ACK");
        TcpAckNr = remoteSeqNr + 1;
        tcp_sendAck();
-       tcpState = TCP_STATE_CLOSED;
+       // tcpState = TCP_STATE_CLOSED;
        peerFinPending = false;
    }
 }
