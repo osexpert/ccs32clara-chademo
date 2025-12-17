@@ -1,0 +1,4 @@
+kia soul
+71%
+109.OutputVoltage 382 -> 378
+target:420V max:430V 
