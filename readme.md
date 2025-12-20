@@ -196,6 +196,8 @@ Releases are made less often and the difference is, a release has been tested in
 ### Alternative function builds
 There are builds named AF#. These are alternative function builds. Currently, these AF-builds exist:
 - **AF1:** For target voltage 410v, use nominal voltage 380v instead of 355v. AF1 should be a better match for Leaf's with 20-30kwh battery.
+- **AF10**: Use a single chademo session, may work better with eg. Lexus.
+- **AF11**: Combination of **AF1** and **AF10**. May work better with Leaf ZE0 or AZE0 when using discharge mode.
 
 ## Building
 If you want to compile the software from scratch, you can follow these instructions
