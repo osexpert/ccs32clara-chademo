@@ -588,7 +588,6 @@ void ChademoCharger::RunStateMachine()
         {
             OpenAdapterContactor();
 
-            UnlockChargingPlug();
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
             // do stop CAN in own state to make sure we send this message to car before we kill CAN
@@ -613,6 +612,9 @@ void ChademoCharger::RunStateMachine()
             println("[cha] BUG: StopReason not set. Failover to UNKNOWN");
             _stopReason = StopReason::UNKNOWN;
         }
+
+		if (IsChargingPlugLocked())
+			UnlockChargingPlug();
     }
 }
 
@@ -972,15 +974,6 @@ void ChademoCharger::UpdateChargerMessages()
 
 bool ChademoCharger::IsPowerOffOk()
 {
-    // Must have time to tell the car via CAN that plug is unlocked, so auto off when UnlockChargingPlug() is a bit too soon.
-
-    if (_state == ChargerState::Stopped) {
-        // power off ok if stopped
-        return true;
-    }
-    else {
-        // not stopped (maybe not even started), then power off ok if plug was never locked
-        return not _chargingPlugLockedTrigger;
-    }
+    return not IsChargingPlugLocked();
 }
 

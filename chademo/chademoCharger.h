@@ -644,16 +644,23 @@ public:
     }
 
     void LockChargingPlug() {
-        _chargingPlugLockedTrigger = true;
+        _chargingPlugLocked = true;
+        println("[cha] Lock charging plug");
     }
 
     void UnlockChargingPlug() {
+        _chargingPlugLocked = false;
+        println("[cha] Unlock charging plug");
+    }
+
+    bool IsChargingPlugLocked() {
+        return _chargingPlugLocked;
     }
 
     private:
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
-        bool _chargingPlugLockedTrigger = false;
+        bool _chargingPlugLocked = false;
         bool _switch_k = false;
         bool _switch_d1 = false;
         bool _msg102_recieved = false;

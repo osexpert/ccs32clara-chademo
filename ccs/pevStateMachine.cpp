@@ -7,8 +7,7 @@ extern global_data _global;
 /* The Charging State Machine for the car */
 //STATE_ENTRY(internalName, friendlyName, timeout in s)
 #define STATE_LIST \
-   STATE_ENTRY(NotYetInitialized, Off, 0) \
-   STATE_ENTRY(Connecting, Connecting, 0) \
+   STATE_ENTRY(Start, Start, 0) \
    STATE_ENTRY(Connected, Connected, 0) \
    STATE_ENTRY(WaitForSupportedApplicationProtocolResponse, NegotiateProtocol, 2) \
    STATE_ENTRY(WaitForSessionSetupResponse, SessionSetup, 2) \
@@ -78,7 +77,7 @@ static const uint8_t exiDemoSupportedApplicationProtocolRequestIoniq[] = { 0x80,
 
 static uint16_t pev_cyclesInState;
 static uint8_t pev_DelayCycles;
-static pevstates pev_state = PEV_STATE_NotYetInitialized;
+static pevstates pev_state = PEV_STATE_Start;
 static uint16_t pev_numberOfContractAuthenticationReq;
 static uint16_t pev_numberOfChargeParameterDiscoveryReq;
 static uint16_t pev_numberOfCableCheckReq;
@@ -395,8 +394,7 @@ static void pev_sendWeldingDetectionReq(void)
 
 /**** State functions ***************/
 //Empty functions
-static void stateFunctionNotYetInitialized() {}
-static void stateFunctionConnecting() {}
+static void stateFunctionStart() {}
 
 static void stateFunctionConnected(void)
 {
@@ -993,9 +991,6 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                 /* no other fields are mandatory */
                 setCheckpoint(900);
                 encodeAndTransmit();
-                addToTrace(MOD_PEV, "Unlocking the connector");
-                /* unlock the connectore here. Better here than later, to avoid endless locked connector in case of broken SessionStopResponse. */
-                hardwareInterface_triggerConnectorUnlocking();
                 pev_enterState(PEV_STATE_WaitForSessionStopResponse);
             }
             /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
@@ -1066,17 +1061,19 @@ static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
         pev_DelayCycles--;
         return;
     }
-    /* Finally, when we have no current and no voltage, unlock the connector */
     setCheckpoint(1400);
-    addToTrace(MOD_PEV, "Safe-shutdown-sequence: unlocking the connector");
-    hardwareInterface_triggerConnectorUnlocking();
     /* This is the end of the safe-shutdown-sequence. */
     pev_enterState(PEV_STATE_End);
 }
 
 static void stateFunctionEnd(void)
 {
+    if (hardwareInterface_isConnectorLocked())
+		hardwareInterface_triggerConnectorUnlocking();
+
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
+
+    // FIXME: staying here or going back to Start....does not matter much?
 }
 
 static void pev_enterState(pevstates n)
@@ -1097,19 +1094,17 @@ static void pev_runFsm(void)
 {
     if (connMgr_getConnectionLevel() < CONNLEVEL_80_TCP_RUNNING)
     {
-        /* If we have no TCP to the charger, nothing to do here. Just wait for the link. */
-        if (pev_state != PEV_STATE_NotYetInitialized)
+        if (pev_state == PEV_STATE_Start)
         {
-            pev_enterState(PEV_STATE_NotYetInitialized);
-            hardwareInterface_setStateB();
-            hardwareInterface_setPowerRelayOff();
+            /* If we have no TCP to the charger, and we are still in Start, nothing to do here. Just wait for the link. */
+            return;
         }
-        return;
     }
-    if (connMgr_getConnectionLevel() == CONNLEVEL_80_TCP_RUNNING)
+    else if (connMgr_getConnectionLevel() == CONNLEVEL_80_TCP_RUNNING)
     {
         /* We have a TCP connection. This is the trigger for us. */
-        if (pev_state == PEV_STATE_NotYetInitialized) pev_enterState(PEV_STATE_Connected);
+        if (pev_state == PEV_STATE_Start) 
+            pev_enterState(PEV_STATE_Connected);
     }
 
     stateFunctions[pev_state](); //call state function

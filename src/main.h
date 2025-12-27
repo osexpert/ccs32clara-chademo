@@ -46,7 +46,6 @@ struct global_data
     int alternative_function = GITHUB_AF;
 
     bool ccsPreChargeDoneButStalledTrigger = false;
-    bool ccsConnectorLockingTrigger = false;
 
     uint32_t auto_power_off_timer_count_up_ms = 0;
 };

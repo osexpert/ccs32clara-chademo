@@ -62,17 +62,17 @@ void hardwareInterface_setStateC(void)
 
 void hardwareInterface_triggerConnectorLocking(void)
 {
+    println("[ccs] Lock charging plug");
     Param::SetInt(Param::LockState, LOCK_CLOSED);
-
-    _global.ccsConnectorLockingTrigger = true;
 }
 
 void hardwareInterface_triggerConnectorUnlocking(void)
 {
+    println("[ccs] Unlock charging plug");
     Param::SetInt(Param::LockState, LOCK_OPEN);
 }
 
-uint8_t hardwareInterface_isConnectorLocked(void)
+bool hardwareInterface_isConnectorLocked(void)
 {
     return Param::GetInt(Param::LockState) == LOCK_CLOSED;
 }

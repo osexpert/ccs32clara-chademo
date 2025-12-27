@@ -209,16 +209,7 @@ void power_off_no_return(const char* reason)
 
 bool ccs_isPowerOffOk()
 {
-    // plug is unlocked right after welding detection, so can't use it reliably.
-
-    if (chademoInterface_ccsInEndState()) {
-        // if ended, power off is ok
-        return true;
-    }
-    else {
-        // if not ended (maybe not even started), power off ok if plug was never locked
-        return not _global.ccsConnectorLockingTrigger;
-    }
+    return not hardwareInterface_isConnectorLocked();
 }
 
 void power_off_check()
