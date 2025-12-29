@@ -17,12 +17,12 @@ extern global_data _global;
    STATE_ENTRY(WaitForChargeParameterDiscoveryResponse, ChargeParameterDiscovery, 5) /* On some charger models, the chargeParameterDiscovery needs more than a second. Wait at least 5s. */ \
    STATE_ENTRY(WaitForConnectorLock, ConnectorLock, 2) \
    STATE_ENTRY(WaitForCableCheckResponse, CableCheck, 30) \
-   STATE_ENTRY(PreChargeWait, PreChargeWait, 0) \
+   STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 60) \
    STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 30) \
    STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 5) \
    STATE_ENTRY(WaitForPowerDeliveryResponse, PowerDelivery, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
    STATE_ENTRY(WaitForCurrentDemandResponse, CurrentDemand, 5) /* Test with 5s timeout. Just experimental. The specified performance time is 25ms (ISO), the specified timeout 250ms. */\
-   STATE_ENTRY(WaitForCurrentDownAfterStateB, WaitCurrentDown, 0) \
+   STATE_ENTRY(WaitForCurrentDownAfterStateB, CurrentDown, 60) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
@@ -682,7 +682,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
             if ((rc == dinresponseCodeType_OK) && (proc == dinEVSEProcessingType_Finished))
             {
                 addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
-                pev_enterState(PEV_STATE_PreChargeWait);
+                pev_enterState(PEV_STATE_WaitForPreChargeStart);
             }
             else
             {
@@ -705,7 +705,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
     }
 }
 
-static void stateFunctionPreChargeWait(void)
+static void stateFunctionWaitForPreChargeStart(void)
 {
     // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 2 :-)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
@@ -1073,7 +1073,7 @@ static void stateFunctionEnd(void)
 
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
 
-    // FIXME: staying here or going back to Start....does not matter much?
+    // FIXME: staying here or going back to Start....does it really matter?
 }
 
 static void pev_enterState(pevstates n)
@@ -1111,7 +1111,8 @@ static void pev_runFsm(void)
 
     if (pev_isTooLong())
     {
-        addToTrace(MOD_PEV, "Timeout in state.");
+        const char* label = pevSttLabels[state];
+        addToTrace(MOD_PEV, "Timeout in state %s", label);
         pev_enterState(PEV_STATE_SafeShutDown);
     }
 }
