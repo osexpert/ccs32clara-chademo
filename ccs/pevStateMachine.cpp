@@ -1111,7 +1111,7 @@ static void pev_runFsm(void)
 
     if (pev_isTooLong())
     {
-        const char* label = pevSttLabels[state];
+        const char* label = pevSttLabels[pev_state];
         addToTrace(MOD_PEV, "Timeout in state %s", label);
         pev_enterState(PEV_STATE_SafeShutDown);
     }
