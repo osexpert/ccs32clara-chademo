@@ -395,14 +395,14 @@ void tcp_Mainfunction(void)
 {
    tcp_checkRetry();
 
-   if (connMgr_getConnectionLevel()<50)
+   if (connMgr_getConnectionLevel() < CONNLEVEL_50_SDP_DONE)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
       tcp_disconnect();
       return;
    }
 
-   if ((connMgr_getConnectionLevel()==50) && (tcpState == TCP_STATE_CLOSED))
+   if ((connMgr_getConnectionLevel() == CONNLEVEL_50_SDP_DONE) && (tcpState == TCP_STATE_CLOSED))
    {
       /* SDP is finished, but no TCP connected yet. */
       /* use a new port */

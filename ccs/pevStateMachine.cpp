@@ -1092,19 +1092,16 @@ static uint8_t pev_isTooLong(void)
 /******* The statemachine dispatcher *******************/
 static void pev_runFsm(void)
 {
-    if (connMgr_getConnectionLevel() < CONNLEVEL_80_TCP_RUNNING)
+    if (connMgr_getConnectionLevel() < CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
     {
-        if (pev_state == PEV_STATE_Start)
-        {
-            /* If we have no TCP to the charger, and we are still in Start, nothing to do here. Just wait for the link. */
-            return;
-        }
+        /* No TCP and we are still in Start. Nothing to do here. */
+        return;
     }
-    else if (connMgr_getConnectionLevel() == CONNLEVEL_80_TCP_RUNNING)
+
+    if (connMgr_getConnectionLevel() == CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
     {
-        /* We have a TCP connection. This is the trigger for us. */
-        if (pev_state == PEV_STATE_Start) 
-            pev_enterState(PEV_STATE_Connected);
+        /* We have TCP and we are in Start. This is the trigger for us. */
+        pev_enterState(PEV_STATE_Connected);
     }
 
     stateFunctions[pev_state](); //call state function
@@ -1114,7 +1111,7 @@ static void pev_runFsm(void)
 
     if (pev_isTooLong())
     {
-        addToTrace(MOD_PEV, "Timeout in dispatcher.");
+        addToTrace(MOD_PEV, "Timeout in state.");
         pev_enterState(PEV_STATE_SafeShutDown);
     }
 }

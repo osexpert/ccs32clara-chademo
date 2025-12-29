@@ -558,13 +558,13 @@ void runSlacSequencer(void)
 {
    pevSequenceCyclesInState++;
    /* in PevMode, check whether homeplug modem is connected, run the SLAC */
-   if (connMgr_getConnectionLevel()<10)
+   if (connMgr_getConnectionLevel() < CONNLEVEL_10_ONE_MODEM_FOUND)
    {
       /* we have no modem seen. --> nothing to do for the SLAC */
       if (pevSequenceState!=STATE_INITIAL) slac_enterState(STATE_INITIAL);
       return;
    }
-   if (connMgr_getConnectionLevel()>=20)
+   if (connMgr_getConnectionLevel() >= CONNLEVEL_20_TWO_MODEMS_FOUND)
    {
       /* we have two modems in the AVLN. This means, the modem pairing is already done. --> nothing to do for the SLAC */
       if (pevSequenceState!=STATE_INITIAL) slac_enterState(STATE_INITIAL);
@@ -763,13 +763,13 @@ void runSlacSequencer(void)
 
 void runSdpStateMachine(void)
 {
-   if (connMgr_getConnectionLevel()<15)
+   if (connMgr_getConnectionLevel() < CONNLEVEL_15_SLAC_ONGOING)
    {
       /* We have no AVLN established, and SLAC is not ongoing. It does not make sense to start SDP. */
       sdp_state = 0;
       return;
    }
-   if (connMgr_getConnectionLevel()>20)
+   if (connMgr_getConnectionLevel() > CONNLEVEL_20_TWO_MODEMS_FOUND)
    {
       /* SDP was already successful. No need to run it again. */
       sdp_state = 0;
@@ -816,7 +816,7 @@ static void evaluateGetKeyCnf(void) {}
 
 void evaluateReceivedHomeplugPacket(void)
 {
-   if (connMgr_getConnectionLevel()==100) {
+   if (connMgr_getConnectionLevel() == CONNLEVEL_100_APPL_RUNNING) {
        /* we have TCP traffic running, so we ignore all homeplug management packets. This
        makes us robust against cross-talk from other charging cables.
        Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */
