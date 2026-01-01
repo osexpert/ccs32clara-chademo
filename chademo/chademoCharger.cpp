@@ -171,7 +171,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.RequestCurrent = _msg102.m.RequestCurrent;
         }
 
-        // soc and the constant both unstable before switch(k)
+        // soc and the constant both unstable before switch(k). But the soc change slightly between switch(k) and car READY_TO_CHARGE...
         if (_switch_k)
         {
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
@@ -382,11 +382,11 @@ void ChademoCharger::RunStateMachine()
 
         SetSwitchD1(true); // will trigger car sending CAN
 
-        SetState(ChargerState::WaitForCarSwitchK);
+        SetState(ChargerState::WaitForCarSwitchKAndCarReadyToCharge);
     }
-    else if (_state == ChargerState::WaitForCarSwitchK)
+    else if (_state == ChargerState::WaitForCarSwitchKAndCarReadyToCharge)
     {
-        if (_switch_k)
+        if (_switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
         {
             SetBatteryVoltOverrides();
             // refresh EstimatedBatteryVoltage after (potentionally) setting overrides
@@ -409,26 +409,15 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
-                SetState(ChargerState::WaitForCarReadyToCharge);
+                _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
+
+                LockChargingPlug();
+                set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
+
+                //PerformInsulationTest();
+
+                SetState(ChargerState::WaitForPreChargeDone);
             }
-        }
-        else if (IsTimeoutSec(20))
-        {
-            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
-        }
-    }
-    else if (_state == ChargerState::WaitForCarReadyToCharge)
-    {
-        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
-        {
-            _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
-
-            LockChargingPlug();
-            set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
-
-            //PerformInsulationTest();
-
-            SetState(ChargerState::WaitForPreChargeDone);
         }
         else if (IsTimeoutSec(20))
         {
@@ -525,6 +514,8 @@ void ChademoCharger::RunStateMachine()
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();
+                // PreCharge aknowledge received.Inlet 388V, accu 388V. Only dischargers can manifest exact voltage at first call and nothing else?
+                // A discharger will only mirror batt or target, nothing else. Currently we check for mirror of Target -> OutputVoltage (Charging). Maybe we could also check Battery -> OutputVoltage (PreCharge).
                 if (chargerIsDischarger)
                 {
                     // one discharger is observed to mirror asked amps as delivered amps.
