@@ -375,7 +375,6 @@ void ChademoCharger::RunStateMachine()
     {
         // reset in case set during discovery
         _msg102_received = false;
-        _tenCyclesCountdown = 10;
         _carData.Faults = {};
         _carData.Status = {};
         _chargerData.Status = ChargerStatus::STOPPED;
@@ -940,11 +939,9 @@ void ChademoCharger::UpdateChargerMessages()
 
     uint8_t remainingChargingTime10s = 0;
     uint8_t remainingChargingTimeMins = 0;
-    if (_tenCyclesCountdown > 0)
+    if (_carData.MaxChargingTimeSec == 0)
     {
-        // Wild experiment: it make no sense, but I saw in a random can log that the 10 first messages the charger send 0xff. It should not matter,
-        // but maybe some cars relay on it.....
-        _tenCyclesCountdown--;
+        // Wild experiment: car has not set its max charging time yet, so use 0xff (if we used 0, car might think charger has 0 time left?)
         remainingChargingTime10s = 0xff;
         remainingChargingTimeMins = 0xff;
     }
