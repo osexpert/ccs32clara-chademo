@@ -658,7 +658,7 @@ extern "C" bool chademoInterface_carContactorsOpened()
 bool ChademoCharger::PreChargeCanStart()
 {
 #ifdef CHADEMO_SINGLE_SESSION
-    return _state > ChargerState::WaitForCarSwitchK;
+    return _state > ChargerState::WaitForCarSwitchKAndCarReadyToCharge;
 #else
     return true;
 #endif
