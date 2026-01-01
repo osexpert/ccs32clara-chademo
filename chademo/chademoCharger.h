@@ -663,7 +663,8 @@ public:
         bool _chargingPlugLocked = false;
         bool _switch_k = false;
         bool _switch_d1 = false;
-        bool _msg102_recieved = false;
+        bool _msg102_received = false;
+        int _tenCyclesCountdown = 10;
 
 #ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;

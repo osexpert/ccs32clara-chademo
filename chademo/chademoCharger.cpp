@@ -189,7 +189,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _adjustBelowSoc, _adjustBelowFactor);
         }
 
-        _msg102_recieved = true;
+        _msg102_received = true;
     }
     if (_msg110_pending)
     {
@@ -374,7 +374,8 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Start)
     {
         // reset in case set during discovery
-        _msg102_recieved = false;
+        _msg102_received = false;
+        _tenCyclesCountdown = 10;
         _carData.Faults = {};
         _carData.Status = {};
         _chargerData.Status = ChargerStatus::STOPPED;
@@ -901,7 +902,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 
 void ChademoCharger::SendChargerMessages()
 {
-    if (_switch_d1 && _msg102_recieved)
+    if (_switch_d1 && _msg102_received)
     {
         UpdateChargerMessages();
 
@@ -939,7 +940,15 @@ void ChademoCharger::UpdateChargerMessages()
 
     uint8_t remainingChargingTime10s = 0;
     uint8_t remainingChargingTimeMins = 0;
-    if (_chargerData.RemainingChargeTimeSec < 60)
+    if (_tenCyclesCountdown > 0)
+    {
+        // Wild experiment: it make no sense, but I saw in a random can log that the 10 first messages the charger send 0xff. It should not matter,
+        // but maybe some cars relay on it.....
+        _tenCyclesCountdown--;
+        remainingChargingTime10s = 0xff;
+        remainingChargingTimeMins = 0xff;
+    }
+    else if (_chargerData.RemainingChargeTimeSec < 60)
     {
         remainingChargingTime10s = _chargerData.RemainingChargeTimeSec / 10;
         remainingChargingTimeMins = 0;
