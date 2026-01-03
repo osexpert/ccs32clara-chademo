@@ -247,7 +247,7 @@ struct msg100
             /// <summary>
             /// Leaf 40kwh: always start out as 240. When car discover changer chademo version, it changes to 100 if >= chademo 1.0, or 255 if chademo 0.9. Weird stuff.
             /// </summary>
-            uint8_t SocPercentConstant;
+            uint8_t SocPercentDivider;
             uint8_t Unused7;
         } m;
         uint8_t bytes[8];

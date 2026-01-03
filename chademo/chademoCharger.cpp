@@ -101,7 +101,7 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg100.m.MinVoltage, _msg100_isr.m.MinVoltage, "100.MinVoltage %d -> %d");
         COMPARE_SET(_msg100.m.MaxVoltage, _msg100_isr.m.MaxVoltage, "100.MaxVoltage %d -> %d");
 
-        COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "100.SocPercentConstant %d -> %d");
+        COMPARE_SET(_msg100.m.SocPercentDivider, _msg100_isr.m.SocPercentDivider, "100.SocPercentDivider %d -> %d");
         
         COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "100.Unused7 %d -> %d");
 
@@ -171,11 +171,11 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.RequestCurrent = _msg102.m.RequestCurrent;
         }
 
-        // soc and the constant both unstable before switch(k)
+        // soc and the divider both unstable before switch(k)
         if (_switch_k)
         {
-            if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
-                _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
+            if (_msg100.m.SocPercentDivider > 0 && _msg100.m.SocPercentDivider != 100)
+                _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentDivider) * 100;
             else
                 _carData.SocPercent = _msg102.m.SocPercent;
 
@@ -373,12 +373,12 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Start)
     {
-        // reset in case set during discovery
+        // reset (set during discovery)
         _msg102_recieved = false;
-        _carData.Faults = {};
-        _carData.Status = {};
-        _chargerData.Status = ChargerStatus::STOPPED;
-        _stopReason = StopReason::NONE;
+//        _carData.Faults = {};
+//        _carData.Status = {};
+//        _chargerData.Status = ChargerStatus::STOPPED;
+//        _stopReason = StopReason::NONE;
 
         SetSwitchD1(true); // will trigger car sending CAN
 
@@ -386,12 +386,17 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarSwitchK)
     {
+        /* may be updated until switch(k) is on:
+        100.4+5 max volt
+        100.6 soc divider (so effectively soc is also unstable before switch(k))
+        101.1 max charge time 10s
+        101.2 max charge time min
+        101.5+6 battery capacity
+        102.1+2 target volt
+        */
+
         if (_switch_k)
         {
-            SetBatteryVoltOverrides();
-            // refresh EstimatedBatteryVoltage after (potentionally) setting overrides
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _adjustBelowSoc, _adjustBelowFactor);
-
             // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
             // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
             if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
@@ -399,16 +404,11 @@ void ChademoCharger::RunStateMachine()
                 println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
                 set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
-            else if (_discovery)
-            {
-                SetSwitchD1(false); // PS: even if we set to false, car can continue to send 102 for a short time
-                _discovery = false;
-                println("[cha] Discovery completed");
-
-                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone);
-            }
             else
             {
+                // now that TargetVoltage is stable, set overrides, if any
+                SetBatteryVoltOverrides();
+
                 SetState(ChargerState::WaitForCarReadyToCharge);
             }
         }
@@ -419,16 +419,30 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
-        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) // will take a few seconds (ca. 3) until car is ready
+        // will take a few seconds (ca. 3) from D1 until car is ready
+        // will take approx one second after _switch_k
+        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
         {
-            _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
+            // SOC may change a couple of % even after SwitchK, so SOC is not completely stable until READY_TO_CHARGE. If it was not for this, we could end discovery at SwitchK.
+            if (_discovery)
+            {
+                SetSwitchD1(false); // PS: even if we set to false, car may continue to send 102 for a short time
+                _discovery = false;
+                println("[cha] Discovery completed");
 
-            LockChargingPlug();
-            set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
+                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone);
+            }
+            else
+            {
+                _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
 
-            //PerformInsulationTest();
+                LockChargingPlug();
+                set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
-            SetState(ChargerState::WaitForPreChargeDone);
+                //PerformInsulationTest();
+
+                SetState(ChargerState::WaitForPreChargeDone);
+            }
         }
         else if (IsTimeoutSec(20))
         {
@@ -625,8 +639,8 @@ bool ChademoCharger::PreChargeCompleted()
 
     if (_precharge_Longer_So_We_Can_Measure_Battery_Voltage)
     {
-        bool carAskingAmps = _state > ChargerState::WaitForCarRequestCurrent;
-        if (carAskingAmps)
+        bool carRequestCurrent = _state > ChargerState::WaitForCarRequestCurrent;
+        if (carRequestCurrent)
         {
             SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
             println("[cha] Estimated battery voltage deviation:%d", _chargerData.OutputVoltage - _carData.EstimatedBatteryVoltage);
@@ -636,7 +650,7 @@ bool ChademoCharger::PreChargeCompleted()
             println("[cha] PreCharge stalled until car asking for amps");
         }
             
-        return carAskingAmps;
+        return carRequestCurrent;
     }
     else
     {
@@ -655,8 +669,8 @@ extern "C" bool chademoInterface_preChargeCompleted()
 
 bool ChademoCharger::CarContactorsOpened()
 {
-    bool contactorsOpened = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
-    return contactorsOpened;
+    bool carContactorsOpen = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
+    return carContactorsOpen;
 }
 
 extern "C" bool chademoInterface_carContactorsOpened()
@@ -667,7 +681,9 @@ extern "C" bool chademoInterface_carContactorsOpened()
 bool ChademoCharger::PreChargeCanStart()
 {
 #ifdef CHADEMO_SINGLE_SESSION
-    return _state > ChargerState::WaitForCarSwitchK;
+    // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
+    bool carReadyToCharge = _state > ChargerState::WaitForCarReadyToCharge;
+    return carReadyToCharge;
 #else
     return true;
 #endif
