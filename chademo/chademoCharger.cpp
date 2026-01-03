@@ -101,7 +101,7 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg100.m.MinVoltage, _msg100_isr.m.MinVoltage, "100.MinVoltage %d -> %d");
         COMPARE_SET(_msg100.m.MaxVoltage, _msg100_isr.m.MaxVoltage, "100.MaxVoltage %d -> %d");
 
-        COMPARE_SET(_msg100.m.SocPercentDivider, _msg100_isr.m.SocPercentDivider, "100.SocPercentDivider %d -> %d");
+        COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "100.SocPercentConstant %d -> %d");
         
         COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "100.Unused7 %d -> %d");
 
@@ -171,11 +171,11 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.RequestCurrent = _msg102.m.RequestCurrent;
         }
 
-        // soc and the divider both unstable before switch(k)
+        // soc and the constant both unstable before switch(k)
         if (_switch_k)
         {
-            if (_msg100.m.SocPercentDivider > 0 && _msg100.m.SocPercentDivider != 100)
-                _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentDivider) * 100;
+            if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
+                _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else
                 _carData.SocPercent = _msg102.m.SocPercent;
 
