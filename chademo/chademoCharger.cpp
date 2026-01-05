@@ -151,6 +151,8 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
+        COMPARE_SET(_carStatusStopBeforeCharging, has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING), "[cha] CarStatus::STOP_BEFORE_CHARGING %d -> %d");
+
         if (_state == ChargerState::ChargingLoop && _msg102.m.TargetVoltage > _chargerData.AvailableOutputVoltage)
         {
             println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetVoltage, _chargerData.AvailableOutputVoltage);
@@ -342,7 +344,7 @@ void ChademoCharger::RunStateMachine()
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reason
-        if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING)) set_flag(&stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
+        //if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING)) set_flag(&stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reason
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
@@ -562,8 +564,8 @@ void ChademoCharger::RunStateMachine()
                     dischargeSimulation = true;
                 }
             }
-            COMPARE_SET(dischargeUnit, _dischargeUnit, "[cha] DischargeUnit %d -> %d");
-            COMPARE_SET(dischargeSimulation, _dischargeSimulation, "[cha] DischargeSimulation %d -> %d");
+            COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
+            COMPARE_SET(_dischargeSimulation, dischargeSimulation, "[cha] DischargeSimulation %d -> %d");
         }
     }
     else if (_state == ChargerState::Stopping_Start)

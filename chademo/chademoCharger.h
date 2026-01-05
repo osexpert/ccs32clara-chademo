@@ -679,6 +679,7 @@ public:
         bool _dischargeEnabled = false;
         bool _dischargeUnit = false;
         bool _dischargeSimulation = false;
+        bool _carStatusStopBeforeCharging = false;
         bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
