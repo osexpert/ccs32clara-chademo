@@ -714,7 +714,19 @@ const char* ChademoCharger::GetStateName()
 
 void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
 {
-    _chargerData.AvailableOutputVoltage = maxV;
+	(void)maxV; // unused
+
+    // Round up to nearest 100?
+    // uint16_t rounded = ((maxV + 99) / 100) * 100;
+
+    // Some cars (E-NV200 24kWh, 10 Years old) don't like anything else than 500v
+    // TODO: Support 800V (1000V) cars/chargers too? I guess I need one to test on before I can change it,
+    // but probably it can be detected based on the car TargetVoltage and ChargerMaxVoltage, rounded up to next hundred?
+    // Example: 
+    // if (TargetVoltage > 600 && ChargerMaxVoltage >= TargetVoltage) {
+    //    AvailableOutputVoltage = RoundUp100(TargetVoltage);
+    // }
+    _chargerData.AvailableOutputVoltage = 500;
     if (_chargerData.AvailableOutputVoltage > ADAPTER_MAX_VOLTS)
         _chargerData.AvailableOutputVoltage = ADAPTER_MAX_VOLTS;
 
