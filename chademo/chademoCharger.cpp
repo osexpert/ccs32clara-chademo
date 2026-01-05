@@ -562,8 +562,8 @@ void ChademoCharger::RunStateMachine()
                     dischargeSimulation = true;
                 }
             }
-            COMPARE_SET(dischargeUnit, _dischargeUnit, "[cha] DischargeUnit %d -> %d");
-            COMPARE_SET(dischargeSimulation, _dischargeSimulation, "[cha] DischargeSimulation %d -> %d");
+            COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
+            COMPARE_SET(_dischargeSimulation, dischargeSimulation, "[cha] DischargeSimulation %d -> %d");
         }
     }
     else if (_state == ChargerState::Stopping_Start)
