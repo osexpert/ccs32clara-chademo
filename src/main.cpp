@@ -64,7 +64,7 @@ volatile uint32_t system_millis;
 #define CCS_TRACE_EVERY_MS 1000 // 1 sec
 #define SYSINFO_EVERY_MS 2000 // 2 sec
 
-enum MainProgress
+enum LedState
 {
     Init,
     WaitForCcsStarted,
@@ -78,77 +78,77 @@ enum MainProgress
     Stop
 };
 
-MainProgress _state = MainProgress::Init;
+LedState _ledState = LedState::Init;
 
-void RunMainProgressStateMachine()
+void RunLedStateMachine()
 {
-    if (_global.powerOffPending && _state != MainProgress::Stop)
+    if (_global.powerOffPending && _ledState != LedState::Stop)
     {
         ledBlinker->setPattern(blink_stop);
-        _state = MainProgress::Stop;
+        _ledState = LedState::Stop;
     }
 
-    if (_state == MainProgress::Init)
+    if (_ledState == LedState::Init)
     {
         ledBlinker->setPattern(blink_start);
-        _state = MainProgress::WaitForCcsStarted;
+        _ledState = LedState::WaitForCcsStarted;
     }
-    else if (_state == MainProgress::WaitForCcsStarted)
+    else if (_ledState == LedState::WaitForCcsStarted)
     {
         if (_global.ccsKickoff)
         {
-            _state = MainProgress::WaitForSlacDone;
+            _ledState = LedState::WaitForSlacDone;
         }
     }
-    else if (_state == MainProgress::WaitForSlacDone)
+    else if (_ledState == LedState::WaitForSlacDone)
     {
         if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
         {
             ledBlinker->setPattern(blink_1);
-            _state = MainProgress::WaitForTcpConnected;
+            _ledState = LedState::WaitForTcpConnected;
         }
     }
-    else if (_state == MainProgress::WaitForTcpConnected)
+    else if (_ledState == LedState::WaitForTcpConnected)
     {
         if (Param::GetInt(Param::checkpoint) >= 303) // tcp connected
         {
             ledBlinker->setPattern(blink_2);
-            _state = MainProgress::WaitForPreChargeStart;
+            _ledState = LedState::WaitForPreChargeStart;
         }
     }
-    else if (_state == MainProgress::WaitForPreChargeStart)
+    else if (_ledState == LedState::WaitForPreChargeStart)
     {
         if (Param::GetInt(Param::checkpoint) >= 570)
         {
             ledBlinker->setPattern(blink_3);
-            _state = MainProgress::WaitForPreChargeDoneButStalled;
+            _ledState = LedState::WaitForPreChargeDoneButStalled;
         }
     }
-    else if (_state == MainProgress::WaitForPreChargeDoneButStalled)
+    else if (_ledState == LedState::WaitForPreChargeDoneButStalled)
     {
         if (_global.ccsPreChargeDoneButStalledTrigger)
         {
             ledBlinker->setPattern(blink_4);
-            _state = MainProgress::WaitForCurrentDemandLoop;
+            _ledState = LedState::WaitForCurrentDemandLoop;
         }
     }
-    else if (_state == MainProgress::WaitForCurrentDemandLoop)
+    else if (_ledState == LedState::WaitForCurrentDemandLoop)
     {
         if (Param::GetInt(Param::checkpoint) >= 700)
         {
             // barely noticable, removed blink
-            _state = MainProgress::WaitForDeliveringAmps;
+            _ledState = LedState::WaitForDeliveringAmps;
         }
     }
-    else if (_state == MainProgress::WaitForDeliveringAmps)
+    else if (_ledState == LedState::WaitForDeliveringAmps)
     {
         if (Param::GetInt(Param::EvseCurrent) > 0)
         {
             ledBlinker->setPattern(blink_working);
-            _state = MainProgress::Charging;
+            _ledState = LedState::Charging;
         }
     }
-    else if (_state == MainProgress::Charging)
+    else if (_ledState == LedState::Charging)
     {
 
     }
@@ -227,7 +227,7 @@ void power_off_check()
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
-        if (buttonPressedBriefly && _state != MainProgress::WaitForSlacDone && not special_modes_selection_pending())
+        if (buttonPressedBriefly && _ledState != LedState::WaitForSlacDone && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
             println("Stop button pressed briefly and slac not pending. Power off pending...");
@@ -343,7 +343,7 @@ void print_sysinfo()
         // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
         // during charging car, vcc12 seen between 12.19-12.31V
         // Min values seen and working: vcc4:3.78V vcc12:11.46V
-        println("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d m_state:%d",
+        println("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d led_state:%d",
             system_millis / 1000,
             &adc_4_volt, // bypass float to double promotion by passing as reference
             &adc_12_volt, // bypass float to double promotion by passing as reference
@@ -353,7 +353,7 @@ void print_sysinfo()
             _global.powerOffPending,
             powerOffOkCcs,
             powerOffOkCha,
-            _state
+            _ledState
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
@@ -409,7 +409,7 @@ static void Ms100Task(void)
     }
     else
     {
-        RunMainProgressStateMachine();
+        RunLedStateMachine();
         ledBlinker->tick(); // 100 ms tick
 
         if (special_modes_is_selected(SpecialMode::Unwelding))
