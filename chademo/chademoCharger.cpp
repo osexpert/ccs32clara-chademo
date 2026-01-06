@@ -356,6 +356,7 @@ void ChademoCharger::RunStateMachine()
         }
 
         _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxVoltage);
+        // TODO: I see in some logs, it calc this first when OutputAmps > 0
         _chargerData.RemainingChargeTimeSec = _carData.MaxChargingTimeSec;
         _chargerData.RemainingChargeTimeCycles = _chargerData.RemainingChargeTimeSec * CHA_CYCLES_PER_SEC;
     }
@@ -634,7 +635,14 @@ void ChademoCharger::RunStateMachine()
 
 		if (IsChargingPlugLocked())
 			UnlockChargingPlug();
+
+        SetState(ChargerState::End);
     }
+    else if (_state == ChargerState::End)
+    {
+        // terminal state. No code should exist here. We can never leave.
+    }
+
 }
 
 bool ChademoCharger::PreChargeCompleted()

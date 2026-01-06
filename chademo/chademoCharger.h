@@ -219,7 +219,8 @@ enum class StopReason
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
     CHARGER_STATE(Stopping_WaitForLowVolts) \
     CHARGER_STATE(Stopping_End) \
-    CHARGER_STATE(Stopped)
+    CHARGER_STATE(Stopped) \
+    CHARGER_STATE(End)
 
 enum ChargerState {
 #define CHARGER_STATE(name) name,
