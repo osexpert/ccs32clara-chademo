@@ -68,7 +68,7 @@
     TESTP_ENTRY(CAT_CHARGE,  ChargeCurrent,        "A",       0,      500,    0,      4   ) \
     TESTP_ENTRY(CAT_CHARGE,  soc,                  "%",       0,      100,    0,      5   ) \
     TESTP_ENTRY(CAT_CHARGE,  BatteryVoltage,       "V",       0,      1000,   0,      6   ) \
-    TESTP_ENTRY(CAT_CHARGE,  enable,               OFFON,     0,      1,      1,      23  ) \
+ /*   TESTP_ENTRY(CAT_CHARGE,  enable,               OFFON,     0,      1,      1,      23  ) */ \
  /*   TESTP_ENTRY(CAT_CHARGE,  AcObcState,           ACOBCSTT,  0,      5,      0,      29  ) \ */ \
 /*    PARAM_ENTRY(CAT_TEST,    DemoVoltage,          "V",       0,      500,    0,      20  ) */  \
 /*    PARAM_ENTRY(CAT_TEST,    DemoControl,          DEMOCTRL,  0,      511,    0,      25  ) \ */ \
@@ -113,101 +113,39 @@
 
 
 /***** Enum String definitions *****/
-#define IVSRC        "0=ChargerOutput, 1=AnalogInput, 2=CAN"
-#define LOCK         "0=None, 1=Open, 2=Closed, 3=Opening, 4=Closing"
-#define ACTEST       "0=None, 1=OpenLock, 2=CloseLock, 3=Contactor, 4=LedRed, 5=LedGreen, 6=LedBlue, 7=StateC"
+//#define IVSRC        "0=ChargerOutput, 1=AnalogInput, 2=CAN"
+//#define LOCK         "0=None, 1=Open, 2=Closed, 3=Opening, 4=Closing"
+//#define ACTEST       "0=None, 1=OpenLock, 2=CloseLock, 3=Contactor, 4=LedRed, 5=LedGreen, 6=LedBlue, 7=StateC"
 #define MODULES      "0=None, 1=ConnMgr, 2=HwInterface, 4=Homeplug, 8=StateMachine, 16=QCA, 32=Tcp, 64=TcpTraffic, 128=IPV6, 256=ModemFinder, 512=SDP, 1024=EthTraffic, 2047=All, 959=AllButTraffic"
-#define CANSPEEDS    "0=125k, 1=250k, 2=500k, 3=800k, 4=1M"
-#define OFFON        "0=Off, 1=On"
-#define DEMOCTRL     "0=CAN, 234=StandAlone"
-#define ACMODES      "0=CANRemoteControlled, 1=StandAlone"
+//#define CANSPEEDS    "0=125k, 1=250k, 2=500k, 3=800k, 4=1M"
+//#define OFFON        "0=Off, 1=On"
+//#define DEMOCTRL     "0=CAN, 234=StandAlone"
+//#define ACMODES      "0=CANRemoteControlled, 1=StandAlone"
 #define STOPREASONS  "0=None, 1=Button, 2=MissingEnable, 3=CANTimeout, 4=ChargerShutdown, 5=AccuFull, 6=ChargerEmergency, 7=InletOverheat, 8=EvseMalfunction"
-#define WAKEUP       "0=Level, 1=Pulse, 2=LevelOnValidCp, 3=PulseOnValidCp, 4=LevelOnValidPP"
-#define CAT_HARDWARE "Hardware Config"
-#define CAT_CHARGE   "Charge parameters"
-#define CAT_COMM     "Communication"
-#define CAT_TEST     "Testing"
-#define LIMITREASONS "0=None, 1=Charger, 2=Battery, 3=InletHot"
-#define PPVARIANT    "0=Foccci4.1_3V3_1k, 1=Foccci4.2_5V_330up_3000down, 2=Foccci4.5_5V_330up_no_down, 3=Foccci5_330up_no_down, 4=Foccci5_330up_2700down, 5=Foccci5_330up_3300down"
-#define ACOBCSTT     "0=Idle, 1=Lock, 2=Charging, 3=Pause, 4=Complete, 5=Error"
-#define PORTSTAT     "0=Idle, 1=PluggedIn, 2=Ready, 3=ChargingAC, 4=ChargingDC, 5=Stopping, 6=Unlock, 7=PortError"
+//#define WAKEUP       "0=Level, 1=Pulse, 2=LevelOnValidCp, 3=PulseOnValidCp, 4=LevelOnValidPP"
+//#define CAT_HARDWARE "Hardware Config"
+//#define CAT_CHARGE   "Charge parameters"
+//#define CAT_COMM     "Communication"
+//#define CAT_TEST     "Testing"
+//#define LIMITREASONS "0=None, 1=Charger, 2=Battery, 3=InletHot"
+//#define PPVARIANT    "0=Foccci4.1_3V3_1k, 1=Foccci4.2_5V_330up_3000down, 2=Foccci4.5_5V_330up_no_down, 3=Foccci5_330up_no_down, 4=Foccci5_330up_2700down, 5=Foccci5_330up_3300down"
+//#define ACOBCSTT     "0=Idle, 1=Lock, 2=Charging, 3=Pause, 4=Complete, 5=Error"
+//#define PORTSTAT     "0=Idle, 1=PluggedIn, 2=Ready, 3=ChargingAC, 4=ChargingDC, 5=Stopping, 6=Unlock, 7=PortError"
 
 /***** enums ******/
 
-enum acobcstate
-{
-   OBC_IDLE = 0,
-   OBC_LOCK = 1,
-   OBC_CHARGE = 2,
-   OBC_PAUSE = 3,
-   OBC_COMPLETE = 4,
-   OBC_ERROR = 5
-};
-
-enum portstate
-{
-   PS_IDLE = 0,
-   PS_PLUGGEDIN = 1,
-   PS_READY = 2,
-   PS_CHARGING_AC = 3,
-   PS_CHARGING_DC = 4,
-   PS_STOPPING = 5,
-   PS_UNLOCK = 6,
-   PS_PORTERROR = 7
-};
-
-enum acmodes
-{
-   ACM_CANCONTROLLED = 0,
-   ACM_STANDALONE = 1
-};
-
-enum _wakeupfuncs
-{
-   WAKEUP_LEVEL = 0,
-   WAKEUP_PULSE = 1,
-   WAKEUP_ONVALIDCP = 2,
-   WAKEUP_ONVALIDPP = 4
-};
-
-enum _inletsources
-{
-   IVSRC_CHARGER,
-//   IVSRC_ANAIN,
-  // IVSRC_CAN
-};
 
 enum _stopreasons
 {
    STOP_REASON_NONE,
    STOP_REASON_CAR_USER,
-   STOP_REASON_MISSING_ENABLE,
-   STOP_REASON_CAN_TIMEOUT,
+//   STOP_REASON_MISSING_ENABLE,
+//   STOP_REASON_CAN_TIMEOUT,
    STOP_REASON_CHARGER_SHUTDOWN,
    STOP_REASON_ACCU_FULL,
    STOP_REASON_CHARGER_EMERGENCY_SHUTDOWN,
-   STOP_REASON_INLET_OVERHEAT,
+//   STOP_REASON_INLET_OVERHEAT,
    STOP_REASON_CHARGER_EVSE_MALFUNCTION
-};
-
-enum _limitationreasons
-{
-   LIMITATIONREASON_NONE,
-   LIMITATIONREASON_CHARGER,
-   LIMITATIONREASON_BATTERY,
-   LIMITATIONREASON_INLET_HOT
-};
-
-enum _actuatortest
-{
-   TEST_NONE,
-   TEST_OPENLOCK,
-   TEST_CLOSELOCK,
-   TEST_CONTACTOR,
-   TEST_LEDRED,
-   TEST_LEDGREEN,
-   TEST_LEDBLUE,
-   TEST_STATEC
 };
 
 
