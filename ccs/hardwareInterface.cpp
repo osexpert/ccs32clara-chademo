@@ -85,23 +85,7 @@ uint8_t hardwareInterface_getPowerRelayConfirmation(void)
 
 bool hardwareInterface_stopChargeRequested()
 {
-    uint8_t stopReason = STOP_REASON_NONE;
-
-    if (_global.powerOffPending)
-    {
-        stopReason = STOP_REASON_BUTTON;
-        Param::SetInt(Param::StopReason, stopReason);
-        addToTrace(MOD_HWIF, "Power off pending.");
-    }
-
-    if (!Param::GetBool(Param::enable))
-    {
-        stopReason = STOP_REASON_MISSING_ENABLE;
-        Param::SetInt(Param::StopReason, stopReason);
-        addToTrace(MOD_HWIF, "Got enable=false.");
-    }
-
-    return (stopReason != STOP_REASON_NONE);
+    return _global.powerOffPending;
 }
 
 

@@ -910,6 +910,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 else if (pev_isUserStopRequestOnCarSide)
                 {
                     addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
+                    Param::SetInt(Param::StopReason, STOP_REASON_CAR_USER);
                 }
                 else if (pev_isUserStopRequestOnChargerSide)
                 {
