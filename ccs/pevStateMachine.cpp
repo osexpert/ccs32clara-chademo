@@ -453,8 +453,6 @@ static void stateFunctionWaitForSupportedApplicationProtocolResponse(void)
             pev_enterState(PEV_STATE_WaitForSessionSetupResponse);
         }
     }
-    if (pev_isTooLong())
-        ErrorMessage::Post(ERR_PLCTIMEOUT);
 }
 
 static void stateFunctionWaitForSessionSetupResponse(void)
@@ -654,8 +652,6 @@ static void stateFunctionWaitForConnectorLock(void)
         pev_numberOfCableCheckReq = 1; // This is the first request.
         pev_enterState(PEV_STATE_WaitForCableCheckResponse);
     }
-    if (pev_isTooLong())
-        ErrorMessage::Post(ERR_LOCKTIMEOUT);
 }
 
 static void stateFunctionWaitForCableCheckResponse(void)
@@ -761,8 +757,6 @@ static void stateFunctionWaitForPreChargeResponse(void)
             }
         }
     }
-    if (pev_isTooLong())
-        ErrorMessage::Post(ERR_PRECTIMEOUT);
 }
 
 static void stateFunctionWaitForContactorsClosed(void)
@@ -980,7 +974,6 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                         /* even after multiple welding detection requests/responses, the voltage did not fall as expected.
                         This may be due to two hanging/welded contactors or an issue of the charging station. */
                         addToTrace(MOD_PEV, "WeldingDetection: ERROR: Did not reach low voltage: contactors probably welded.");
-                        ErrorMessage::Post(ERR_RELAYWELDED);
                     }
                 }
 

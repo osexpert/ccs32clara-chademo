@@ -32,7 +32,6 @@
 #include "params.h"
 #include "digio.h"
 #include "hwinit.h"
-#include "errormessage.h"
 #include "printf.h"
 #include "connMgr.h"
 #include "hardwareInterface.h"
@@ -471,8 +470,6 @@ static void Ms30Task()
     runSdpStateMachine();
     tcp_Mainfunction();
     pevStateMachine_Mainfunction();
-
-    ErrorMessage::SetTime(rtc_get_ms());
 
     _global.ccsEnded = chademoInterface_ccsInEndState();
     if (_global.ccsEnded)

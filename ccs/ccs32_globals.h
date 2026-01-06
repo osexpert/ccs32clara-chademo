@@ -28,7 +28,6 @@
 #include "digio.h"
 #include "params.h"
 #include "hwinit.h"
-#include "errormessage.h"
 #include "my_string.h"
 #include "libopencm3/cm3/cortex.h"
 #include "main.h"
