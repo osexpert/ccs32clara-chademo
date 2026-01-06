@@ -505,10 +505,6 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
-        if (_chargerData.RemainingChargeTimeCycles > 0)
-            _chargerData.RemainingChargeTimeCycles--;
-        _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
-
         StopReason stopReason = StopReason::NONE;
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
@@ -564,6 +560,15 @@ void ChademoCharger::RunStateMachine()
             }
             COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
             COMPARE_SET(_dischargeSimulation, dischargeSimulation, "[cha] DischargeSimulation %d -> %d");
+
+            // Only count down if charging amps. So if discharging, we can go on forever.
+            // The check for _chargerData.RemainingChargeTimeSec is in the start of the state, but not a problem, its only one cycle behind:-)
+            if (_chargerData.OutputCurrent > 0)
+            {
+                if (_chargerData.RemainingChargeTimeCycles > 0)
+                    _chargerData.RemainingChargeTimeCycles--;
+                _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
+            }
         }
     }
     else if (_state == ChargerState::Stopping_Start)
