@@ -865,55 +865,44 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             _global.auto_power_off_timer_count_up_ms = 0;
 
             /* as long as the accu is not full and no stop-demand from the user, we continue charging */
-            bool pev_isUserStopRequestOnChargerSide = false;
-            bool pev_stopRequestFromCharger = false;
+            _stopreasons currentDemandStopReason = STOP_REASON_NONE;
             if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Shutdown)
             {
                 /* https://github.com/uhi22/pyPLC#example-flow, checkpoint 790: If the user stops the
                    charging session on the charger, we get a CurrentDemandResponse with
                    DC_EVSEStatus.EVSEStatusCode = 2 "EVSE_Shutdown" (observed on Compleo. To be tested
                    on other chargers. */
-                addToTrace(MOD_PEV, "Checkpoint790: Charging is terminated from charger side.");
+                addToTrace(MOD_PEV, "User requested stop on charger side.");
                 setCheckpoint(790);
-                pev_isUserStopRequestOnChargerSide = true;
-                Param::SetInt(Param::StopReason, STOP_REASON_CHARGER_SHUTDOWN);
+                currentDemandStopReason = STOP_REASON_CHARGER_SHUTDOWN;
             }
             else if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Malfunction)
             {
                 /* If the charger reports a malfunction, we stop the charging. */
                 /* Issue reference: https://github.com/uhi22/ccs32clara/issues/29 */
                 addToTrace(MOD_PEV, "Charger reported EVSE_Malfunction. A reason could be hitting the EVMaximumVoltageLimit or EVSEMaximumVoltageLimit.");
-                pev_stopRequestFromCharger = true;
-                Param::SetInt(Param::StopReason, STOP_REASON_CHARGER_EVSE_MALFUNCTION);
+                currentDemandStopReason = STOP_REASON_CHARGER_EVSE_MALFUNCTION;
             }
             else if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_EmergencyShutdown)
             {
                 /* If the charger reports an emergency, we stop the charging. */
                 addToTrace(MOD_PEV, "Charger reported EmergencyShutdown.");
-                pev_stopRequestFromCharger = true;
-                Param::SetInt(Param::StopReason, STOP_REASON_CHARGER_EMERGENCY_SHUTDOWN);
+                currentDemandStopReason = STOP_REASON_CHARGER_EMERGENCY_SHUTDOWN;
+            }
+            else if (hardwareInterface_stopChargeRequested())
+            {
+                addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
+                currentDemandStopReason = STOP_REASON_CAR_USER;
+            }
+            else if (hardwareInterface_getIsAccuFull())
+            {
+                addToTrace(MOD_PEV, "Accu is full. Sending PowerDeliveryReq Stop.");
+                currentDemandStopReason = STOP_REASON_ACCU_FULL;
             }
 
-            /* If the pushbutton is pressed longer than 0.5s or enable is set to off, we interpret this as charge stop request. */
-            bool pev_isUserStopRequestOnCarSide = hardwareInterface_stopChargeRequested();
-            bool pev_isAccuFull = hardwareInterface_getIsAccuFull();
-            if (pev_isAccuFull || pev_isUserStopRequestOnCarSide || pev_isUserStopRequestOnChargerSide || pev_stopRequestFromCharger)
+            if (currentDemandStopReason != STOP_REASON_NONE)
             {
-                if (pev_isAccuFull)
-                {
-                    addToTrace(MOD_PEV, "Accu is full. Sending PowerDeliveryReq Stop.");
-                    Param::SetInt(Param::StopReason, STOP_REASON_ACCU_FULL);
-                }
-                else if (pev_isUserStopRequestOnCarSide)
-                {
-                    addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
-                    Param::SetInt(Param::StopReason, STOP_REASON_CAR_USER);
-                }
-                else if (pev_isUserStopRequestOnChargerSide)
-                {
-                    addToTrace(MOD_PEV, "User requested stop on charger side. Sending PowerDeliveryReq Stop.");
-                }
-
+                Param::SetInt(Param::StopReason, currentDemandStopReason);
                 setCheckpoint(800);
                 pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                                 sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
