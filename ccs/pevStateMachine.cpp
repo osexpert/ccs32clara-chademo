@@ -676,12 +676,12 @@ static void stateFunctionWaitForCableCheckResponse(void)
             // We have two cases here:
             // 1) The charger says "cable check is finished and cable ok", by setting ResponseCode=OK and EVSEProcessing=Finished.
             // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
-            if ((rc == dinresponseCodeType_OK) && (proc == dinEVSEProcessingType_Finished))
+            if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Finished)
             {
                 addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
                 pev_enterState(PEV_STATE_WaitForPreChargeStart);
             }
-            else
+            else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
             {
                 if (pev_numberOfCableCheckReq > 60)   /* approx 60s should be sufficient for cable check. The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
                 {
@@ -690,13 +690,18 @@ static void stateFunctionWaitForCableCheckResponse(void)
                 }
                 else
                 {
-                    // cable check not yet finished or finished with bad result -> try again
+                    // cable check not yet finished -> try again
                     pev_numberOfCableCheckReq += 1;
-                    addToTrace(MOD_PEV, "Will again send CableCheckReq (rc:%d proc:%d)", rc, proc);
+                    addToTrace(MOD_PEV, "Will again send CableCheckReq");
                     pev_sendCableCheckReq();
                     // stay in the same state
                     pev_enterState(PEV_STATE_WaitForCableCheckResponse);
                 }
+            }
+            else // spec only mention the 2 cases above, assuming all other cases must be errors
+            {
+                addToTrace(MOD_PEV, "CableCheck error rc:%d proc:%d", rc, proc);
+                pev_enterState(PEV_STATE_SafeShutDown);
             }
         }
     }
