@@ -634,8 +634,7 @@ void ChademoCharger::RunStateMachine()
             _stopReason = StopReason::UNKNOWN;
         }
 
-		if (IsChargingPlugLocked())
-			UnlockChargingPlug();
+    	UnlockChargingPlug();
 
         SetState(ChargerState::End);
     }

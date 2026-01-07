@@ -79,12 +79,6 @@ bool hardwareInterface_isConnectorLocked(void)
     return _connectorLocked;
 }
 
-uint8_t hardwareInterface_getPowerRelayConfirmation(void)
-{
-    /* todo */
-    return 1;
-}
-
 bool hardwareInterface_stopChargeRequested()
 {
     return _global.powerOffPending;

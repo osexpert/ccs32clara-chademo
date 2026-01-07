@@ -1048,8 +1048,7 @@ static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
 
 static void stateFunctionStop(void)
 {
-    if (hardwareInterface_isConnectorLocked())
-        hardwareInterface_unlockConnector();
+    hardwareInterface_unlockConnector();
 
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
 
@@ -1058,7 +1057,7 @@ static void stateFunctionStop(void)
     if (currentDemandStopReason == STOP_REASON_NONE)
     {
         // If we did not stop CurrentDemand, aka. we did not reach CurrentDemand, so go back to Start and try again.
-        addToTrace(MOD_PEV, "Did not reach CurrentDemand. Restart.");
+        addToTrace(MOD_PEV, "Did not reach CurrentDemand -> retry.");
         pev_enterState(PEV_STATE_Start);
     }
     else

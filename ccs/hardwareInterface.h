@@ -12,7 +12,6 @@ extern void hardwareInterface_setPowerRelayOn(void);
 extern void hardwareInterface_lockConnector(void);
 extern void hardwareInterface_unlockConnector(void);
 extern bool hardwareInterface_isConnectorLocked(void);
-extern uint8_t hardwareInterface_getPowerRelayConfirmation(void);
 extern bool hardwareInterface_stopChargeRequested();
 extern uint8_t hardwareInterface_getIsAccuFull(void);
 extern uint8_t hardwareInterface_getSoc(void);
