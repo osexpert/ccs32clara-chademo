@@ -60,21 +60,23 @@ void hardwareInterface_setStateC(void)
     DigIo::state_c_out_inverted.Clear();
 }
 
-void hardwareInterface_triggerConnectorLocking(void)
+static bool _connectorLocked = false;
+
+void hardwareInterface_lockConnector(void)
 {
     println("[ccs] Lock charging plug");
-    Param::SetInt(Param::LockState, LOCK_CLOSED);
+    _connectorLocked = true;
 }
 
-void hardwareInterface_triggerConnectorUnlocking(void)
+void hardwareInterface_unlockConnector(void)
 {
     println("[ccs] Unlock charging plug");
-    Param::SetInt(Param::LockState, LOCK_OPEN);
+    _connectorLocked = false;
 }
 
 bool hardwareInterface_isConnectorLocked(void)
 {
-    return Param::GetInt(Param::LockState) == LOCK_CLOSED;
+    return _connectorLocked;
 }
 
 uint8_t hardwareInterface_getPowerRelayConfirmation(void)

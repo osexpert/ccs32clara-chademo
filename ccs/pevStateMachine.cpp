@@ -15,7 +15,6 @@ extern global_data _global;
    STATE_ENTRY(WaitForServicePaymentSelectionResponse, PaymentSelection, 2) \
    STATE_ENTRY(WaitForContractAuthenticationResponse, ContractAuthentication, 2) \
    STATE_ENTRY(WaitForChargeParameterDiscoveryResponse, ChargeParameterDiscovery, 5) /* On some charger models, the chargeParameterDiscovery needs more than a second. Wait at least 5s. */ \
-   STATE_ENTRY(WaitForConnectorLock, ConnectorLock, 2) \
    STATE_ENTRY(WaitForCableCheckResponse, CableCheck, 30) \
    STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 60) \
    STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 30) \
@@ -615,8 +614,13 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                 // pull the CP line to state C here:
                 hardwareInterface_setStateC();
                 addToTrace(MOD_PEV, "Checkpoint555: Locking the connector.");
-                hardwareInterface_triggerConnectorLocking();
-                pev_enterState(PEV_STATE_WaitForConnectorLock);
+                hardwareInterface_lockConnector();
+
+                addToTrace(MOD_PEV, "Checkpoint560: Send CableCheckReq.");
+                setCheckpoint(560);
+                pev_sendCableCheckReq();
+                pev_numberOfCableCheckReq = 1; // This is the first request.
+                pev_enterState(PEV_STATE_WaitForCableCheckResponse);
             }
             else
             {
@@ -640,18 +644,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                 }
             }
         }
-    }
-}
-
-static void stateFunctionWaitForConnectorLock(void)
-{
-    if (hardwareInterface_isConnectorLocked())
-    {
-        addToTrace(MOD_PEV, "Checkpoint560: Connector Lock confirmed. Will send CableCheckReq.");
-        setCheckpoint(560);
-        pev_sendCableCheckReq();
-        pev_numberOfCableCheckReq = 1; // This is the first request.
-        pev_enterState(PEV_STATE_WaitForCableCheckResponse);
     }
 }
 
@@ -843,7 +835,6 @@ static void stateFunctionWaitForCurrentDownAfterStateB(void)
     if (pev_DelayCycles > 0) {
         /* just waiting */
         pev_DelayCycles--;
-
     }
     else if (chademoInterface_carContactorsOpened()) {
         /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
@@ -1069,7 +1060,7 @@ static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
 static void stateFunctionStop(void)
 {
     if (hardwareInterface_isConnectorLocked())
-        hardwareInterface_triggerConnectorUnlocking();
+        hardwareInterface_unlockConnector();
 
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
 

@@ -102,7 +102,7 @@
 /*    VALUE_ENTRY(AdcHwVariant,       "",              2022 ) \ */ \
 /*    VALUE_ENTRY(HardwareVariant,    "",              2025 ) \*/  \
 /*    VALUE_ENTRY(AdcIpropi,          "",              2023 ) \ */  \
-    VALUE_ENTRY(LockState,          LOCK,            2014 ) \
+/*    VALUE_ENTRY(LockState,          LOCK,            2014 ) \ */ \
     VALUE_ENTRY(StopReason,         STOPREASONS,     2017 ) \
     VALUE_ENTRY(checkpoint,         "dig",           2015 ) \
 /*    VALUE_ENTRY(CanWatchdog,        "dig",           2016 ) \ */ \
