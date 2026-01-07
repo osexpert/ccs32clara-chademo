@@ -892,7 +892,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             else if (hardwareInterface_stopChargeRequested())
             {
                 addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
-                currentDemandStopReason = STOP_REASON_CAR_USER;
+                currentDemandStopReason = STOP_REASON_POWER_OFF_PENDING;
             }
             else if (hardwareInterface_getIsAccuFull())
             {

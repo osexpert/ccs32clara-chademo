@@ -342,7 +342,8 @@ void ChademoCharger::RunStateMachine()
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reason
-        if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING)) set_flag(&stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
+        // STOP_BEFORE_CHARGING seems unreliable. At least some E-NV200 24kWh 2015 set this flag for no apperant reason, and still seem to work...
+        //if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING)) set_flag(&stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reason
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
