@@ -28,6 +28,7 @@ extern global_data _global;
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
    STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0) \
    STATE_ENTRY(SafeShutDownWaitForContactorsOpen, WaitForContactorsOpen, 0) \
+   STATE_ENTRY(Stop, Stop, 0) \
    STATE_ENTRY(End, End, 0)
 
 //States enum
@@ -1014,7 +1015,7 @@ static void stateFunctionWaitForSessionStopResponse(void)
         {
             tcp_disconnect();
             addToTrace(MOD_PEV, "Charging is finished");
-            pev_enterState(PEV_STATE_End);
+            pev_enterState(PEV_STATE_Stop);
         }
     }
 }
@@ -1057,17 +1058,33 @@ static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
     }
     setCheckpoint(1400);
     /* This is the end of the safe-shutdown-sequence. */
-    pev_enterState(PEV_STATE_End);
+    pev_enterState(PEV_STATE_Stop);
+}
+
+static void stateFunctionStop(void)
+{
+    if (hardwareInterface_isConnectorLocked())
+        hardwareInterface_triggerConnectorUnlocking();
+
+    /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
+
+    // I guess we would want to retry if something failed, but only if we did not reach the charging loop.
+    int currentDemandStopReason = Param::GetInt(Param::StopReason);
+    if (currentDemandStopReason == STOP_REASON_NONE)
+    {
+        // If we did not stop CurrentDemand, aka. we did not reach CurrentDemand, so go back to Start and try again.
+        addToTrace(MOD_PEV, "Did not reach CurrentDemand. Restart.");
+        pev_enterState(PEV_STATE_Start);
+    }
+    else
+    {
+        pev_enterState(PEV_STATE_End);
+    }
 }
 
 static void stateFunctionEnd(void)
 {
-    if (hardwareInterface_isConnectorLocked())
-		hardwareInterface_triggerConnectorUnlocking();
-
-    /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
-
-    // FIXME: staying here or going back to Start....does it really matter?
+    // terminal state. No code should exist here. We can never leave this state
 }
 
 static void pev_enterState(pevstates n)
@@ -1132,6 +1149,10 @@ int chademoInterface_ccsChargingVoltageMirrorsTarget() {
 }
 
 bool chademoInterface_ccsCableCheckDone() {
-    return pev_state > PEV_STATE_WaitForCableCheckResponse;
+    //This would return true even if SafeShutdown and restart...
+    //return pev_state > PEV_STATE_WaitForCableCheckResponse;
+
+    // ...while this one should only be true when we are in this state, and should allow ccs statemachine restarts
+    return pev_state == PEV_STATE_WaitForPreChargeStart;
 }
 

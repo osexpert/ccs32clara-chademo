@@ -142,6 +142,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForDeliveringAmps)
     {
+        // TODO: or check if we are in ccs CurrentDemand state?
         if (Param::GetInt(Param::EvseCurrent) > 0)
         {
             ledBlinker->setPattern(blink_working);
@@ -249,11 +250,11 @@ void power_off_check()
             println("Ccs ended. Power off pending...");
         }
 
-        int ccsStopReason = Param::GetInt(Param::StopReason);
-        if (ccsStopReason != STOP_REASON_NONE)
+        int ccsCurrentDemandStopReason = Param::GetInt(Param::StopReason);
+        if (ccsCurrentDemandStopReason != STOP_REASON_NONE)
         {
             _global.powerOffPending = true;
-            println("Ccs stop reason 0x%x. Power off pending...", ccsStopReason);
+            println("Ccs CurrentDemand stop reason 0x%x. Power off pending...", ccsCurrentDemandStopReason);
         }
 
         StopReason chaStopReason = chademoCharger->GetStopReason();
