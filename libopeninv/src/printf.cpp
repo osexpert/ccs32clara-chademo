@@ -165,8 +165,12 @@ static int print(IPutChar* put, const char *format, va_list args )
 				pc += prints (put, s?s:"(null)", width, pad);
 				continue;
 			}
-			if( *format == 'd' || *format == 'i' || *format == 'u') {
+			if( *format == 'd' || *format == 'i') {
 				pc += printi (put, va_arg( args, int ), 10, 1, width, pad, 'a');
+				continue;
+			}
+			if (*format == 'u') {
+				pc += printi(put, va_arg(args, unsigned int), 10, 0, width, pad, 'a');
 				continue;
 			}
 			if( *format == 'x' ) {
@@ -177,10 +181,10 @@ static int print(IPutChar* put, const char *format, va_list args )
 				pc += printi (put, va_arg( args, int ), 16, 0, width, pad, 'A');
 				continue;
 			}
-			//if( *format == 'u' ) {
-			//	pc += printi (put, va_arg( args, int ), 10, 0, width, pad, 'a');
-			//	continue;
-			//}
+			if (*format == 'b') {
+				pc += printi(put, va_arg(args, int), 2, 0, width, pad, 'a');
+				continue;
+			}
 			if ( *format == 'f' ) {
 				pc += printfp (put, va_arg( args, float*), width, pad);
 				continue;

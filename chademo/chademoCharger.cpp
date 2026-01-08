@@ -30,6 +30,14 @@ extern ChademoCharger* chademoCharger;
         } \
     } while (0)
 
+#define COMPARE_SET_DUO(oldval, newval, fmt) \
+    do { \
+        if ((oldval) != (newval)) { \
+            println(fmt, (oldval), (oldval), (newval), (newval)); \
+            (oldval) = (newval); \
+        } \
+    } while (0)
+
 extern volatile uint32_t system_millis;
 extern global_data _global;
 
@@ -141,8 +149,8 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
         COMPARE_SET(_msg102.m.RequestCurrent, _msg102_isr.m.RequestCurrent, "102.RequestCurrent %d -> %d");
-        COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%02x -> 0x%02x");
-        COMPARE_SET(_msg102.m.Status, _msg102_isr.m.Status, "102.Status 0x%02x -> 0x%02x");
+        COMPARE_SET_DUO(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults %08b (0x%02x) -> %08b (0x%02x)");
+        COMPARE_SET_DUO(_msg102.m.Status, _msg102_isr.m.Status, "102.Status %08b (0x%02x) -> %08b (0x%02x)");
         COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "102.SocPercent %d -> %d");
         COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "102.Unused7 %d -> %d");
 
@@ -981,8 +989,8 @@ void ChademoCharger::UpdateChargerMessages()
 
     COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "109.RemainingChargingTime10s %d -> %d");
     COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "109.RemainingChargingTimeMinutes %d -> %d");
-    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status 0x%02x -> 0x%02x");
-    COMPARE_SET(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 0x%02x -> 0x%02x");
+    COMPARE_SET_DUO(_msg109.m.Status, _chargerData.Status, "109.Status %08b (0x%02x) -> %08b (0x%02x)");
+    COMPARE_SET_DUO(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 %08b (0x%02x) -> %08b (0x%02x)");
 
     if (_dischargeEnabled && not _discovery)
     {

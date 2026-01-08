@@ -806,7 +806,7 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
                     // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
                     // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
                     // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
-                    addToTrace(MOD_PEV, "PowerDelivery failed:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+                    addToTrace(MOD_PEV, "PowerDelivery failed rc:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
                     pev_enterState(PEV_STATE_SafeShutDown);
                 }
             }
@@ -1052,11 +1052,11 @@ static void stateFunctionStop(void)
 
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
 
-    // I guess we would want to retry if something failed, but only if we did not reach the charging loop.
+    // I guess we would want to retry if something failed, but only if we did not reach current demand.
     int currentDemandStopReason = Param::GetInt(Param::StopReason);
     if (currentDemandStopReason == STOP_REASON_NONE)
     {
-        // If we did not stop CurrentDemand, aka. we did not reach CurrentDemand, so go back to Start and try again.
+        // If we did not reach CurrentDemand, so go back to Start and try again.
         addToTrace(MOD_PEV, "Did not reach CurrentDemand -> retry.");
         pev_enterState(PEV_STATE_Start);
     }
