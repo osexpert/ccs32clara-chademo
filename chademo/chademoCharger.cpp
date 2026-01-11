@@ -541,7 +541,10 @@ void ChademoCharger::RunStateMachine()
 
             bool dischargeUnit = false;
             bool dischargeSimulation = false;
-            if (_dischargeEnabled && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
+            // Discharge is opt-in, so if discharge is activated, don't care about checking if car is compatible or not (if it works, it works).
+            // Problem: some buggy cars seems to set and unset this flag randomly. So just ignore it and do our thing regardless.
+            // If the car don't support it, it does not matter if we send it or not, it will not work in any case:-)
+            if (_dischargeEnabled)// && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
             {
                 // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
                 bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();

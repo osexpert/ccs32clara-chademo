@@ -130,6 +130,11 @@ enum CarStatus
     STOP_BEFORE_CHARGING = 0x10,
 
     /// <summary>
+    /// 102.5.5 Unknown, never seen
+    /// </summary>
+    UNKNOWN_5 = 0x20,
+
+    /// <summary>
     /// 102.5.6
     /// Unknown. Possibly related to V2X? Old Leafs (ZE0) seem to have this set.
     /// At least some ZE0's support support dynamic AvailableOutputCurrent, and they set this flag. For now, assume its not a coincidence:-)
