@@ -13,7 +13,7 @@ extern void hardwareInterface_lockConnector(void);
 extern void hardwareInterface_unlockConnector(void);
 extern bool hardwareInterface_isConnectorLocked(void);
 extern bool hardwareInterface_stopChargeRequested();
-extern uint8_t hardwareInterface_getIsAccuFull(void);
+extern bool hardwareInterface_getIsAccuFull(void);
 extern uint8_t hardwareInterface_getSoc(void);
 extern int16_t hardwareInterface_getAccuVoltage(void);
 extern int16_t hardwareInterface_getInletVoltage(void);

@@ -817,18 +817,18 @@ const uint8_t* getOurMac()
 
 int homeplug_sanityCheck(void)
 {
-   if (pevSequenceState>STATE_SDP)
-   {
-      //addToTrace("ERROR: Sanity check of the homeplug state machine failed: %d", pevSequenceState);
-      addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the homeplug state machine failed.");
-      return -1;
-   }
-   if (sdp_state>=2)
-   {
-      addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the SDP state machine failed.");
-      return -1;
-   }
-   return 0;
+    if (pevSequenceState > STATE_SDP)
+    {
+        //addToTrace("ERROR: Sanity check of the homeplug state machine failed: %d", pevSequenceState);
+        addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the homeplug state machine failed.");
+        return -1;
+    }
+    if (sdp_state >= 2)
+    {
+        addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the SDP state machine failed.");
+        return -1;
+    }
+    return 0;
 }
 
 void homeplugInit(void)
@@ -837,5 +837,4 @@ void homeplugInit(void)
    pevSequenceCyclesInState = 0;
    pevSequenceDelayCycles = 0;
    numberOfSoftwareVersionResponses = 0;
-//   numberOfFoundModems = 0;
 }

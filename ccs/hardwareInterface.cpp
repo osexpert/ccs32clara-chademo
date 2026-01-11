@@ -32,7 +32,7 @@ uint8_t hardwareInterface_getSoc(void)
     return Param::GetInt(Param::soc);
 }
 
-uint8_t hardwareInterface_getIsAccuFull(void)
+bool hardwareInterface_getIsAccuFull(void)
 {
     // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
     return Param::GetInt(Param::soc) == 100;
