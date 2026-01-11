@@ -28,7 +28,7 @@ void modemFinder_Mainfunction(void) {
             // connMgr_ModemFinderOk(numberOfSoftwareVersionResponses);
             // This seems wrong....IF we for some reason find more than 1 modem here (I sometimes do), we will skip SLAC and go directly to CONNLEVEL_20_TWO_MODEMS_FOUND!
             // So always say we found just 1 (local) modem here, else SLAC can sometimes be skipped (typicalle when plug is left in car, and charging restarted)
-            connMgr_ModemFinderOk(1);
+            connMgr_ModemLocalOk();
         }
         mofi_stateDelay = 15; /* 0.5s to show the number of modems, before we start a new search if necessary */
         mofi_state = 2;

@@ -67,7 +67,6 @@ static uint8_t verLen;
 static uint8_t sourceMac[6];
 static uint8_t NID[7];
 static uint8_t NMK[16];
-static uint8_t numberOfFoundModems;
 static uint8_t pevSequenceState;
 static uint16_t pevSequenceCyclesInState;
 static uint16_t pevSequenceDelayCycles;
@@ -533,14 +532,6 @@ void evaluateGetSwCnf(void)
    }
 }
 
-uint8_t isEvseModemFound(void)
-{
-   /* todo: look whether the MAC of the EVSE modem is in the list of detected modems */
-   /* as simple solution we say: If we see two modems, then it should be one
-      local in the car, and one in the charger. */
-   return numberOfFoundModems>1;
-}
-
 void slac_enterState(int n)
 {
    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] from %d entering %d", pevSequenceState, n);
@@ -556,260 +547,227 @@ int isTooLong(void)
 
 void runSlacSequencer(void)
 {
-   pevSequenceCyclesInState++;
-   /* in PevMode, check whether homeplug modem is connected, run the SLAC */
-   if (connMgr_getConnectionLevel() < CONNLEVEL_10_ONE_MODEM_FOUND)
-   {
-      /* we have no modem seen. --> nothing to do for the SLAC */
-      if (pevSequenceState!=STATE_INITIAL) slac_enterState(STATE_INITIAL);
-      return;
-   }
-   if (connMgr_getConnectionLevel() >= CONNLEVEL_20_TWO_MODEMS_FOUND)
-   {
-      /* we have two modems in the AVLN. This means, the modem pairing is already done. --> nothing to do for the SLAC */
-      if (pevSequenceState!=STATE_INITIAL) slac_enterState(STATE_INITIAL);
-      return;
-   }
-   if (pevSequenceState == STATE_INITIAL)
-   {
-      /* The modem is present, starting SLAC. */
-      slac_enterState(STATE_READY_FOR_SLAC);
-      return;
-   }
-   if (pevSequenceState==STATE_READY_FOR_SLAC)
-   {
-      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
-      setCheckpoint(100);
-      composeSlacParamReq();
-      myEthTransmit();
-      slac_enterState(STATE_WAITING_FOR_SLAC_PARAM_CNF);
-      return;
-   }
-   if (pevSequenceState==STATE_WAITING_FOR_SLAC_PARAM_CNF)   // Waiting for slac_param confirmation.
-   {
-      if (pevSequenceCyclesInState>=33)
-      {
-         // No response for 1s, this is an error.
-         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
-         slac_enterState(STATE_INITIAL);
-      }
-      // (the normal state transition is done in the reception handler)
-      return;
-   }
-   if (pevSequenceState==STATE_SLAC_PARAM_CNF_RECEIVED)   // slac_param confirmation was received.
-   {
-      pevSequenceDelayCycles = 1; //  1*30=30ms as preparation for the next state.
-      //  Between the SLAC_PARAM.CNF and the first START_ATTEN_CHAR.IND the Ioniq waits 100ms.
-      //  The allowed time TP_match_sequence is 0 to 100ms.
-      //  Alpitronic and ABB chargers are more tolerant, they worked with a delay of approx
-      //  250ms. In contrast, Supercharger and Compleo do not respond anymore if we
-      //  wait so long.
-      nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
-      slac_enterState(STATE_BEFORE_START_ATTEN_CHAR);
-      return;
-   }
-   if (pevSequenceState==STATE_BEFORE_START_ATTEN_CHAR)   // received SLAC_PARAM.CNF. Multiple transmissions of START_ATTEN_CHAR.
-   {
-      if (pevSequenceDelayCycles>0)
-      {
-         pevSequenceDelayCycles-=1;
-         return;
-      }
-      // The delay time is over. Let's transmit.
-      if (nRemainingStartAttenChar>0)
-      {
-         nRemainingStartAttenChar-=1;
-         composeStartAttenCharInd();
-         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting START_ATTEN_CHAR.IND...");
-         myEthTransmit();
-         pevSequenceDelayCycles = 0; // original from ioniq is 20ms between the START_ATTEN_CHAR. Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
-         return;
-      }
-      else
-      {
-         // all three START_ATTEN_CHAR.IND are finished. Now we send 10 MNBC_SOUND.IND
-         pevSequenceDelayCycles = 0; // original from ioniq is 40ms after the last START_ATTEN_CHAR.IND.
-         // Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
-         remainingNumberOfSounds = 10; // We shall transmit 10 sound messages.
-         slac_enterState(STATE_SOUNDING);
-      }
-      return;
-   }
-   if (pevSequenceState==STATE_SOUNDING)   // Multiple transmissions of MNBC_SOUND.IND.
-   {
-      if (pevSequenceDelayCycles>0)
-      {
-         pevSequenceDelayCycles-=1;
-         return;
-      }
-      if (remainingNumberOfSounds>0)
-      {
-         remainingNumberOfSounds-=1;
-         composeNmbcSoundInd();
-         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting MNBC_SOUND.IND..."); // original from ioniq is 40ms after the last START_ATTEN_CHAR.IND
-         setCheckpoint(104);
-         myEthTransmit();
-         if (remainingNumberOfSounds==0)
-         {
-            slac_enterState(STATE_WAIT_FOR_ATTEN_CHAR_IND); // move fast to the next state, so that a fast response is catched in the correct state
-         }
-         pevSequenceDelayCycles = 0; // original from ioniq is 20ms between the messages.
-         // Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
-         return;
-      }
-   }
-   if (pevSequenceState==STATE_WAIT_FOR_ATTEN_CHAR_IND)   // waiting for ATTEN_CHAR.IND
-   {
-      // todo: it is possible that we receive this message from multiple chargers. We need
-      // to select the charger with the loudest reported signals.
-      if (isTooLong())
-      {
-         slac_enterState(STATE_INITIAL);
-      }
-      return;
-      // (the normal state transition is done in the reception handler)
-   }
-   if (pevSequenceState==STATE_ATTEN_CHAR_IND_RECEIVED)   // ATTEN_CHAR.IND was received and the
-   {
-      // nearest charger decided and the
-      // ATTEN_CHAR.RSP was sent.
-      slac_enterState(STATE_DELAY_BEFORE_MATCH);
-      pevSequenceDelayCycles = 30; // original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
-      return;
-   }
-   if (pevSequenceState==STATE_DELAY_BEFORE_MATCH)   // Waiting time before SLAC_MATCH.REQ
-   {
-      if (pevSequenceDelayCycles>0)
-      {
-         pevSequenceDelayCycles-=1;
-         return;
-      }
-      composeSlacMatchReq();
-      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...");
-      setCheckpoint(150);
-      myEthTransmit();
-      slac_enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF);
-      return;
-   }
-   if (pevSequenceState==STATE_WAITING_FOR_SLAC_MATCH_CNF)   // waiting for SLAC_MATCH.CNF
-   {
-      if (isTooLong())
-      {
-         slac_enterState(STATE_INITIAL);
-         return;
-      }
-      pevSequenceDelayCycles = 100; // 3s reset wait time (may be a little bit too short, need a retry)
-      // (the normal state transition is done in the receive handler of SLAC_MATCH.CNF,
-      // including the transmission of SET_KEY.REQ)
-      return;
-   }
-   if (pevSequenceState==STATE_WAITING_FOR_RESTART2)   // SLAC is finished, SET_KEY.REQ was
-   {
-      // transmitted. The homeplug modem makes
-      // the reset and we need to wait until it
-      // is up with the new key.
-      if (pevSequenceDelayCycles>0)
-      {
-         pevSequenceDelayCycles-=1;
-         return;
-      }
-      addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checking whether the pairing worked, by GET_KEY.REQ...");
-      numberOfFoundModems = 0; // reset the number, we want to count the modems newly.
-      nEvseModemMissingCounter=0; // reset the retry counter
-      composeGetKey();
-      myEthTransmit();
-      slac_enterState(STATE_FIND_MODEMS2);
-      return;
-   }
-   if (pevSequenceState==STATE_FIND_MODEMS2)   // Waiting for the modems to answer.
-   {
-      if (pevSequenceCyclesInState>=10)   //
-      {
-         // It was sufficient time to get the answers from the modems.
-         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] It was sufficient time to get the answers from the modems.");
-         // Let's see what we received.
-         if (!isEvseModemFound())
-         {
-            nEvseModemMissingCounter+=1;
+    pevSequenceCyclesInState++;
+    if (not (connMgr_getConnectionLevel() == CONNLEVEL_10_ONE_MODEM_FOUND))
+    {
+        if (pevSequenceState != STATE_INITIAL) slac_enterState(STATE_INITIAL);
+    }
+    else if (pevSequenceState == STATE_INITIAL)
+    {
+        /* The modem is present, starting SLAC. */
+        slac_enterState(STATE_READY_FOR_SLAC);
+    }
+    else if (pevSequenceState == STATE_READY_FOR_SLAC)
+    {
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
+        setCheckpoint(100);
+        composeSlacParamReq();
+        myEthTransmit();
+        slac_enterState(STATE_WAITING_FOR_SLAC_PARAM_CNF);
+    }
+    else if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF)   // Waiting for slac_param confirmation.
+    {
+        if (pevSequenceCyclesInState >= 33)
+        {
+            // No response for 1s, this is an error.
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
+            slac_enterState(STATE_INITIAL);
+        }
+        // (the normal state transition is done in the reception handler)
+    }
+    else if (pevSequenceState == STATE_SLAC_PARAM_CNF_RECEIVED)   // slac_param confirmation was received.
+    {
+        pevSequenceDelayCycles = 1; //  1*30=30ms as preparation for the next state.
+        //  Between the SLAC_PARAM.CNF and the first START_ATTEN_CHAR.IND the Ioniq waits 100ms.
+        //  The allowed time TP_match_sequence is 0 to 100ms.
+        //  Alpitronic and ABB chargers are more tolerant, they worked with a delay of approx
+        //  250ms. In contrast, Supercharger and Compleo do not respond anymore if we
+        //  wait so long.
+        nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
+        slac_enterState(STATE_BEFORE_START_ATTEN_CHAR);
+    }
+    else if (pevSequenceState == STATE_BEFORE_START_ATTEN_CHAR)   // received SLAC_PARAM.CNF. Multiple transmissions of START_ATTEN_CHAR.
+    {
+        if (pevSequenceDelayCycles > 0)
+        {
+            pevSequenceDelayCycles -= 1;
+        }
+        // The delay time is over. Let's transmit.
+        else if (nRemainingStartAttenChar > 0)
+        {
+            nRemainingStartAttenChar -= 1;
+            composeStartAttenCharInd();
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting START_ATTEN_CHAR.IND...");
+            myEthTransmit();
+            pevSequenceDelayCycles = 0; // original from ioniq is 20ms between the START_ATTEN_CHAR. Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
+        }
+        else
+        {
+            // all three START_ATTEN_CHAR.IND are finished. Now we send 10 MNBC_SOUND.IND
+            pevSequenceDelayCycles = 0; // original from ioniq is 40ms after the last START_ATTEN_CHAR.IND.
+            // Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
+            remainingNumberOfSounds = 10; // We shall transmit 10 sound messages.
+            slac_enterState(STATE_SOUNDING);
+        }
+    }
+    else if (pevSequenceState == STATE_SOUNDING)   // Multiple transmissions of MNBC_SOUND.IND.
+    {
+        if (pevSequenceDelayCycles > 0)
+        {
+            pevSequenceDelayCycles -= 1;
+        }
+        else if (remainingNumberOfSounds > 0)
+        {
+            remainingNumberOfSounds -= 1;
+            composeNmbcSoundInd();
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting MNBC_SOUND.IND..."); // original from ioniq is 40ms after the last START_ATTEN_CHAR.IND
+            setCheckpoint(104);
+            myEthTransmit();
+            if (remainingNumberOfSounds == 0)
+            {
+                slac_enterState(STATE_WAIT_FOR_ATTEN_CHAR_IND); // move fast to the next state, so that a fast response is catched in the correct state
+            }
+            pevSequenceDelayCycles = 0; // original from ioniq is 20ms between the messages.
+            // Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
+        }
+    }
+    else if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // waiting for ATTEN_CHAR.IND
+    {
+        // todo: it is possible that we receive this message from multiple chargers. We need
+        // to select the charger with the loudest reported signals.
+        if (isTooLong())
+        {
+            slac_enterState(STATE_INITIAL);
+        }
+        // (the normal state transition is done in the reception handler)
+    }
+    else if (pevSequenceState == STATE_ATTEN_CHAR_IND_RECEIVED)   // ATTEN_CHAR.IND was received and the
+    {
+        // nearest charger decided and the ATTEN_CHAR.RSP was sent.
+        slac_enterState(STATE_DELAY_BEFORE_MATCH);
+        pevSequenceDelayCycles = 30; // original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
+    }
+    else if (pevSequenceState == STATE_DELAY_BEFORE_MATCH)   // Waiting time before SLAC_MATCH.REQ
+    {
+        if (pevSequenceDelayCycles > 0)
+        {
+            pevSequenceDelayCycles -= 1;
+        }
+        else
+        {
+            composeSlacMatchReq();
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...");
+            setCheckpoint(150);
+            myEthTransmit();
+            slac_enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF);
+        }
+    }
+    else if (pevSequenceState == STATE_WAITING_FOR_SLAC_MATCH_CNF)   // waiting for SLAC_MATCH.CNF
+    {
+        if (isTooLong())
+        {
+            slac_enterState(STATE_INITIAL);
+        }
+        else
+        {
+            pevSequenceDelayCycles = 100; // 3s reset wait time (may be a little bit too short, need a retry)
+            // (the normal state transition is done in the receive handler of SLAC_MATCH.CNF,
+            // including the transmission of SET_KEY.REQ)
+        }
+    }
+    else if (pevSequenceState == STATE_WAITING_FOR_RESTART2)   // SLAC is finished, SET_KEY.REQ was
+    {
+        // transmitted. The homeplug modem makes the reset and we need to wait until it is up with the new key.
+        if (pevSequenceDelayCycles > 0)
+        {
+            pevSequenceDelayCycles -= 1;
+        }
+        else
+        {
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checking whether the pairing worked, by GET_KEY.REQ...");
+            nEvseModemMissingCounter = 0; // reset the retry counter
+            composeGetKey();
+            myEthTransmit();
+            slac_enterState(STATE_FIND_MODEMS2);
+        }
+    }
+    else if (pevSequenceState == STATE_FIND_MODEMS2)   // Waiting for the modems to answer.
+    {
+        if (pevSequenceCyclesInState >= 10)
+        {
+            // It was sufficient time to get the answers from the modems.
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] It was sufficient time to get the answers from the modems.");
+            // Let's see what we received.
+
+            nEvseModemMissingCounter += 1;
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] No EVSE seen (yet). Still waiting for it.");
             // At the Alpitronic we measured, that it takes 7s between the SlacMatchResponse and
             // the chargers modem reacts to GetKeyRequest. So we should wait here at least 10s.
-            if (nEvseModemMissingCounter>20)
+            if (nEvseModemMissingCounter > 20)
             {
-               // We lost the connection to the EVSE modem. Back to the beginning.
-               addToTrace(MOD_HOMEPLUG, "[PEVSLAC] We lost the connection to the EVSE modem. Back to the beginning.");
-               slac_enterState(STATE_INITIAL);
-               return;
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] We lost the connection to the EVSE modem. Back to the beginning.");
+                slac_enterState(STATE_INITIAL);
             }
-            // The EVSE modem is (shortly) not seen. Ask again.
-            pevSequenceDelayCycles=30;
-            slac_enterState(STATE_WAITING_FOR_RESTART2);
-            return;
-         }
-         // The EVSE modem is present (or we are simulating)
-         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] EVSE is up, pairing successful.");
-         nEvseModemMissingCounter=0;
-         connMgr_ModemFinderOk(2); /* Two modems were found. */
-         /* This is the end of the SLAC. */
-         /* The AVLN is established, we have at least two modems in the network. */
-         slac_enterState(STATE_INITIAL);
-      }
-      return;
-   }
-   // invalid state is reached. As robustness measure, go to initial state.
-   addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ERROR: Invalid state reached");
-   slac_enterState(STATE_INITIAL);
+            else
+            {
+                // The EVSE modem is (shortly) not seen. Ask again.
+                pevSequenceDelayCycles = 30;
+                // In STATE_WAITING_FOR_RESTART2 it only set STATE_FIND_MODEMS2, so it can seem like an infinite loop here:-)
+                // BUT if we try more than 20 times (above) we will go back to STATE_INITIAL or if we succeed, 
+                // evaluateSetKeyCnf() will call connMgr_SlacOk() and take us into CONNLEVEL_50_SDP_DONE and runSlacSequencer() will do nothing.
+                slac_enterState(STATE_WAITING_FOR_RESTART2);
+            }
+        }
+    }
+    else
+    {
+        // invalid state is reached. As robustness measure, go to initial state.
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ERROR: Invalid state reached");
+        slac_enterState(STATE_INITIAL);
+    }
 }
 
 void runSdpStateMachine(void)
 {
-   if (connMgr_getConnectionLevel() < CONNLEVEL_15_SLAC_ONGOING)
-   {
-      /* We have no AVLN established, and SLAC is not ongoing. It does not make sense to start SDP. */
-      sdp_state = 0;
-      return;
-   }
-   if (connMgr_getConnectionLevel() > CONNLEVEL_20_TWO_MODEMS_FOUND)
-   {
-      /* SDP was already successful. No need to run it again. */
-      sdp_state = 0;
-      return;
-   }
-   /* The ConnectionLevel demands the SDP. */
-   if (sdp_state==0)
-   {
-      // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
-      addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
-      setCheckpoint(200);
-      pevSequenceDelayCycles=0;
-      SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.
-      sdp_state = 1;
-      return;
-   }
-   if (sdp_state == 1)   // SDP request transmission and waiting for SDP response.
-   {
-      /* The normal state transition in case of received SDP response is done in
-         the IPv6 receive handler. This will inform the ConnectionManager, and we will stop here
-         because of the increased ConnectionLevel. */
-      if (pevSequenceDelayCycles>0)
-      {
-         // just waiting until next action
-         pevSequenceDelayCycles-=1;
-         return;
-      }
-      if (SdpRepetitionCounter>0)
-      {
-         // Reference: The Ioniq waits 4.1s from the slac_match.cnf to the SDP request.
-         // Here we send the SdpRequest. Maybe too early, but we will retry if there is no response.
-         ipv6_initiateSdpRequest();
-         SdpRepetitionCounter-=1;
-         pevSequenceDelayCycles = 15; // e.g. half-a-second delay until re-try of the SDP
-         return;
-      }
-      // All repetitions are over, no SDP response was seen. Back to the beginning.
-      addToTrace(MOD_HOMEPLUG, "[SDP] ERROR: Did not receive SDP response. Giving up.");
-      sdp_state = 0;
-   }
+    if (not (connMgr_getConnectionLevel() == CONNLEVEL_15_SLAC_DONE))
+    {
+        /* Only start SDP when SLAC is done */
+        sdp_state = 0;
+    }
+    else if (sdp_state == 0) /* The ConnectionLevel demands the SDP. */
+    {
+        // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
+        addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
+        setCheckpoint(200);
+        pevSequenceDelayCycles = 0;
+        SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.
+        sdp_state = 1;
+    }
+    else if (sdp_state == 1)   // SDP request transmission and waiting for SDP response.
+    {
+        /* The normal state transition in case of received SDP response is done in
+           the IPv6 receive handler. This will inform the ConnectionManager, and we will stop here
+           because of the increased ConnectionLevel. */
+        if (pevSequenceDelayCycles > 0)
+        {
+            // just waiting until next action
+            pevSequenceDelayCycles -= 1;
+        }
+        else if (SdpRepetitionCounter > 0)
+        {
+            // Reference: The Ioniq waits 4.1s from the slac_match.cnf to the SDP request.
+            // Here we send the SdpRequest. Maybe too early, but we will retry if there is no response.
+            ipv6_initiateSdpRequest();
+            SdpRepetitionCounter -= 1;
+            pevSequenceDelayCycles = 15; // e.g. half-a-second delay until re-try of the SDP
+        }
+        else
+        {
+            // All repetitions are over, no SDP response was seen. Back to the beginning.
+            addToTrace(MOD_HOMEPLUG, "[SDP] ERROR: Did not receive SDP response. Giving up.");
+            sdp_state = 0;
+        }
+    }
 }
 
 static void evaluateGetKeyCnf(void) {}
@@ -879,5 +837,5 @@ void homeplugInit(void)
    pevSequenceCyclesInState = 0;
    pevSequenceDelayCycles = 0;
    numberOfSoftwareVersionResponses = 0;
-   numberOfFoundModems = 0;
+//   numberOfFoundModems = 0;
 }

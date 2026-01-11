@@ -15,7 +15,6 @@
 
 static uint16_t connMgr_timerEthLink;
 static uint16_t connMgr_timerModemLocal;
-static uint16_t connMgr_timerModemRemote;
 static uint16_t connMgr_timerSlac;
 static uint16_t connMgr_timerSDP;
 static uint16_t connMgr_timerTCP;
@@ -38,10 +37,9 @@ uint8_t connMgr_getConnectionLevel(void)
 
 void connMgr_printDebugInfos(void)
 {
-   addToTrace(MOD_CONNMGR, "[CONNMGR] %d %d %d %d %d %d %d --> %d",
+   addToTrace(MOD_CONNMGR, "[CONNMGR] %d %d %d %d %d %d --> %d",
              connMgr_timerEthLink,  /* the timeout counter for "ethernet is up". Not meaningful, because Foccci modem is hardwired via SPI. */
              connMgr_timerModemLocal, /* the timeout counter for the local QCA modem */
-             connMgr_timerModemRemote, /* the timeout counter for the remote modem */
              connMgr_timerSlac, /* the timeout counter for the SLAC procedure */
              connMgr_timerSDP, /* the timeout counter for successfull ServiceDiscoveryResponse */
              connMgr_timerTCP, /* the timeout counter for successful TCP connection */
@@ -55,7 +53,6 @@ void connMgr_Mainfunction(void)
    /* count all the timers down */
    if (connMgr_timerEthLink>0) connMgr_timerEthLink--;
    if (connMgr_timerModemLocal>0) connMgr_timerModemLocal--;
-   if (connMgr_timerModemRemote>0) connMgr_timerModemRemote--;
    if (connMgr_timerSlac>0) connMgr_timerSlac--;
    if (connMgr_timerSDP>0) connMgr_timerSDP--;
    if (connMgr_timerTCP>0) connMgr_timerTCP--;
@@ -65,8 +62,7 @@ void connMgr_Mainfunction(void)
    if      (connMgr_timerAppl>0)         connMgr_ConnectionLevel=CONNLEVEL_100_APPL_RUNNING;
    else if (connMgr_timerTCP>0)          connMgr_ConnectionLevel=CONNLEVEL_80_TCP_RUNNING;
    else if (connMgr_timerSDP>0)          connMgr_ConnectionLevel=CONNLEVEL_50_SDP_DONE;
-   else if (connMgr_timerModemRemote>0)  connMgr_ConnectionLevel=CONNLEVEL_20_TWO_MODEMS_FOUND;
-   else if (connMgr_timerSlac>0)         connMgr_ConnectionLevel=CONNLEVEL_15_SLAC_ONGOING;
+   else if (connMgr_timerSlac>0)         connMgr_ConnectionLevel=CONNLEVEL_15_SLAC_DONE;
    else if (connMgr_timerModemLocal>0)   connMgr_ConnectionLevel=CONNLEVEL_10_ONE_MODEM_FOUND;
    else if (connMgr_timerEthLink>0)      connMgr_ConnectionLevel=CONNLEVEL_5_ETH_LINK_PRESENT;
    else connMgr_ConnectionLevel=0;
@@ -90,16 +86,9 @@ void connMgr_Mainfunction(void)
    connMgr_cycles++;
 }
 
-void connMgr_ModemFinderOk(uint8_t numberOfFoundModems)
+void connMgr_ModemLocalOk()
 {
-   if (numberOfFoundModems>=1)
-   {
-      connMgr_timerModemLocal = CONNMGR_TIMER_MAX;
-   }
-   if (numberOfFoundModems>=2)
-   {
-      connMgr_timerModemRemote = CONNMGR_TIMER_MAX_10s; /* 10s for the slac sequence, to avoid too fast timeout */
-   }
+   connMgr_timerModemLocal = CONNMGR_TIMER_MAX;
 }
 
 void connMgr_SlacOk(void)
