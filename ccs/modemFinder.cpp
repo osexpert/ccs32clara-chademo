@@ -4,8 +4,18 @@
 uint8_t mofi_state;
 uint8_t mofi_stateDelay;
 
-void modemFinder_Mainfunction(void) {
-    if ((connMgr_getConnectionLevel() == CONNLEVEL_5_ETH_LINK_PRESENT) && (mofi_state == 0)) {
+void modemFinder_Mainfunction(void) 
+{
+    if (connMgr_getConnectionLevel() != CONNLEVEL_5_ETH_LINK_PRESENT)
+    {
+        mofi_state = 0;
+        return;
+    }
+
+    // ConnectionLevel is CONNLEVEL_5_ETH_LINK_PRESENT
+
+    if (mofi_state == 0) 
+    {
         /* We want the modem search only, if no connection is present at all. */
         addToTrace(MOD_MODEMFINDER, "[ModemFinder] Starting modem search");
         composeGetSwReq();
@@ -15,7 +25,8 @@ void modemFinder_Mainfunction(void) {
         mofi_stateDelay = 15; /* 0.5s should be sufficient to receive the software versions from the modems */
         mofi_state = 1;
     }
-    else if (mofi_state == 1) {
+    else if (mofi_state == 1) 
+    {
         /* waiting for responses of the modems */
         if (mofi_stateDelay > 0) {
             mofi_stateDelay--;
@@ -33,7 +44,8 @@ void modemFinder_Mainfunction(void) {
             mofi_state = 2;
         }
     }
-    else if (mofi_state == 2) {
+    else if (mofi_state == 2) 
+    {
         /* just waiting, to give the user time to read the result. */
         if (mofi_stateDelay > 0) {
             mofi_stateDelay--;

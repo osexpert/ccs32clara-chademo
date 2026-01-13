@@ -548,11 +548,16 @@ int isTooLong(void)
 void runSlacSequencer(void)
 {
     pevSequenceCyclesInState++;
-    if (not (connMgr_getConnectionLevel() == CONNLEVEL_10_ONE_MODEM_FOUND))
+
+    if (connMgr_getConnectionLevel() != CONNLEVEL_10_ONE_MODEM_FOUND)
     {
         if (pevSequenceState != STATE_INITIAL) slac_enterState(STATE_INITIAL);
+        return;
     }
-    else if (pevSequenceState == STATE_INITIAL)
+    
+    // ConnectionLevel is CONNLEVEL_10_ONE_MODEM_FOUND
+
+    if (pevSequenceState == STATE_INITIAL)
     {
         /* The modem is present, starting SLAC. */
         slac_enterState(STATE_READY_FOR_SLAC);
@@ -729,12 +734,16 @@ void runSlacSequencer(void)
 
 void runSdpStateMachine(void)
 {
-    if (not (connMgr_getConnectionLevel() == CONNLEVEL_15_SLAC_DONE))
+    if (connMgr_getConnectionLevel() != CONNLEVEL_15_SLAC_DONE)
     {
         /* Only start SDP when SLAC is done */
         sdp_state = 0;
+        return;
     }
-    else if (sdp_state == 0) /* The ConnectionLevel demands the SDP. */
+    
+    // ConnectionLevel is CONNLEVEL_15_SLAC_DONE
+
+    if (sdp_state == 0) /* The ConnectionLevel demands the SDP. */
     {
         // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
         addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
@@ -774,7 +783,7 @@ static void evaluateGetKeyCnf(void) {}
 
 void evaluateReceivedHomeplugPacket(void)
 {
-   if (connMgr_getConnectionLevel() == CONNLEVEL_100_APPL_RUNNING) {
+   if (connMgr_getConnectionLevel() >= CONNLEVEL_80_TCP_RUNNING) {
        /* we have TCP traffic running, so we ignore all homeplug management packets. This
        makes us robust against cross-talk from other charging cables.
        Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */
