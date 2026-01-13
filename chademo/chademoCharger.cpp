@@ -285,15 +285,15 @@ bool ChademoCharger::HasElapsedSec(uint16_t sec)
 }
 
 // car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-)
-static const int offsets[] = { 20, 0, -20, 0 };
-static int offset_index = 0;
-
-static int GetCyclicOffset()
-{
-    int result = offsets[offset_index];
-    offset_index = (offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
-    return result;
-}
+//static const int offsets[] = { 20, 0, -20, 0 };
+//static int offset_index = 0;
+//
+//static int GetCyclicOffset()
+//{
+//    int result = offsets[offset_index];
+//    offset_index = (offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
+//    return result;
+//}
 
 void ChademoCharger::SetBatteryVoltOverrides()
 {
@@ -339,9 +339,6 @@ void ChademoCharger::SetBatteryVoltOverrides()
 
 void ChademoCharger::RunStateMachine()
 {
-    _chargerData.DischargeCurrent = 0; // reset every iteration
-    _chargerData.RemainingDischargeTime = 0; // reset every iteration
-
     _cyclesInState++;
 
     if (_state < ChargerState::ChargingLoop)
@@ -365,9 +362,9 @@ void ChademoCharger::RunStateMachine()
         }
 
         _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxVoltage);
-        // TODO: I see in some logs, it calc this first when OutputAmps > 0
+
         _chargerData.RemainingChargeTimeSec = _carData.MaxChargingTimeSec;
-        _chargerData.RemainingChargeTimeCycles = _chargerData.RemainingChargeTimeSec * CHA_CYCLES_PER_SEC;
+        _chargerData.RemainingChargeTimeCycles = _carData.MaxChargingTimeSec * CHA_CYCLES_PER_SEC;
     }
 
     if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone)
@@ -535,10 +532,6 @@ void ChademoCharger::RunStateMachine()
         }
         else
         {
-            // Seen in a log that set RemainingDischargeTime=5 right after car ask for amps, and keep it like this for the rest of the session.
-            // Not sure if this is good for anything...if it triggers anything...
-            // Possibly this is also a way to get more time, without asking for DischargeCurrent. Not tried it.
-
             bool dischargeUnit = false;
             bool dischargeSimulation = false;
             // Discharge is opt-in, so if discharge is activated, don't care about checking if car is compatible or not (if it works, it works).
@@ -546,28 +539,26 @@ void ChademoCharger::RunStateMachine()
             // If the car don't support it, it does not matter if we send it or not, it will not work in any case:-)
             if (_dischargeEnabled)// && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
             {
-                // one discharger is observed to mirror target voltage as output voltage. may not apply to all dischargers...
-                bool chargerIsDischarger = chademoInterface_ccsChargingVoltageMirrorsTarget();
-                if (chargerIsDischarger)
+				// If we say we have discharging left to do, behaviour change completely. No timeout if not charging/discharging amps (allow trickle charge/discharge with long periods of amps not flowing in any direction).
+    	        _chargerData.RemainingDischargeTime = 5;
+
+                // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
+                if (chademoInterface_ccsChargingVoltageMirrorsTarget())
                 {
                     // one discharger is observed to mirror asked amps as delivered amps.
-                    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps...)
+                    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
                     _chargerData.OutputCurrent = 0;
                     _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
-                    _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
-                    _chargerData.RemainingDischargeTime = 5; // seen in canlog. not sure what it does...possibly MaxDischargeCurrent can sometimes be 0 but we still want to defeat the 4 second timeouit?
+                    _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                     dischargeUnit = true;
                 }
                 // 3 seconds passed without amps delivered? We are living dangerously. Try to buy us more time!
                 // Consider: what if output current drops to 0 _during_ charging? I guess...we should buy time as usual?
-                else if (_cyclesInState > (CHA_CYCLES_PER_SEC * 3) && _chargerData.OutputCurrent == 0)
+				// if setting RemainingDischargeTime alone is not sufficient, try this:
+                else if (false)//cyclesInState > (CHA_CYCLES_PER_SEC * 3) && chargerData.OutputCurrent == 0)
                 {
-                    // this will/should put the car into discharge mode, where it no longer care about if amps are delivered
-                    // (allthou the car will still ask for plenty, it will be happy with getting none)
+                    // TODO: it is possible that setting RemainingDischargeTime is sufficient? Test this! Think trickle charging, then both charging 0 and discharging 0 amps should be ok!
                     _chargerData.DischargeCurrent = min((uint8_t)1, _carData.MaxDischargeCurrent);
-                    //dont think cycliv voltage make any sense when buying time. now the contactors are already closed and voltages met anyways
-//                    _chargerData.OutputVoltage += GetCyclicOffset(); // not sure if it has meaning. it is a hack that works for higly deviating batt volt estimate, but it seems we can't charge either...
-                    _chargerData.RemainingDischargeTime = 5; // seen in canlog. not sure what it does...possibly MaxDischargeCurrent can sometimes be 0 but we still want to defeat the 4 second timeouit?
                     dischargeSimulation = true;
                 }
             }
@@ -586,6 +577,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_Start)
     {
+		// TODO: what about discharge and chargerData.OutputVoltage/chargerData.DischargeCurrent?
+		// DischargeCurrent will be left at what we set them to last, while OutputVoltage will suddenly rise to Target voltage... Not sure if it matters thou, at this stage.
+
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
         SetState(ChargerState::Stopping_WaitForLowAmps);
@@ -594,6 +588,11 @@ void ChademoCharger::RunStateMachine()
     {
         if (_chargerData.OutputCurrent <= 5 || IsTimeoutSec(10))
         {
+            _chargerData.RemainingChargeTimeCycles = 0;
+            _chargerData.RemainingChargeTimeSec = 0;
+
+//            _chargerData.RemainingDischargeTime = 0;
+
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
