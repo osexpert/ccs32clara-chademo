@@ -991,7 +991,7 @@ void ChademoCharger::UpdateChargerMessages()
 
     COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "109.RemainingChargingTime10s %d -> %d");
     COMPARE_SET(_msg109.m.RemainingChargingTimeMinutes, remainingChargingTimeMins, "109.RemainingChargingTimeMinutes %d -> %d");
-    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status %0x%02x -> 0x%02x");
+    COMPARE_SET(_msg109.m.Status, _chargerData.Status, "109.Status 0x%02x -> 0x%02x");
     COMPARE_SET(_msg118.m.ExtendedFunction1, _chargerData.ExtendedFunction1, "118.ExtendedFunction1 0x%02x -> 0x%02x");
 
     if (_dischargeEnabled && not _discovery)

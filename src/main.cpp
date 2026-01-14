@@ -466,7 +466,7 @@ static void Ms30Task()
         return;
 
     connMgr_Mainfunction(); /* ConnectionManager */
-    modemFinder_Mainfunction();
+//    modemFinder_Mainfunction();
     runSlacSequencer();
     runSdpStateMachine();
     tcp_Mainfunction();

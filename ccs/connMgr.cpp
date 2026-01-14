@@ -13,105 +13,98 @@
 
 #include "ccs32_globals.h"
 
-static uint16_t connMgr_timerEthLink;
-static uint16_t connMgr_timerModemLocal;
-static uint16_t connMgr_timerSlac;
-static uint16_t connMgr_timerSDP;
-static uint16_t connMgr_timerTCP;
-static uint16_t connMgr_timerAppl;
-static uint16_t connMgr_ConnectionLevel;
-static uint16_t connMgr_ConnectionLevelOld;
+static uint16_t connMgr_state = CONNLEVEL_5_ETH_LINK_PRESENT; /* we have SPI, so just say ETH is up */
+static uint16_t connMgr_timer = 0;
+
 static uint16_t connMgr_cycles;
 
 #define CONNMGR_CYCLES_PER_SECOND 33 /* 33 cycles per second, because 30ms cycle time */
-#define CONNMGR_TIMER_MAX (5*33) /* 5 seconds until an OkReport is forgotten. */
-#define CONNMGR_TIMER_MAX_10s (10*33) /* 10 seconds until an OkReport is forgotten. */
-#define CONNMGR_TIMER_MAX_15s (15*33) /* 15 seconds until an OkReport is forgotten. */
-#define CONNMGR_TIMER_MAX_20s (20*33) /* 20 seconds until an OkReport is forgotten. */
+#define CONNMGR_TIMER_5s (5*33) /* 5 seconds until an OkReport is forgotten. */
+#define CONNMGR_TIMER_10s (10*33) /* 10 seconds until an OkReport is forgotten. */
+#define CONNMGR_TIMER_15s (15*33) /* 15 seconds until an OkReport is forgotten. */
+#define CONNMGR_TIMER_20s (20*33) /* 20 seconds until an OkReport is forgotten. */
 
 
 uint8_t connMgr_getConnectionLevel(void)
 {
-   return connMgr_ConnectionLevel;
+    return connMgr_state;
 }
 
 void connMgr_printDebugInfos(void)
 {
-   addToTrace(MOD_CONNMGR, "[CONNMGR] %d %d %d %d %d %d --> %d",
-             connMgr_timerEthLink,  /* the timeout counter for "ethernet is up". Not meaningful, because Foccci modem is hardwired via SPI. */
-             connMgr_timerModemLocal, /* the timeout counter for the local QCA modem */
-             connMgr_timerSlac, /* the timeout counter for the SLAC procedure */
-             connMgr_timerSDP, /* the timeout counter for successfull ServiceDiscoveryResponse */
-             connMgr_timerTCP, /* the timeout counter for successful TCP connection */
-             connMgr_timerAppl, /* the timeout counter for application communication */
-             connMgr_ConnectionLevel /* the connection level, calculated based on the timeout counters */
-            );
+    addToTrace(MOD_CONNMGR, "[CONNMGR] %d --> %d",
+        connMgr_timer, /* the timeout counter for application communication */
+        connMgr_state /* the connection level, calculated based on the timeout counters */
+    );
+}
+
+void setState(uint16_t newState, uint16_t timeout)
+{
+    if (newState != connMgr_state)
+    {
+        addToTrace(MOD_CONNMGR, "[CONNMGR] ConnectionLevel changed from %d to %d.", connMgr_state, newState);
+        connMgr_state = newState;
+    }
+    connMgr_timer = timeout;
 }
 
 void connMgr_Mainfunction(void)
 {
-   /* count all the timers down */
-   if (connMgr_timerEthLink>0) connMgr_timerEthLink--;
-   if (connMgr_timerModemLocal>0) connMgr_timerModemLocal--;
-   if (connMgr_timerSlac>0) connMgr_timerSlac--;
-   if (connMgr_timerSDP>0) connMgr_timerSDP--;
-   if (connMgr_timerTCP>0) connMgr_timerTCP--;
-   if (connMgr_timerAppl>0) connMgr_timerAppl--;
+    if (connMgr_timer > 0)
+    {
+        connMgr_timer--;
+        if (connMgr_timer == 0)
+        {
+            println("[CONNMGR] Timeout in %d", connMgr_state);
+            setState(CONNLEVEL_5_ETH_LINK_PRESENT, 0 /* no timeout */);
+        }
+    }
 
-   /* Based on the timers, calculate the connectionLevel. */
-   if      (connMgr_timerAppl>0)         connMgr_ConnectionLevel=CONNLEVEL_100_APPL_RUNNING;
-   else if (connMgr_timerTCP>0)          connMgr_ConnectionLevel=CONNLEVEL_80_TCP_RUNNING;
-   else if (connMgr_timerSDP>0)          connMgr_ConnectionLevel=CONNLEVEL_50_SDP_DONE;
-   else if (connMgr_timerSlac>0)         connMgr_ConnectionLevel=CONNLEVEL_15_SLAC_DONE;
-   else if (connMgr_timerModemLocal>0)   connMgr_ConnectionLevel=CONNLEVEL_10_ONE_MODEM_FOUND;
-   else if (connMgr_timerEthLink>0)      connMgr_ConnectionLevel=CONNLEVEL_5_ETH_LINK_PRESENT;
-   else connMgr_ConnectionLevel=0;
-
-   connMgr_timerEthLink = CONNMGR_TIMER_MAX; /* we have SPI, so just say ETH is up */
-
-   if (connMgr_ConnectionLevelOld!=connMgr_ConnectionLevel)
-   {
-      addToTrace(MOD_CONNMGR, "[CONNMGR] ConnectionLevel changed from %d to %d.", connMgr_ConnectionLevelOld, connMgr_ConnectionLevel);
-      connMgr_ConnectionLevelOld = connMgr_ConnectionLevel;
-   }
-   if ((connMgr_cycles % 33)==0)
-   {
-      /* once per second */
-      connMgr_printDebugInfos();
-      if (connMgr_ConnectionLevel<CONNLEVEL_5_ETH_LINK_PRESENT)
-      {
-         publishStatus("Eth", "no link");
-      }
-   }
-   connMgr_cycles++;
+    if ((connMgr_cycles % 33) == 0)
+    {
+        /* once per second */
+        connMgr_printDebugInfos();
+    }
+    connMgr_cycles++;
 }
 
-void connMgr_ModemLocalOk()
-{
-   connMgr_timerModemLocal = CONNMGR_TIMER_MAX;
-}
+//void connMgr_ModemLocalOk()
+//{
+//    // slac control own timeout, so use 0
+//    setState(CONNLEVEL_10_ONE_MODEM_FOUND, 0);// CONNMGR_TIMER_5s);
+//}
 
 void connMgr_SlacOk(void)
 {
-   /* The SetKey was sent to the local modem. This leads to restart of the
-   local modem, and potenially also for the remote modem. If both modems are up,
-   they need additional time to pair. We need to be patient during this process. */
-   connMgr_timerSlac = CONNMGR_TIMER_MAX_20s;
+    /* The SetKey was sent to the local modem. This leads to restart of the
+    local modem, and potenially also for the remote modem. If both modems are up,
+    they need additional time to pair. We need to be patient during this process. */
+
+    // allow 20s between SLAC (Set-Key-Cnf) and SDP
+    setState(CONNLEVEL_15_SLAC_DONE, CONNMGR_TIMER_20s);
 }
 
 void connMgr_SdpOk(void)
 {
-   connMgr_timerSDP = CONNMGR_TIMER_MAX;
+    // allow 5s between SDP ok and TCP connected.
+    setState(CONNLEVEL_50_SDP_DONE, CONNMGR_TIMER_5s);
 }
 
 void connMgr_TcpOk(void)
 {
-   connMgr_timerTCP = CONNMGR_TIMER_MAX;
+    if (connMgr_state > CONNLEVEL_80_TCP_RUNNING)
+        return;
+
+    // allow 5s between TCP connect and APPL-ok
+    setState(CONNLEVEL_80_TCP_RUNNING, CONNMGR_TIMER_5s);
 }
 
 void connMgr_ApplOk(uint8_t timeout_in_seconds)
 {
-   connMgr_timerAppl = timeout_in_seconds * CONNMGR_CYCLES_PER_SECOND;
+    setState(CONNLEVEL_100_APPL_RUNNING, timeout_in_seconds * CONNMGR_CYCLES_PER_SECOND);
 }
 
-
+void connMgr_Restart(void)
+{
+    setState(CONNLEVEL_5_ETH_LINK_PRESENT, 0 /* no timeout */);
+}

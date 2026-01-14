@@ -1,3 +1,4 @@
+#if false
 #include "ccs32_globals.h"
 
 
@@ -55,3 +56,4 @@ void modemFinder_Mainfunction(void)
         }
     }
 }
+#endif

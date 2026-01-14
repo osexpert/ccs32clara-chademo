@@ -1,3 +1,4 @@
+#if false
 /* Interface header for modemFinder.c */
 
 /* Global Defines */
@@ -12,3 +13,4 @@ extern
 #endif
 void modemFinder_Mainfunction(void);
 
+#endif

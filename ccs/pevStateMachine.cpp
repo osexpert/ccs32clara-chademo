@@ -1057,8 +1057,10 @@ static void stateFunctionStop(void)
     if (currentDemandStopReason == STOP_REASON_NONE)
     {
         // If we did not reach CurrentDemand, so go back to Start and try again.
-        addToTrace(MOD_PEV, "Did not reach CurrentDemand -> retry.");
+        addToTrace(MOD_PEV, "Did not reach CurrentDemand -> restart");
         pev_enterState(PEV_STATE_Start);
+        // ConnMgr would restart by itself after timing out (5s), but no point in waiting when we know where to go:-)
+        connMgr_Restart();
     }
     else
     {
