@@ -38,6 +38,7 @@
 #define MMTYPE_RSP  0x0003
 
 #define STATE_INITIAL  0
+#define STATE_WAIT_FOR_SDP_RESPONSE 1
 //#define STATE_MODEM_SEARCH_ONGOING  1
 #define STATE_READY_FOR_SLAC        2
 //#define STATE_WAITING_FOR_MODEM_RESTARTED  3
@@ -474,8 +475,8 @@ static void evaluateSetKeyCnf(void)
     else
     {
         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says %d: Success.", result);
-        connMgr_SlacOk();
         slac_enterState(STATE_INITIAL); // this would have happened anyways, but for readability
+        connMgr_setLevel(CONNLEVEL_15_SLAC_DONE_SDP_NEXT);
     }
 }
 
@@ -576,14 +577,13 @@ int isTooLongTotal(void)
 
 void runSlacSequencer(void)
 {
-    //if (connMgr_getConnectionLevel() != CONNLEVEL_10_ONE_MODEM_FOUND)
-    if (connMgr_getConnectionLevel() != CONNLEVEL_5_ETH_LINK_PRESENT)
+    if (connMgr_getLevel() != CONNLEVEL_0_START)
     {
         if (pevSequenceState != STATE_INITIAL) slac_enterState(STATE_INITIAL);
         return;
     }
 
-    // ConnectionLevel is CONNLEVEL_5_ETH_LINK_PRESENT
+    // ConnectionLevel is CONNLEVEL_0_START
 
     pevSequenceCyclesInState++;
     pevTotalCycles++;
@@ -598,8 +598,27 @@ void runSlacSequencer(void)
     // state machine
     if (pevSequenceState == STATE_INITIAL)
     {
-        /* The modem is present, starting SLAC. */
-        slac_enterState(STATE_READY_FOR_SLAC);
+        if (connMgr_sdpDoneTrigger())
+        {
+            // SDP done at least once already. try fast path
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SDP already done before: Try fast path");
+            ipv6_initiateSdpRequest();
+            slac_enterState(STATE_WAIT_FOR_SDP_RESPONSE);
+        }
+        else
+        {
+            /* The modem is present, starting SLAC. */
+            slac_enterState(STATE_READY_FOR_SLAC);
+        }
+    }
+    else if (pevSequenceState == STATE_WAIT_FOR_SDP_RESPONSE)
+    {
+        // AI suggest 300ms delay and total 1–1.5s, but currently just sending one request and wait for 500ms.
+        if (pevSequenceCyclesInState >= 15) // 0.5s
+        {
+            // We are still here after 0.5 seconds, so SDP attempt did not fly. Go to slac.
+            slac_enterState(STATE_READY_FOR_SLAC);
+        }
     }
     else if (pevSequenceState == STATE_READY_FOR_SLAC)
     {
@@ -686,9 +705,8 @@ void runSlacSequencer(void)
         //}
         // (the normal state transition is done in the reception handler)
     }
-    else if (pevSequenceState == STATE_ATTEN_CHAR_IND_RECEIVED)   // ATTEN_CHAR.IND was received and the
+    else if (pevSequenceState == STATE_ATTEN_CHAR_IND_RECEIVED)   // ATTEN_CHAR.IND was received and the nearest charger decided and the ATTEN_CHAR.RSP was sent.
     {
-        // nearest charger decided and the ATTEN_CHAR.RSP was sent.
         slac_enterState(STATE_DELAY_BEFORE_MATCH);
         pevSequenceDelayCycles = 30; // original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
     }
@@ -724,8 +742,7 @@ void runSlacSequencer(void)
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SET_KEY.CNF");
             slac_enterState(STATE_INITIAL);
         }
-        // evaluateSefKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP
-        // ....or stay until ConnMgr timeout:-)
+        // evaluateSefKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP....or stay until ConnMgr timeout:-)
     }
     else
     {
@@ -737,16 +754,15 @@ void runSlacSequencer(void)
 
 void runSdpStateMachine(void)
 {
-    if (connMgr_getConnectionLevel() != CONNLEVEL_15_SLAC_DONE)
+    if (connMgr_getLevel() != CONNLEVEL_15_SLAC_DONE_SDP_NEXT)
     {
-        /* Only run SDP when SLAC is done */
         sdp_state = 0;
         return;
     }
     
-    // ConnectionLevel is CONNLEVEL_15_SLAC_DONE
+    // ConnectionLevel is CONNLEVEL_15_SLAC_DONE_SDP_NEXT
 
-    if (sdp_state == 0) /* The ConnectionLevel demands the SDP. */
+    if (sdp_state == 0)
     {
         // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
         addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
@@ -778,6 +794,7 @@ void runSdpStateMachine(void)
             // All repetitions are over, no SDP response was seen. Back to the beginning.
             addToTrace(MOD_HOMEPLUG, "[SDP] ERROR: Did not receive SDP response. Giving up.");
             sdp_state = 0;
+			connMgr_restart();
         }
     }
 }
@@ -786,7 +803,7 @@ static void evaluateGetKeyCnf(void) {}
 
 void evaluateReceivedHomeplugPacket(void)
 {
-    if (connMgr_getConnectionLevel() >= CONNLEVEL_80_TCP_RUNNING) {
+    if (connMgr_getLevel() >= CONNLEVEL_80_TCP_RUNNING) {
         /* we have TCP traffic running, so we ignore all homeplug management packets. This
         makes us robust against cross-talk from other charging cables.
         Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */

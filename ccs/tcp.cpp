@@ -123,9 +123,10 @@ void evaluateTcpPacket(void)
          setCheckpoint(303);
          tcpState = TCP_STATE_ESTABLISHED;
          tcp_sendAck();
-         connMgr_TcpOk();
+
          addToTrace(MOD_TCP, "[TCP] connected.");
          finPending = peerFinPending = true;
+         connMgr_setLevel(CONNLEVEL_80_TCP_RUNNING);
       }
       // Ignore everything else
       return;
@@ -147,7 +148,7 @@ void evaluateTcpPacket(void)
            the overwritten myethreceivebuffer would lead to not seeing the tcp_rxdata anymore, if this would be just
            a pointer to myethreceivebuffer[74]. */
            memcpy(tcp_rxdata, &myethreceivebuffer[54 + hdrLen], tcp_rxdataLen);  /* provide the received data to the application */
-           connMgr_TcpOk();
+//           connMgr_TcpOk();
            TcpAckNr = remoteSeqNr + tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
            tcp_sendAck();
 
@@ -395,14 +396,14 @@ void tcp_Mainfunction(void)
 {
    tcp_checkRetry();
 
-   if (connMgr_getConnectionLevel() < CONNLEVEL_50_SDP_DONE)
+   if (connMgr_getLevel() < CONNLEVEL_50_SDP_DONE_TCP_NEXT)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
       tcp_disconnect();
       return;
    }
 
-   if ((connMgr_getConnectionLevel() == CONNLEVEL_50_SDP_DONE) && (tcpState == TCP_STATE_CLOSED))
+   if ((connMgr_getLevel() == CONNLEVEL_50_SDP_DONE_TCP_NEXT) && (tcpState == TCP_STATE_CLOSED))
    {
       /* SDP is finished, but no TCP connected yet. */
       /* use a new port */

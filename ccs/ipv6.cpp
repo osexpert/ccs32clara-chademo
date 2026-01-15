@@ -59,7 +59,7 @@ void evaluateUdpPayload(void) {
                               udpPayload[7];
             if (v2gptPayloadLen == 20) {
                //# 20 is the only valid length for a SDP response.
-               if (connMgr_getConnectionLevel() >= CONNLEVEL_80_TCP_RUNNING) {
+               if (connMgr_getLevel() >= CONNLEVEL_80_TCP_RUNNING) {
                     /* we have TCP traffic running, so we ignore additional SDP messages. This
                     makes us robust against cross-talk from other charging cables.
                     Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */
@@ -84,7 +84,7 @@ void evaluateUdpPayload(void) {
                }
                addToTrace(MOD_SDP, "[SDP] Now we know the chargers IP.");
                readModemVersions(); /* read the software versions from our modem and from the chargers modem. Just for information/logging. */
-               connMgr_SdpOk();
+               connMgr_setLevel(CONNLEVEL_50_SDP_DONE_TCP_NEXT);
             }
          }
          else {

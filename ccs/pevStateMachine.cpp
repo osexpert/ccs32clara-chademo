@@ -179,7 +179,7 @@ static void routeDecoderInputData(void)
     //#endif
        /* We have something to decode, this is a good sign that the connection is fine.
           Inform the ConnectionManager that everything is fine. */
-    connMgr_ApplOk(10);
+//    connMgr_ApplOk(10);
 }
 
 /********* EXI creation functions ************************/
@@ -247,7 +247,7 @@ static void pev_sendCableCheckReq(void)
        This makes sure, that the timeout of the state machine comes before the timeout of the connectionManager, so
        that we enter the safe shutdown sequence as intended.
        (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
-    connMgr_ApplOk(31);
+//    connMgr_ApplOk(31);
 }
 
 static void pev_sendPreChargeReq(void)
@@ -709,7 +709,7 @@ static void stateFunctionWaitForPreChargeStart(void)
         addToTrace(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);
         pev_sendPreChargeReq();
-        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
+//        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
         //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
         pev_enterState(PEV_STATE_WaitForPreChargeResponse);
     }
@@ -1059,8 +1059,7 @@ static void stateFunctionStop(void)
         // If we did not reach CurrentDemand, so go back to Start and try again.
         addToTrace(MOD_PEV, "Did not reach CurrentDemand -> restart");
         pev_enterState(PEV_STATE_Start);
-        // ConnMgr would restart by itself after timing out (5s), but no point in waiting when we know where to go:-)
-        connMgr_Restart();
+        connMgr_restart();
     }
     else
     {
@@ -1089,16 +1088,17 @@ static uint8_t pev_isTooLong(void)
 /******* The statemachine dispatcher *******************/
 static void pev_runFsm(void)
 {
-    if (connMgr_getConnectionLevel() < CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
+    if (connMgr_getLevel() < CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
     {
         /* No TCP and we are still in Start. Nothing to do here. */
         return;
     }
 
-    if (connMgr_getConnectionLevel() == CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
+    if (connMgr_getLevel() == CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
     {
         /* We have TCP and we are in Start. This is the trigger for us. */
         pev_enterState(PEV_STATE_Connected);
+        connMgr_setLevel(CONNLEVEL_100_APPL_RUNNING);
     }
 
     stateFunctions[pev_state](); //call state function

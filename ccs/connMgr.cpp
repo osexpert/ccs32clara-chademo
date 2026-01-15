@@ -13,10 +13,12 @@
 
 #include "ccs32_globals.h"
 
-static uint16_t connMgr_state = CONNLEVEL_5_ETH_LINK_PRESENT; /* we have SPI, so just say ETH is up */
+static uint16_t connMgr_level = CONNLEVEL_0_START;
 static uint16_t connMgr_timer = 0;
 
 static uint16_t connMgr_cycles;
+
+static bool sdpDoneTrigger;
 
 #define CONNMGR_CYCLES_PER_SECOND 33 /* 33 cycles per second, because 30ms cycle time */
 #define CONNMGR_TIMER_5s (5*33) /* 5 seconds until an OkReport is forgotten. */
@@ -25,27 +27,48 @@ static uint16_t connMgr_cycles;
 #define CONNMGR_TIMER_20s (20*33) /* 20 seconds until an OkReport is forgotten. */
 
 
-uint8_t connMgr_getConnectionLevel(void)
+uint8_t connMgr_getLevel(void)
 {
-    return connMgr_state;
+    return connMgr_level;
 }
 
 void connMgr_printDebugInfos(void)
 {
     addToTrace(MOD_CONNMGR, "[CONNMGR] %d --> %d",
-        connMgr_timer, /* the timeout counter for application communication */
-        connMgr_state /* the connection level, calculated based on the timeout counters */
+        connMgr_timer,
+        connMgr_level
     );
 }
 
-void setState(uint16_t newState, uint16_t timeout)
+void setLevel(uint16_t level, uint16_t timeout)
 {
-    if (newState != connMgr_state)
+    if (level != connMgr_level)
     {
-        addToTrace(MOD_CONNMGR, "[CONNMGR] ConnectionLevel changed from %d to %d.", connMgr_state, newState);
-        connMgr_state = newState;
+        addToTrace(MOD_CONNMGR, "[CONNMGR] Level changed from %d to %d.", connMgr_level, level);
+        connMgr_level = level;
     }
     connMgr_timer = timeout;
+
+    if (level == CONNLEVEL_50_SDP_DONE_TCP_NEXT)
+        sdpDoneTrigger = true; // done at least once
+}
+
+bool connMgr_sdpDoneTrigger()
+{
+    return sdpDoneTrigger;
+}
+
+void connMgr_setLevel(uint16_t level)
+{
+    uint16_t timeout = 0;
+    if (level == CONNLEVEL_50_SDP_DONE_TCP_NEXT) timeout = CONNMGR_TIMER_5s;
+//    else if (level == CONNLEVEL_15_SLAC_DONE_SDP_NEXT) timeout = CONNMGR_TIMER_20s; SDP control its own timeout (50 retries) so this only messes up
+    setLevel(level, timeout);
+}
+
+void connMgr_restart(void)
+{
+    connMgr_setLevel(CONNLEVEL_0_START);
 }
 
 void connMgr_Mainfunction(void)
@@ -55,8 +78,8 @@ void connMgr_Mainfunction(void)
         connMgr_timer--;
         if (connMgr_timer == 0)
         {
-            println("[CONNMGR] Timeout in %d", connMgr_state);
-            setState(CONNLEVEL_5_ETH_LINK_PRESENT, 0 /* no timeout */);
+            println("[CONNMGR] Timeout in %d", connMgr_level);
+            connMgr_restart();
         }
     }
 
@@ -68,43 +91,4 @@ void connMgr_Mainfunction(void)
     connMgr_cycles++;
 }
 
-//void connMgr_ModemLocalOk()
-//{
-//    // slac control own timeout, so use 0
-//    setState(CONNLEVEL_10_ONE_MODEM_FOUND, 0);// CONNMGR_TIMER_5s);
-//}
 
-void connMgr_SlacOk(void)
-{
-    /* The SetKey was sent to the local modem. This leads to restart of the
-    local modem, and potenially also for the remote modem. If both modems are up,
-    they need additional time to pair. We need to be patient during this process. */
-
-    // allow 20s between SLAC (Set-Key-Cnf) and SDP
-    setState(CONNLEVEL_15_SLAC_DONE, CONNMGR_TIMER_20s);
-}
-
-void connMgr_SdpOk(void)
-{
-    // allow 5s between SDP ok and TCP connected.
-    setState(CONNLEVEL_50_SDP_DONE, CONNMGR_TIMER_5s);
-}
-
-void connMgr_TcpOk(void)
-{
-    if (connMgr_state > CONNLEVEL_80_TCP_RUNNING)
-        return;
-
-    // allow 5s between TCP connect and APPL-ok
-    setState(CONNLEVEL_80_TCP_RUNNING, CONNMGR_TIMER_5s);
-}
-
-void connMgr_ApplOk(uint8_t timeout_in_seconds)
-{
-    setState(CONNLEVEL_100_APPL_RUNNING, timeout_in_seconds * CONNMGR_CYCLES_PER_SECOND);
-}
-
-void connMgr_Restart(void)
-{
-    setState(CONNLEVEL_5_ETH_LINK_PRESENT, 0 /* no timeout */);
-}
