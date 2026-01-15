@@ -61,7 +61,8 @@ bool connMgr_sdpDoneTrigger()
 void connMgr_setLevel(uint16_t level)
 {
     uint16_t timeout = 0;
-    if (level == CONNLEVEL_50_SDP_DONE_TCP_NEXT) timeout = CONNMGR_TIMER_5s;
+    if (level == CONNLEVEL_50_SDP_DONE_TCP_NEXT) timeout = CONNMGR_TIMER_5s; // allow 5s between SDP done and TCP connected
+    else if (level == CONNLEVEL_80_TCP_RUNNING) timeout = CONNMGR_TIMER_5s; // allow 5s between TCP connected and APPL-ok
 //    else if (level == CONNLEVEL_15_SLAC_DONE_SDP_NEXT) timeout = CONNMGR_TIMER_20s; SDP control its own timeout (50 retries) so this only messes up
     setLevel(level, timeout);
 }
