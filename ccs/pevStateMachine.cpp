@@ -1088,13 +1088,15 @@ static uint8_t pev_isTooLong(void)
 /******* The statemachine dispatcher *******************/
 static void pev_runFsm(void)
 {
-    if (connMgr_getLevel() < CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
+    // TODO: check power off pending for all states, not only during current demand?
+
+    if (connMgr_getLevel() < CONNLEVEL_80_TCP_CONNECTED && pev_state == PEV_STATE_Start)
     {
         /* No TCP and we are still in Start. Nothing to do here. */
         return;
     }
 
-    if (connMgr_getLevel() == CONNLEVEL_80_TCP_RUNNING && pev_state == PEV_STATE_Start)
+    if (connMgr_getLevel() == CONNLEVEL_80_TCP_CONNECTED && pev_state == PEV_STATE_Start)
     {
         /* We have TCP and we are in Start. This is the trigger for us. */
         pev_enterState(PEV_STATE_Connected);

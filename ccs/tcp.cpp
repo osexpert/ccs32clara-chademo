@@ -47,6 +47,8 @@ static uint32_t tcp_debug_totalRetryCounter;
 static bool finPending;
 static bool peerFinPending;
 
+static uint16_t tcp_connecting_timeout;
+
 /*** local function prototypes ****************************************************/
 
 static void tcp_packRequestIntoEthernet(void);
@@ -126,7 +128,8 @@ void evaluateTcpPacket(void)
 
          addToTrace(MOD_TCP, "[TCP] connected.");
          finPending = peerFinPending = true;
-         connMgr_setLevel(CONNLEVEL_80_TCP_RUNNING);
+         tcp_connecting_timeout = 0; // disable the timer
+         connMgr_setLevel(CONNLEVEL_80_TCP_CONNECTED);
       }
       // Ignore everything else
       return;
@@ -394,8 +397,6 @@ void tcp_checkRetry(void)
 
 void tcp_Mainfunction(void)
 {
-   tcp_checkRetry();
-
    if (connMgr_getLevel() < CONNLEVEL_50_SDP_DONE_TCP_NEXT)
    {
       /* No SDP done. Means: It does not make sense to start or continue TCP. */
@@ -413,6 +414,19 @@ void tcp_Mainfunction(void)
          evccPort++;
 
       tcp_connect();
+      tcp_connecting_timeout = (5 * 33) + 1; // 5s
+   }
+
+   tcp_checkRetry();
+
+   if (tcp_connecting_timeout > 0)
+   {
+       tcp_connecting_timeout--;
+       if (tcp_connecting_timeout == 0)
+       {
+           addToTrace(MOD_TCP, "[TCP] Connect timeout -> restart");
+           connMgr_restart();
+       }
    }
 }
 

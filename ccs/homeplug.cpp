@@ -803,7 +803,7 @@ static void evaluateGetKeyCnf(void) {}
 
 void evaluateReceivedHomeplugPacket(void)
 {
-    if (connMgr_getLevel() >= CONNLEVEL_80_TCP_RUNNING) {
+    if (connMgr_getLevel() >= CONNLEVEL_80_TCP_CONNECTED) {
         /* we have TCP traffic running, so we ignore all homeplug management packets. This
         makes us robust against cross-talk from other charging cables.
         Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */

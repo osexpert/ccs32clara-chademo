@@ -59,7 +59,7 @@ void evaluateUdpPayload(void) {
                               udpPayload[7];
             if (v2gptPayloadLen == 20) {
                //# 20 is the only valid length for a SDP response.
-               if (connMgr_getLevel() >= CONNLEVEL_80_TCP_RUNNING) {
+               if (connMgr_getLevel() >= CONNLEVEL_80_TCP_CONNECTED) {
                     /* we have TCP traffic running, so we ignore additional SDP messages. This
                     makes us robust against cross-talk from other charging cables.
                     Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */
