@@ -13,7 +13,7 @@
 
 #include "ccs32_globals.h"
 
-static uint16_t connMgr_level = CONNLEVEL_0_START;
+static uint16_t connMgr_level = CONNLEVEL_5_SDP_RECOVERY;
 
 static uint16_t connMgr_cycles;
 
@@ -56,7 +56,7 @@ bool connMgr_sdpDoneTrigger()
 
 void connMgr_restart(void)
 {
-    connMgr_setLevel(CONNLEVEL_0_START);
+    connMgr_setLevel(CONNLEVEL_5_SDP_RECOVERY);
 }
 
 void connMgr_Mainfunction(void)

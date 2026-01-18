@@ -38,24 +38,16 @@
 #define MMTYPE_RSP  0x0003
 
 #define STATE_INITIAL  0
-#define STATE_WAIT_FOR_SDP_RESPONSE 1
-//#define STATE_MODEM_SEARCH_ONGOING  1
-#define STATE_READY_FOR_SLAC        2
-//#define STATE_WAITING_FOR_MODEM_RESTARTED  3
-#define STATE_WAITING_FOR_SLAC_PARAM_CNF   4
-#define STATE_SLAC_PARAM_CNF_RECEIVED      5
-#define STATE_BEFORE_START_ATTEN_CHAR      6
-#define STATE_SOUNDING                     7
-#define STATE_WAIT_FOR_ATTEN_CHAR_IND      8
-#define STATE_ATTEN_CHAR_IND_RECEIVED      9
-#define STATE_DELAY_BEFORE_MATCH           10
-#define STATE_WAITING_FOR_SLAC_MATCH_CNF   11
-#define STATE_WAITING_FOR_SET_KEY_CNF   12
-//#define STATE_WAITING_FOR_RESTART2         12
-//#define STATE_FIND_MODEMS2                 13
-//#define STATE_WAITING_FOR_SW_VERSIONS      14
-//#define STATE_READY_FOR_SDP                15
-//#define STATE_SDP                          16
+#define STATE_SEND_SLAC_PARAM_REQ        1
+#define STATE_WAITING_FOR_SLAC_PARAM_CNF   2
+#define STATE_SLAC_PARAM_CNF_RECEIVED      3
+#define STATE_BEFORE_START_ATTEN_CHAR      4
+#define STATE_SOUNDING                     5
+#define STATE_WAIT_FOR_ATTEN_CHAR_IND      6
+#define STATE_ATTEN_CHAR_IND_RECEIVED      7
+#define STATE_DELAY_BEFORE_MATCH           8
+#define STATE_WAITING_FOR_SLAC_MATCH_CNF   9
+#define STATE_WAITING_FOR_SET_KEY_CNF   10
 
 #define iAmPev 1 /* This project is intended only for PEV mode at the moment. */
 #define iAmEvse 0
@@ -577,13 +569,11 @@ int isTooLongTotal(void)
 
 void runSlacSequencer(void)
 {
-    if (connMgr_getLevel() != CONNLEVEL_0_START)
+    if (connMgr_getLevel() != CONNLEVEL_10_START_SLAC)
     {
         if (pevSequenceState != STATE_INITIAL) slac_enterState(STATE_INITIAL);
         return;
     }
-
-    // ConnectionLevel is CONNLEVEL_0_START
 
     pevSequenceCyclesInState++;
     pevTotalCycles++;
@@ -598,29 +588,10 @@ void runSlacSequencer(void)
     // state machine
     if (pevSequenceState == STATE_INITIAL)
     {
-        if (connMgr_sdpDoneTrigger())
-        {
-            // SDP done at least once already. try fast path
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SDP already done before: Try fast path");
-            ipv6_initiateSdpRequest();
-            slac_enterState(STATE_WAIT_FOR_SDP_RESPONSE);
-        }
-        else
-        {
-            /* The modem is present, starting SLAC. */
-            slac_enterState(STATE_READY_FOR_SLAC);
-        }
+        /* The modem is present, starting SLAC. */
+        slac_enterState(STATE_SEND_SLAC_PARAM_REQ);
     }
-    else if (pevSequenceState == STATE_WAIT_FOR_SDP_RESPONSE)
-    {
-        // AI suggest 300ms delay and total 1â€“1.5s, but currently just sending one request and wait for 500ms.
-        if (pevSequenceCyclesInState >= 15) // 0.5s
-        {
-            // We are still here after 0.5 seconds, so SDP attempt did not fly. Go to slac.
-            slac_enterState(STATE_READY_FOR_SLAC);
-        }
-    }
-    else if (pevSequenceState == STATE_READY_FOR_SLAC)
+    else if (pevSequenceState == STATE_SEND_SLAC_PARAM_REQ)
     {
         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
         setCheckpoint(100);
@@ -698,7 +669,7 @@ void runSlacSequencer(void)
     {
         // todo: it is possible that we receive this message from multiple chargers. We need
         // to select the charger with the loudest reported signals.
-		// TODO: add a medium (~8 s) timeout? Currently the 15s timeout hit hit this. Maybe if it happend a lot:-)
+        // TODO: add a medium (~8 s) timeout? Currently the 15s timeout hit hit this. Maybe if it happend a lot:-)
         //if (isTooLong())
         //{
         //    slac_enterState(STATE_INITIAL);
@@ -752,6 +723,47 @@ void runSlacSequencer(void)
     }
 }
 
+static int sdpRecoveryState = 0;
+static int sdpRecoveryDelay = 0;
+
+void runSdpRecoveryStateMachine(void)
+{
+    if (connMgr_getLevel() != CONNLEVEL_5_SDP_RECOVERY)
+    {
+        sdpRecoveryState = 0;
+        return;
+    }
+
+    if (connMgr_sdpDoneTrigger()) // SDP done before, so restarting, try fast path
+    {
+        if (sdpRecoveryState == 0)
+        {
+            addToTrace(MOD_HOMEPLUG, "[SDP] Try SDP recovery before SLAC...");
+            ipv6_initiateSdpRequest();
+            sdpRecoveryState = 1;
+            sdpRecoveryDelay = 15; // 0.5s
+        }
+        else if (sdpRecoveryState == 1)
+        {
+            // AI suggest 300ms delay and total 1-€“1.5s, but currently just sending one request and wait for 500ms.
+            if (sdpRecoveryDelay > 0)
+            {
+                sdpRecoveryDelay--;
+            }
+            else
+            {
+                // We are still here after 0.5 seconds, so SDP attempt did not fly. Go to slac.
+                // Why would we not be here? evaluateUdpPayload would have taken us into connMgr_setLevel(CONNLEVEL_50_SDP_DONE_TCP_NEXT);
+                connMgr_setLevel(CONNLEVEL_10_START_SLAC);
+            }
+        }
+    }
+    else // cold start, directly to SLAC
+    {
+        connMgr_setLevel(CONNLEVEL_10_START_SLAC);
+    }
+}
+
 void runSdpStateMachine(void)
 {
     if (connMgr_getLevel() != CONNLEVEL_15_SLAC_DONE_SDP_NEXT)
@@ -759,8 +771,6 @@ void runSdpStateMachine(void)
         sdp_state = 0;
         return;
     }
-    
-    // ConnectionLevel is CONNLEVEL_15_SLAC_DONE_SDP_NEXT
 
     if (sdp_state == 0)
     {
@@ -792,9 +802,9 @@ void runSdpStateMachine(void)
         else
         {
             // All repetitions are over, no SDP response was seen. Back to the beginning.
-            addToTrace(MOD_HOMEPLUG, "[SDP] ERROR: Did not receive SDP response. Giving up.");
+            addToTrace(MOD_HOMEPLUG, "[SDP] ERROR: Did not receive SDP response -> restart");
             sdp_state = 0;
-			connMgr_restart();
+            connMgr_restart();
         }
     }
 }

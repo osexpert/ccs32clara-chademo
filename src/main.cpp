@@ -465,8 +465,8 @@ static void Ms30Task()
     if (_global.ccsEnded)
         return;
 
-    connMgr_Mainfunction(); /* ConnectionManager */
-//    modemFinder_Mainfunction();
+    connMgr_Mainfunction();
+    runSdpRecoveryStateMachine();
     runSlacSequencer();
     runSdpStateMachine();
     tcp_Mainfunction();

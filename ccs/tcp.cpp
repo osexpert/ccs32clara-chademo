@@ -397,37 +397,37 @@ void tcp_checkRetry(void)
 
 void tcp_Mainfunction(void)
 {
-   if (connMgr_getLevel() < CONNLEVEL_50_SDP_DONE_TCP_NEXT)
-   {
-      /* No SDP done. Means: It does not make sense to start or continue TCP. */
-      tcp_disconnect();
-      return;
-   }
+    if (connMgr_getLevel() < CONNLEVEL_50_SDP_DONE_TCP_NEXT)
+    {
+        /* No SDP done. Means: It does not make sense to start or continue TCP. */
+        tcp_disconnect();
+        return;
+    }
 
-   if ((connMgr_getLevel() == CONNLEVEL_50_SDP_DONE_TCP_NEXT) && (tcpState == TCP_STATE_CLOSED))
-   {
-      /* SDP is finished, but no TCP connected yet. */
-      /* use a new port */
-      if (evccPort == CLIENT_MAX_PORT)
-         evccPort = CLIENT_MIN_PORT;
-      else
-         evccPort++;
+    if (connMgr_getLevel() == CONNLEVEL_50_SDP_DONE_TCP_NEXT && tcpState == TCP_STATE_CLOSED)
+    {
+        /* SDP is finished, but no TCP connected yet. */
+        /* use a new port */
+        if (evccPort == CLIENT_MAX_PORT)
+            evccPort = CLIENT_MIN_PORT;
+        else
+            evccPort++;
 
-      tcp_connect();
-      tcp_connecting_timeout = (5 * 33) + 1; // 5s
-   }
+        tcp_connect();
+        tcp_connecting_timeout = (5 * 33) + 1; // 5s
+    }
 
-   tcp_checkRetry();
+    tcp_checkRetry();
 
-   if (tcp_connecting_timeout > 0)
-   {
-       tcp_connecting_timeout--;
-       if (tcp_connecting_timeout == 0)
-       {
-           addToTrace(MOD_TCP, "[TCP] Connect timeout -> restart");
-           connMgr_restart();
-       }
-   }
+    if (tcp_connecting_timeout > 0)
+    {
+        tcp_connecting_timeout--;
+        if (tcp_connecting_timeout == 0)
+        {
+            addToTrace(MOD_TCP, "[TCP] Connect timeout -> restart");
+            connMgr_restart();
+        }
+    }
 }
 
 uint16_t setStartPort(uint32_t rand_num)
