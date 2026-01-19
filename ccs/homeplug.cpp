@@ -278,7 +278,8 @@ static void evaluateAttenCharInd(void)
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
             setCheckpoint(140);
             myEthTransmit();
-            pevSequenceState = STATE_ATTEN_CHAR_IND_RECEIVED; // enter next state. Will be handled in the cyclic runSlacSequencer
+
+            slac_enterState(STATE_ATTEN_CHAR_IND_RECEIVED); // enter next state. Will be handled in the cyclic runSlacSequencer
         }
     }
 }
@@ -669,11 +670,16 @@ void runSlacSequencer(void)
     {
         // todo: it is possible that we receive this message from multiple chargers. We need
         // to select the charger with the loudest reported signals.
-        // TODO: add a medium (~8 s) timeout? Currently the 15s timeout hit hit this. Maybe if it happend a lot:-)
-        //if (isTooLong())
-        //{
-        //    slac_enterState(STATE_INITIAL);
-        //}
+
+        // AI:
+        // TP_atten_char = 1.2s per DIN 70121 / ISO 15118-3.
+        // Observed worst case EVSE behavior: Tesla can respond at 1.05–-1.18s but remains < 1.2s on the wire (within spec).
+        // So cycles > 40 is "correct", but add some slack to allow for scheduler/processing delay.
+        if (pevSequenceCyclesInState > 43)
+        {
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for ATTEN_CHAR.IND");
+            slac_enterState(STATE_INITIAL);
+        }
         // (the normal state transition is done in the reception handler)
     }
     else if (pevSequenceState == STATE_ATTEN_CHAR_IND_RECEIVED)   // ATTEN_CHAR.IND was received and the nearest charger decided and the ATTEN_CHAR.RSP was sent.
@@ -699,7 +705,7 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_MATCH_CNF)
     {
-        if (pevSequenceCyclesInState > 200) // ~6 s
+        if (pevSequenceCyclesInState > 66) // 2s
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SLAC_MATCH.CNF");
             slac_enterState(STATE_INITIAL);
