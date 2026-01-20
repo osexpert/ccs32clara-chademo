@@ -37,7 +37,6 @@
 #include "hardwareInterface.h"
 #include "homeplug.h"
 #include "ipv6.h"
-#include "modemFinder.h"
 #include "myHelpers.h"
 #include "pevStateMachine.h"
 #include "qca7000.h"

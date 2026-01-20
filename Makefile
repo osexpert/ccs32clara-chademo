@@ -55,7 +55,7 @@ LDFLAGS    = -Llibopencm3/lib -T$(LDSCRIPT) -march=armv7 -nostartfiles -nostdlib
 OBJSL		  = main.o hwinit.o params.o \
 				 my_string.o digio.o printf.o \
 				 ipv6.o tcp.o \
-				 connMgr.o modemFinder.o pevStateMachine.o \
+				 connMgr.o pevStateMachine.o \
 				 hardwareInterface.o udpChecksum.o \
 				 homeplug.o myHelpers.o qca7000.o \
 				 appHandEXIDatatypesDecoder.o ByteStream.o EncoderChannel.o \

@@ -556,18 +556,6 @@ void slac_enterState(int n)
     if (n == STATE_INITIAL) pevTotalCycles = 0;
 }
 
-//int isTooLong(void)
-//{
-//   /* The timeout handling function. */
-//   return (pevSequenceCyclesInState > 500); // 15s
-//}
-
-int isTooLongTotal(void)
-{
-    /* The timeout handling function. */
-    return (pevTotalCycles > 500); // 15s
-}
-
 void runSlacSequencer(void)
 {
     if (connMgr_getLevel() != CONNLEVEL_10_START_SLAC)
@@ -579,17 +567,16 @@ void runSlacSequencer(void)
     pevSequenceCyclesInState++;
     pevTotalCycles++;
 
-    // 15s timeout for slac in total.
-    if (isTooLongTotal())
+    // 15s timeout for SLAC in total.
+    if (pevSequenceCyclesInState > 500)
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ERROR: Total timeout");
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ERROR: Timeout");
         slac_enterState(STATE_INITIAL);
     }
 
     // state machine
     if (pevSequenceState == STATE_INITIAL)
     {
-        /* The modem is present, starting SLAC. */
         slac_enterState(STATE_SEND_SLAC_PARAM_REQ);
     }
     else if (pevSequenceState == STATE_SEND_SLAC_PARAM_REQ)
@@ -673,7 +660,7 @@ void runSlacSequencer(void)
 
         // AI:
         // TP_atten_char = 1.2s per DIN 70121 / ISO 15118-3.
-        // Observed worst case EVSE behavior: Tesla can respond at 1.05 to 1.18s but remains < 1.2s on the wire (within spec).
+        // Observed worst case EVSE behavior: Tesla can respond at 1.05–-1.18s but remains < 1.2s on the wire (within spec).
         // So cycles > 40 is "correct", but add some slack to allow for scheduler/processing delay.
         if (pevSequenceCyclesInState > 43)
         {
@@ -699,7 +686,6 @@ void runSlacSequencer(void)
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...");
             setCheckpoint(150);
             myEthTransmit();
-            // evaluateSlacMatchCnf() will bring us further into STATE_WAITING_FOR_SET_KEY_CNF after it send SET_KEY.REQ
             slac_enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF);
         }
     }
@@ -751,7 +737,7 @@ void runSdpRecoveryStateMachine(void)
         }
         else if (sdpRecoveryState == 1)
         {
-            // AI suggest 300ms delay and total 1 to 1.5s, but currently just sending one request and wait for 500ms.
+            // AI suggest 300ms delay and total 1-€“1.5s, but currently just sending one request and wait for 500ms.
             if (sdpRecoveryDelay > 0)
             {
                 sdpRecoveryDelay--;
@@ -859,27 +845,3 @@ const uint8_t* getOurMac()
 {
     return myMAC;
 }
-
-//int homeplug_sanityCheck(void)
-//{
-//    if (pevSequenceState > STATE_READY_FOR_SDP)
-//    {
-//        //addToTrace("ERROR: Sanity check of the homeplug state machine failed: %d", pevSequenceState);
-//        addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the homeplug state machine failed.");
-//        return -1;
-//    }
-//    if (sdp_state >= 2)
-//    {
-//        addToTrace(MOD_HOMEPLUG, "ERROR: Sanity check of the SDP state machine failed.");
-//        return -1;
-//    }
-//    return 0;
-//}
-
-//void homeplugInit(void)
-//{
-//   pevSequenceState = STATE_INITIAL;
-//   pevSequenceCyclesInState = 0;
-//   pevSequenceDelayCycles = 0;
-//   numberOfSoftwareVersionResponses = 0;
-//}
