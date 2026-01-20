@@ -352,7 +352,7 @@ static void evaluateSlacMatchCnf(void)
     // The SLAC_MATCH.CNF contains the NMK and the NID.
     // We extract this information, so that we can use it for the CM_SET_KEY afterwards.
     // References: https://github.com/qca/open-plc-utils/blob/master/slac/evse_cm_slac_match.c
-    // 2021-12-16_HPC_säule1_full_slac.pcapng
+    // 2021-12-16_HPC_sÃ¤ule1_full_slac.pcapng
     if (iAmEvse == 1)
     {
         // If we are EVSE, nothing to do. We have sent the match.CNF by our own.
@@ -602,7 +602,7 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF)   // Waiting for slac_param confirmation.
     {
-        if (pevSequenceCyclesInState >= 33)
+        if (pevSequenceCyclesInState > 33)
         {
             // No response for 1s, this is an error.
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
@@ -673,7 +673,7 @@ void runSlacSequencer(void)
 
         // AI:
         // TP_atten_char = 1.2s per DIN 70121 / ISO 15118-3.
-        // Observed worst case EVSE behavior: Tesla can respond at 1.05�-1.18s but remains < 1.2s on the wire (within spec).
+        // Observed worst case EVSE behavior: Tesla can respond at 1.05-1.18s but remains < 1.2s on the wire (within spec).
         // So cycles > 40 is "correct", but add some slack to allow for scheduler/processing delay.
         if (pevSequenceCyclesInState > 43)
         {
@@ -751,7 +751,7 @@ void runSdpRecoveryStateMachine(void)
         }
         else if (sdpRecoveryState == 1)
         {
-            // AI suggest 300ms delay and total 1-��1.5s, but currently just sending one request and wait for 500ms.
+            // AI suggest 300ms delay and total 1-1.5s, but currently just sending one request and wait for 500ms.
             if (sdpRecoveryDelay > 0)
             {
                 sdpRecoveryDelay--;
