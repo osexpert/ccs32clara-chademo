@@ -352,7 +352,7 @@ static void evaluateSlacMatchCnf(void)
     // The SLAC_MATCH.CNF contains the NMK and the NID.
     // We extract this information, so that we can use it for the CM_SET_KEY afterwards.
     // References: https://github.com/qca/open-plc-utils/blob/master/slac/evse_cm_slac_match.c
-    // 2021-12-16_HPC_s√§ule1_full_slac.pcapng
+    // 2021-12-16_HPC_s‰ule1_full_slac.pcapng
     if (iAmEvse == 1)
     {
         // If we are EVSE, nothing to do. We have sent the match.CNF by our own.
@@ -655,14 +655,12 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // waiting for ATTEN_CHAR.IND
     {
-        // todo: it is possible that we receive this message from multiple chargers. We need
+        // TODO: it is possible that we receive this message from multiple chargers. We need
         // to select the charger with the loudest reported signals.
 
-        // AI:
-        // TP_atten_char = 1.2s per DIN 70121 / ISO 15118-3.
-        // Observed worst case EVSE behavior: Tesla can respond at 1.05ñ-1.18s but remains < 1.2s on the wire (within spec).
-        // So cycles > 40 is "correct", but add some slack to allow for scheduler/processing delay.
-        if (pevSequenceCyclesInState > 43)
+        // TT_EV_atten_results: Time EV should wait for ATTEN_CHAR.IND, from first START_ATTEN_CHAR.IND is sent: 1200ms
+        // Since TT_EV_atten_results include 2 more START_ATTEN_CHAR.IND and 10 x NMBC_SOUND.IND, waiting additional 1s should be plenty.
+        if (pevSequenceCyclesInState > 33) // 1s
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for ATTEN_CHAR.IND");
             slac_enterState(STATE_INITIAL);
@@ -737,7 +735,7 @@ void runSdpRecoveryStateMachine(void)
         }
         else if (sdpRecoveryState == 1)
         {
-            // AI suggest 300ms delay and total 1-Äì1.5s, but currently just sending one request and wait for 500ms.
+            // AI suggest 300ms delay and total 1-?"1.5s, but currently just sending one request and wait for 500ms.
             if (sdpRecoveryDelay > 0)
             {
                 sdpRecoveryDelay--;
