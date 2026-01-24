@@ -53,7 +53,7 @@
 #define iAmEvse 0
 
 static const uint8_t MAC_BROADCAST[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-uint8_t myMAC[6] = {0xFE, 0xED, 0xBE, 0xEF, 0xAF, 0xFE};
+uint8_t myMAC[6] = {0xFE, 0xED, 0xBE, 0xEF, 0xAF, 0xFE}; // FEED BEEF *
 uint8_t evseMac[6];
 uint8_t numberOfSoftwareVersionResponses;
 
@@ -542,8 +542,8 @@ void evaluateGetSwCnf(void)
             strVersion[i] = x;
         }
         strVersion[i] = 0;
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:xx:xx:xx:%02x software version %s",
-            sourceMac[0], sourceMac[1], sourceMac[5],
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
+            sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
             strVersion);
     }
 }
@@ -735,7 +735,7 @@ void runSdpRecoveryStateMachine(void)
         }
         else if (sdpRecoveryState == 1)
         {
-            // AI suggest 300ms delay and total 1-?"1.5s, but currently just sending one request and wait for 500ms.
+            // AI suggest 300ms delay and total 1-1.5s, but currently just sending one request and wait for 500ms.
             if (sdpRecoveryDelay > 0)
             {
                 sdpRecoveryDelay--;

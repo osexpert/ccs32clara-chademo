@@ -659,10 +659,6 @@ public:
         println("[cha] Unlock charging plug");
     }
 
-    bool IsChargingPlugLocked() {
-        return _chargingPlugLocked;
-    }
-
     private:
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
@@ -670,6 +666,7 @@ public:
         bool _switch_k = false;
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
+        bool _carContactorsClosed = false;
 
 #ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;
@@ -684,7 +681,6 @@ public:
         float _adjustBelowFactor = 0.0f;
         bool _dischargeEnabled = false;
         bool _dischargeUnit = false;
-        bool _dischargeSimulation = false;
         bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage

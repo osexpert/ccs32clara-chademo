@@ -485,6 +485,9 @@ void ChademoCharger::RunStateMachine()
             // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
+
+			println("[cha] Car contactors closed");
+            _carContactorsClosed = true;
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarRequestCurrent);
@@ -533,7 +536,6 @@ void ChademoCharger::RunStateMachine()
         else
         {
             bool dischargeUnit = false;
-            bool dischargeSimulation = false;
             // Discharge is opt-in, so if discharge is activated, don't care about checking if car is compatible or not (if it works, it works).
             // Problem: some buggy cars seems to set and unset this flag randomly. So just ignore it and do our thing regardless.
             // If the car don't support it, it does not matter if we send it or not, it will not work in any case:-)
@@ -552,18 +554,8 @@ void ChademoCharger::RunStateMachine()
                     _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                     dischargeUnit = true;
                 }
-                // 3 seconds passed without amps delivered? We are living dangerously. Try to buy us more time!
-                // Consider: what if output current drops to 0 _during_ charging? I guess...we should buy time as usual?
-				// if setting RemainingDischargeTime alone is not sufficient, try this:
-                else if (false)//cyclesInState > (CHA_CYCLES_PER_SEC * 3) && chargerData.OutputCurrent == 0)
-                {
-                    // TODO: it is possible that setting RemainingDischargeTime is sufficient? Test this! Think trickle charging, then both charging 0 and discharging 0 amps should be ok!
-                    _chargerData.DischargeCurrent = min((uint8_t)1, _carData.MaxDischargeCurrent);
-                    dischargeSimulation = true;
-                }
             }
             COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
-            COMPARE_SET(_dischargeSimulation, dischargeSimulation, "[cha] DischargeSimulation %d -> %d");
 
             // Only count down if charging amps. So if discharging, we can go on forever.
             // The check for _chargerData.RemainingChargeTimeSec is in the start of the state, but not a problem, its only one cycle behind:-)
@@ -605,8 +597,9 @@ void ChademoCharger::RunStateMachine()
             || IsTimeoutSec(10))
         {
             // welding detection done & car contactors open
+            _carContactorsClosed = false;
             println("[cha] Car contactors opened");
-            
+
             SetSwitchD2(false);
 
             SetState(ChargerState::Stopping_WaitForLowVolts);
@@ -662,7 +655,7 @@ bool ChademoCharger::PreChargeCompleted()
 
     if (_precharge_Longer_So_We_Can_Measure_Battery_Voltage)
     {
-        bool carRequestCurrent = _state > ChargerState::WaitForCarRequestCurrent;
+        bool carRequestCurrent = _state == ChargerState::ChargingLoop;
         if (carRequestCurrent)
         {
             SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
@@ -678,10 +671,9 @@ bool ChademoCharger::PreChargeCompleted()
     else
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
-        bool carContactorsClosed = _state > ChargerState::WaitForCarContactorsClosed;
-        if (not carContactorsClosed)
+        if (not _carContactorsClosed)
             println("[cha] PreCharge stalled until car contactors closed");
-        return carContactorsClosed;
+        return _carContactorsClosed;
     }
 }
 
@@ -692,8 +684,7 @@ extern "C" bool chademoInterface_preChargeCompleted()
 
 bool ChademoCharger::CarContactorsOpened()
 {
-    bool carContactorsOpen = _state > ChargerState::Stopping_WaitForCarContactorsOpen;
-    return carContactorsOpen;
+    return not _carContactorsClosed;
 }
 
 extern "C" bool chademoInterface_carContactorsOpened()
@@ -705,7 +696,7 @@ bool ChademoCharger::PreChargeCanStart()
 {
 #ifdef CHADEMO_SINGLE_SESSION
     // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
-    bool carReadyToCharge = _state > ChargerState::WaitForCarReadyToCharge;
+    bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
     return carReadyToCharge;
 #else
     return true;
@@ -1013,6 +1004,6 @@ void ChademoCharger::UpdateChargerMessages()
 
 bool ChademoCharger::IsPowerOffOk()
 {
-    return not IsChargingPlugLocked();
+    return not _chargingPlugLocked;
 }
 
