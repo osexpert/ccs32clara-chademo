@@ -1054,7 +1054,7 @@ static void stateFunctionStop(void)
 
     // I guess we would want to retry if something failed, but only if we did not reach current demand.
     int currentDemandStopReason = Param::GetInt(Param::StopReason);
-    if (currentDemandStopReason == STOP_REASON_NONE)
+    if (currentDemandStopReason == STOP_REASON_NONE && not hardwareInterface_stopChargeRequested())
     {
         // If we did not reach CurrentDemand, so go back to Start and try again.
         addToTrace(MOD_PEV, "Did not reach CurrentDemand -> restart");
