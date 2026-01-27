@@ -1114,6 +1114,15 @@ static void pev_runFsm(void)
         addToTrace(MOD_PEV, "Timeout in state %s", label);
         pev_enterState(PEV_STATE_SafeShutDown);
     }
+
+    if (hardwareInterface_stopChargeRequested()
+        && hardwareInterface_isConnectorLocked()
+        && pev_state < PEV_STATE_WaitForCurrentDemandResponse
+        )
+    {
+        addToTrace(MOD_PEV, "Stop charging requested before CurrentDemand");
+        pev_enterState(PEV_STATE_SafeShutDown);
+    }
 }
 
 /************ public interfaces *****************************************/
