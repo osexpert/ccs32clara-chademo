@@ -103,7 +103,7 @@
 /*    VALUE_ENTRY(HardwareVariant,    "",              2025 ) \*/  \
 /*    VALUE_ENTRY(AdcIpropi,          "",              2023 ) \ */  \
 /*    VALUE_ENTRY(LockState,          LOCK,            2014 ) \ */ \
-    VALUE_ENTRY(StopReason,         STOPREASONS,     2017 ) \
+    VALUE_ENTRY(CurrentDemandStopReason,         STOPREASONS,     2017 ) \
     VALUE_ENTRY(checkpoint,         "dig",           2015 ) \
 /*    VALUE_ENTRY(CanWatchdog,        "dig",           2016 ) \ */ \
 /*    VALUE_ENTRY(CanAwake,           OFFON,           2032 ) \ */ \
@@ -139,13 +139,11 @@ enum _stopreasons
 {
    STOP_REASON_NONE,
    STOP_REASON_POWER_OFF_PENDING,
-//   STOP_REASON_MISSING_ENABLE,
-//   STOP_REASON_CAN_TIMEOUT,
    STOP_REASON_CHARGER_SHUTDOWN,
    STOP_REASON_ACCU_FULL,
    STOP_REASON_CHARGER_EMERGENCY_SHUTDOWN,
-//   STOP_REASON_INLET_OVERHEAT,
-   STOP_REASON_CHARGER_EVSE_MALFUNCTION
+   STOP_REASON_CHARGER_EVSE_MALFUNCTION,
+   STOP_REASON_TIMEOUT
 };
 
 

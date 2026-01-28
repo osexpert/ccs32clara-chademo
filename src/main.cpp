@@ -249,7 +249,7 @@ void power_off_check()
             println("Ccs ended. Power off pending...");
         }
 
-        int ccsCurrentDemandStopReason = Param::GetInt(Param::StopReason);
+        int ccsCurrentDemandStopReason = Param::GetInt(Param::CurrentDemandStopReason);
         if (ccsCurrentDemandStopReason != STOP_REASON_NONE)
         {
             _global.powerOffPending = true;

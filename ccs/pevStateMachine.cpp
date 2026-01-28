@@ -403,7 +403,7 @@ static void stateFunctionConnected(void)
     addToTrace(MOD_PEV, "Checkpoint400: Sending the initial SupportedApplicationProtocolReq");
     setCheckpoint(400);
     addV2GTPHeaderAndTransmit(exiDemoSupportedApplicationProtocolRequestIoniq, sizeof(exiDemoSupportedApplicationProtocolRequestIoniq));
-    Param::SetInt(Param::StopReason, STOP_REASON_NONE);
+    Param::SetInt(Param::CurrentDemandStopReason, STOP_REASON_NONE);
     pev_enterState(PEV_STATE_WaitForSupportedApplicationProtocolResponse);
 }
 
@@ -902,7 +902,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
 
             if (currentDemandStopReason != STOP_REASON_NONE)
             {
-                Param::SetInt(Param::StopReason, currentDemandStopReason);
+                Param::SetInt(Param::CurrentDemandStopReason, currentDemandStopReason);
                 setCheckpoint(800);
                 pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                                 sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
@@ -1053,8 +1053,7 @@ static void stateFunctionStop(void)
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
 
     // I guess we would want to retry if something failed, but only if we did not reach current demand.
-    int currentDemandStopReason = Param::GetInt(Param::StopReason);
-    if (currentDemandStopReason == STOP_REASON_NONE && not hardwareInterface_stopChargeRequested())
+    if (Param::GetInt(Param::CurrentDemandStopReason) == STOP_REASON_NONE && not hardwareInterface_stopChargeRequested())
     {
         // If we did not reach CurrentDemand, so go back to Start and try again.
         addToTrace(MOD_PEV, "Did not reach CurrentDemand -> restart");
@@ -1108,11 +1107,17 @@ static void pev_runFsm(void)
     if (pev_state != PEV_STATE_WaitForCurrentDemandResponse) //only in currentDemand we have meaningful current values
         Param::SetInt(Param::EvseCurrent, 0);
 
+    bool stop = false;
     if (pev_isTooLong())
     {
-        const char* label = pevSttLabels[pev_state];
-        addToTrace(MOD_PEV, "Timeout in state %s", label);
-        pev_enterState(PEV_STATE_SafeShutDown);
+        addToTrace(MOD_PEV, "Timeout in state %s", pevSttLabels[pev_state]);
+        stop = true;
+    }
+
+    if (timeouts[pev_state] > 0 && not tcp_isConnected())
+    {
+        addToTrace(MOD_PEV, "Tcp connection lost in timeoutable state %s", pevSttLabels[pev_state]);
+        stop = true;
     }
 
     if (hardwareInterface_stopChargeRequested()
@@ -1120,9 +1125,18 @@ static void pev_runFsm(void)
         && pev_state < PEV_STATE_WaitForCurrentDemandResponse
         )
     {
-        addToTrace(MOD_PEV, "Stop charging requested before CurrentDemand");
-        pev_enterState(PEV_STATE_SafeShutDown);
+        addToTrace(MOD_PEV, "Stop charging requested before CurrentDemand (%s)", pevSttLabels[pev_state]);
+        stop = true;
     }
+
+    if (stop)
+    {
+        // Make sure we set a stop reason if we pull the rug on CurrentDemand
+        if (pev_state == PEV_STATE_WaitForCurrentDemandResponse && Param::GetInt(Param::CurrentDemandStopReason) == STOP_REASON_NONE)
+            Param::SetInt(Param::CurrentDemandStopReason, STOP_REASON_TIMEOUT);
+
+        pev_enterState(PEV_STATE_SafeShutDown);
+	}
 }
 
 /************ public interfaces *****************************************/
