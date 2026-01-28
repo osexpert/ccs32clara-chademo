@@ -19,8 +19,9 @@ extern global_data _global;
    STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 60) \
    STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 30) \
    STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 5) \
-   STATE_ENTRY(WaitForPowerDeliveryResponse, PowerDelivery, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
+   STATE_ENTRY(WaitForPowerDeliveryOnResponse, PowerDeliveryOn, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
    STATE_ENTRY(WaitForCurrentDemandResponse, CurrentDemand, 5) /* Test with 5s timeout. Just experimental. The specified performance time is 25ms (ISO), the specified timeout 250ms. */\
+   STATE_ENTRY(WaitForPowerDeliveryOffResponse, PowerDeliveryOff, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
    STATE_ENTRY(WaitForCurrentDownAfterStateB, CurrentDown, 60) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
@@ -81,7 +82,6 @@ static pevstates pev_state = PEV_STATE_Start;
 static uint16_t pev_numberOfContractAuthenticationReq;
 static uint16_t pev_numberOfChargeParameterDiscoveryReq;
 static uint16_t pev_numberOfCableCheckReq;
-static bool pev_wasPowerDeliveryRequestedOn;
 static int EVSEPresentVoltage;
 static int LastChargingVoltage;
 static uint8_t numberOfWeldingDetectionRounds;
@@ -277,7 +277,6 @@ static void pev_sendPreChargeReq(void)
 
 static void pev_sendPowerDeliveryReq(bool isOn)
 {
-    pev_wasPowerDeliveryRequestedOn = isOn;
     if (isOn) {
         // reset if set from previous session
         LastChargingVoltage = 0;
@@ -773,11 +772,10 @@ static void stateFunctionWaitForContactorsClosed(void)
     addToTrace(MOD_PEV, "Contactors assumingly finished closing. Sending PowerDeliveryReq.");
     pev_sendPowerDeliveryReq(true); /* true is ON */
     setCheckpoint(600);
-    pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
+    pev_enterState(PEV_STATE_WaitForPowerDeliveryOnResponse);
 }
 
-
-static void stateFunctionWaitForPowerDeliveryResponse(void)
+static void stateFunctionWaitForPowerDeliveryOnResponse(void)
 {
     if (tcp_rxdataLen > V2GTP_HEADER_SIZE)
     {
@@ -787,66 +785,27 @@ static void stateFunctionWaitForPowerDeliveryResponse(void)
         tcp_rxdataLen = 0; /* mark the input data as "consumed" */
         if (dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed)
         {
-            if (pev_wasPowerDeliveryRequestedOn)
+            if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
             {
-                if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
-                {
-                    addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
-                    setCheckpoint(700);
-                    pev_sendCurrentDemandReq();
-                    pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
-                }
-                else
-                {
-                    // FAILED_PowerDeliveryNotApplied (17) seen in cases where precharge voltage was < 20V less than battery voltage,
-                    // even if precharge is continued and the precharge voltage rised to battery voltage. This is strange
-                    // (not that it is failing, it may create huge inrush current against the charger, when precharge voltage is lower),
-                    // but it is strange that it is not failing during the precharge itself, but during PowerDelivery. This made it harder
-                    // to guess why it failed, but after experimenting, this seems to be the most likely cause.
-                    // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
-                    // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
-                    // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
-                    addToTrace(MOD_PEV, "PowerDelivery failed rc:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
-                    pev_enterState(PEV_STATE_SafeShutDown);
-                }
+                addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
+                setCheckpoint(700);
+                pev_sendCurrentDemandReq();
+                pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
             }
             else
             {
-                /* We requested "OFF". This is while the charging session is ending.
-                When we received this response, the charger had up to 1.5s time to ramp down
-                the current. On Compleo, there are really 1.5s until we get this response.
-                See https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
-                setCheckpoint(810);
-                /* set the CP line to B */
-                hardwareInterface_setStateB(); /* ISO Figure 107: The PEV shall set stateB after receiving PowerDeliveryRes and before WeldingDetectionReq */
-                addToTrace(MOD_PEV, "Giving the charger some time to detect StateB and ramp down the current.");
-                pev_DelayCycles = 10; /* 15*30ms=450ms for charger shutdown. Should be more than sufficient, because somewhere was a requirement with 20ms between StateB until current is down. The Ioniq uses 300ms. */
-                pev_enterState(PEV_STATE_WaitForCurrentDownAfterStateB); /* We give the charger some time to detect the StateB and fully ramp down the current */
+                // FAILED_PowerDeliveryNotApplied (17) seen in cases where precharge voltage was < 20V less than battery voltage,
+                // even if precharge is continued and the precharge voltage rised to battery voltage. This is strange
+                // (not that it is failing, it may create huge inrush current against the charger, when precharge voltage is lower),
+                // but it is strange that it is not failing during the precharge itself, but during PowerDelivery. This made it harder
+                // to guess why it failed, but after experimenting, this seems to be the most likely cause.
+                // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
+                // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
+                // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
+                addToTrace(MOD_PEV, "PowerDelivery failed rc:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
+                pev_enterState(PEV_STATE_SafeShutDown);
             }
         }
-    }
-}
-
-static void stateFunctionWaitForCurrentDownAfterStateB(void)
-{
-    /* During normal end of the charging session, we have set the StateB, and
-       want to give the charger some time to ramp down the current completely,
-       before we are opening the contactors. */
-    if (pev_DelayCycles > 0) {
-        /* just waiting */
-        pev_DelayCycles--;
-    }
-    else if (chademoInterface_carContactorsOpened()) {
-        /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
-        addToTrace(MOD_PEV, "Starting WeldingDetection");
-        hardwareInterface_setPowerRelayOff();
-        setCheckpoint(850);
-        /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
-        will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
-        some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
-        numberOfWeldingDetectionRounds = 0;
-        pev_sendWeldingDetectionReq();
-        pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
     }
 }
 
@@ -906,7 +865,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 setCheckpoint(800);
                 pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                                 sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
-                pev_enterState(PEV_STATE_WaitForPowerDeliveryResponse);
+                pev_enterState(PEV_STATE_WaitForPowerDeliveryOffResponse);
             }
             else
             {
@@ -927,6 +886,53 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
             }
         }
+    }
+}
+
+static void stateFunctionWaitForPowerDeliveryOffResponse(void)
+{
+    if (tcp_rxdataLen > V2GTP_HEADER_SIZE)
+    {
+        //addToTrace_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
+        routeDecoderInputData();
+        projectExiConnector_decode_DinExiDocument();
+        tcp_rxdataLen = 0; /* mark the input data as "consumed" */
+        if (dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed)
+        {
+            /* We requested "OFF". This is while the charging session is ending.
+            When we received this response, the charger had up to 1.5s time to ramp down
+            the current. On Compleo, there are really 1.5s until we get this response.
+            See https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
+            setCheckpoint(810);
+            /* set the CP line to B */
+            hardwareInterface_setStateB(); /* ISO Figure 107: The PEV shall set stateB after receiving PowerDeliveryRes and before WeldingDetectionReq */
+            addToTrace(MOD_PEV, "Giving the charger some time to detect StateB and ramp down the current.");
+            pev_DelayCycles = 10; /* 15*30ms=450ms for charger shutdown. Should be more than sufficient, because somewhere was a requirement with 20ms between StateB until current is down. The Ioniq uses 300ms. */
+            pev_enterState(PEV_STATE_WaitForCurrentDownAfterStateB); /* We give the charger some time to detect the StateB and fully ramp down the current */
+        }
+    }
+}
+
+static void stateFunctionWaitForCurrentDownAfterStateB(void)
+{
+    /* During normal end of the charging session, we have set the StateB, and
+       want to give the charger some time to ramp down the current completely,
+       before we are opening the contactors. */
+    if (pev_DelayCycles > 0) {
+        /* just waiting */
+        pev_DelayCycles--;
+    }
+    else if (chademoInterface_carContactorsOpened()) {
+        /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
+        addToTrace(MOD_PEV, "Starting WeldingDetection");
+        hardwareInterface_setPowerRelayOff();
+        setCheckpoint(850);
+        /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
+        will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
+        some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
+        numberOfWeldingDetectionRounds = 0;
+        pev_sendWeldingDetectionReq();
+        pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
     }
 }
 

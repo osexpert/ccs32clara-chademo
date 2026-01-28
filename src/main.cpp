@@ -343,7 +343,7 @@ void print_sysinfo()
         // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
         // during charging car, vcc12 seen between 12.19-12.31V
         // Min values seen and working: vcc4:3.78V vcc12:11.46V
-        println("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d led_state:%d",
+        println("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d led_state:%d conn_lvl:%d",
             system_millis / 1000,
             &adc_4_volt, // bypass float to double promotion by passing as reference
             &adc_12_volt, // bypass float to double promotion by passing as reference
@@ -353,7 +353,8 @@ void print_sysinfo()
             _global.powerOffPending,
             powerOffOkCcs,
             powerOffOkCha,
-            _ledState
+            _ledState,
+            connMgr_getLevel()
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;

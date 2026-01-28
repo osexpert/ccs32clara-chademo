@@ -64,7 +64,7 @@ void connMgr_Mainfunction(void)
     if ((connMgr_cycles % 33) == 0)
     {
         /* once per second */
-        connMgr_printDebugInfos();
+        //connMgr_printDebugInfos();
     }
     connMgr_cycles++;
 }
