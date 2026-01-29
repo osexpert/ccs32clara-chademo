@@ -27,7 +27,6 @@ extern global_data _global;
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
    STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0) \
-   STATE_ENTRY(SafeShutDownWaitForContactorsOpen, WaitForContactorsOpen, 0) \
    STATE_ENTRY(Stop, Stop, 0) \
    STATE_ENTRY(End, End, 0)
 
@@ -921,8 +920,9 @@ static void stateFunctionWaitForCurrentDownAfterStateB(void)
     if (pev_DelayCycles > 0) {
         /* just waiting */
         pev_DelayCycles--;
+        return;
     }
-    else if (chademoInterface_carContactorsOpened()) {
+    if (chademoInterface_carContactorsOpened()) {
         /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
         addToTrace(MOD_PEV, "Starting WeldingDetection");
         hardwareInterface_setPowerRelayOff();
@@ -1035,25 +1035,14 @@ static void stateFunctionSafeShutDownWaitForChargerShutdown(void)
     addToTrace(MOD_PEV, "Safe-shutdown-sequence: opening contactors");
     setCheckpoint(1300);
     hardwareInterface_setPowerRelayOff();
-    pev_DelayCycles = 33; /* 33*30ms=1s for opening the contactors */
-    pev_enterState(PEV_STATE_SafeShutDownWaitForContactorsOpen);
-}
-
-static void stateFunctionSafeShutDownWaitForContactorsOpen(void)
-{
-    /* wait state, to give the contactors the time to open. */
-    if (pev_DelayCycles > 0)
-    {
-        pev_DelayCycles--;
-        return;
-    }
-    setCheckpoint(1400);
-    /* This is the end of the safe-shutdown-sequence. */
     pev_enterState(PEV_STATE_Stop);
 }
 
 static void stateFunctionStop(void)
 {
+    /* Set voltage to 0 so rest of system sees safe state */
+    Param::SetInt(Param::EvseVoltage, 0);
+
     hardwareInterface_unlockConnector();
 
     /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
