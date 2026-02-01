@@ -550,21 +550,29 @@ void ChademoCharger::RunStateMachine()
                     // one discharger is observed to mirror asked amps as delivered amps.
                     // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
                     _chargerData.OutputCurrent = 0;
-                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
                     _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                     dischargeUnit = true;
                 }
-            }
-            COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
 
-            // Only count down if charging amps. So if discharging, we can go on forever.
+                if (_chargerData.OutputCurrent == 0)
+                {
+                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
+                }
+                else // charging
+                {
+                    _chargerData.DischargeCurrent = 0;
+                }
+            }
+            // Only count down if charging. So if discharging, we can go on forever.
             // The check for _chargerData.RemainingChargeTimeSec is in the start of the state, but not a problem, its only one cycle behind:-)
-            if (_chargerData.OutputCurrent > 0)
+            else
             {
                 if (_chargerData.RemainingChargeTimeCycles > 0)
                     _chargerData.RemainingChargeTimeCycles--;
                 _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
             }
+
+            COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
         }
     }
     else if (_state == ChargerState::Stopping_Start)
