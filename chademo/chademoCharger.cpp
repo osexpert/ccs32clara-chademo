@@ -563,10 +563,10 @@ void ChademoCharger::RunStateMachine()
                     _chargerData.DischargeCurrent = 0;
                 }
             }
-            // Only count down if charging. So if discharging, we can go on forever.
-            // The check for _chargerData.RemainingChargeTimeSec is in the start of the state, but not a problem, its only one cycle behind:-)
             else
             {
+                // Only count down if charging. So if discharging, we can go on forever.
+                // The check for _chargerData.RemainingChargeTimeSec is in the start of the state, but not a problem, its only one cycle behind:-)
                 if (_chargerData.RemainingChargeTimeCycles > 0)
                     _chargerData.RemainingChargeTimeCycles--;
                 _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
@@ -579,6 +579,9 @@ void ChademoCharger::RunStateMachine()
     {
 		// TODO: what about discharge and chargerData.OutputVoltage/chargerData.DischargeCurrent?
 		// DischargeCurrent will be left at what we set them to last, while OutputVoltage will suddenly rise to Target voltage... Not sure if it matters thou, at this stage.
+		// We have no way to know if any discharge is still happening...so just hope it is not...
+        _chargerData.DischargeCurrent = 0;
+        _chargerData.RemainingDischargeTime = 0;
 
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
@@ -590,8 +593,6 @@ void ChademoCharger::RunStateMachine()
         {
             _chargerData.RemainingChargeTimeCycles = 0;
             _chargerData.RemainingChargeTimeSec = 0;
-
-//            _chargerData.RemainingDischargeTime = 0;
 
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
