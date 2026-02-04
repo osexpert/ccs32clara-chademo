@@ -7,9 +7,6 @@
 #define CHADEMO_SINGLE_SESSION
 #endif
 
-#define ADAPTER_MAX_AMPS 200
-#define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
-
 #define CHA_CYCLE_MS 100
 #define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
 

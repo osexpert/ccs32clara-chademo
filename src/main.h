@@ -26,6 +26,9 @@
 extern "C" {
 #endif
 
+#define ADAPTER_MAX_AMPS 200
+#define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
+
 //#define CHADEMO_STANDALONE_TESTING
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)

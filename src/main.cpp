@@ -596,8 +596,7 @@ extern "C" int main(void)
     nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
     nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
 
-    //Param::SetInt(Param::LockState, LOCK_OPEN); //Assume lock open
-    Param::SetInt(Param::MaxCurrent, 200);
+    Param::SetInt(Param::MaxCurrent, ADAPTER_MAX_AMPS);
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
