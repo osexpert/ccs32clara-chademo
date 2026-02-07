@@ -101,6 +101,18 @@ My relay got stuck for some reason (be warned) and this is why I made this funct
 ### Special mode 4: More logging
 Will log binary Exi-data sent and recieved.
 
+## Logging
+Logging works the same way as the original firmware.
+With the adapter, there is included a debug cable. One end has USB-A, the other end has USB-C. The USB-A end has a label "No for Charge Only Debug Cable". The USB-C end go into the adapter. The USB-A end go into the phone or pc. To connect the USB-A to the phone, use the included USB-A to USB-C adapter cable (most USB-A to USB-C adapter cables will work, mine broke so I use another).
+
+If Android phone, use app "Serial USB Terminal": https://play.google.com/store/apps/details?id=de.kai_morich.serial_usb_terminal.
+The default settings should be fine, but make sure 115200 bauds. When connecting to the phone, it will ask to open the app automatically (at least for me). When in the app, press the connect button (looks like 2 opposing plugs) on the top, right next to the thrash can.
+The thrash can button in the app clear the terminal.
+
+Test: power on the adapter and you should see logging in the terminal. Now you are ready to log when charging.
+
+How to get the log out of the app? Two ways: use top right button [...]->Data->Share and. eg. send as email to yourself. I use [...]->Data->Save, but I needed to adjust the save output location first, to be able to access/find the files in the Files app.
+
 ## Other
 There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hung.
 
@@ -124,21 +136,6 @@ Charging via usb is not part of the software, its only hardware.
 While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, this is the bootloader starting.
 Meaning, charging automatically triggers power on, then adapter will auto power off due to inactivity and then auto powered on again by charging, and this goes on forever.
 Charging via USB is very slow, and can take up to 10 hours if the internal battery is really empty.
-
-## How to get a log
-Logging works the same way as the original firmware.
-With the adapter, there is included a debug cable. One end has usb-a, the other end has usb-c. The usb-a end has a label "No for Charge Only Debug Cable". The usb-c end go into the adapter. The usb-a end go into the phone or pc. To connect the usb-a to the phone, use the included usb-a to usb-c adapter cable (most usb-a to usb-c adapter cables will work, mine broke so I use another).
-
-If android phone, use app "Serial USB Terminal": https://play.google.com/store/apps/details?id=de.kai_morich.serial_usb_terminal.
-The default settings should be fine, but make sure 115200 bauds. When connecting to the phone, it will ask to open the app automatically (at least for me). When in the app, press the connect button on the top, right next to the thrash can (looks like 2 opposing plugs).
-3<
-Test: now when powering on adapter, you should see logging in the terminal. Sometimes the terminal can show unreadable characters, then something is wrong (but never happened to me).
-
-The thrash can button in the app clear the terminal.
-
-Now you can log during a (short) charging (the most interesting stuff happen in the beginning, when the charging starts).
-
-How to get the log out of the app? Several ways, but one is, use top right button [...]->Data->Share and. eg. send as email to yourself:-) I use [...]->Data->Save, but I needed to adjust the save output location first, to be able to access the files.
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
