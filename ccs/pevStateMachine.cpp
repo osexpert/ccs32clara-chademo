@@ -669,6 +669,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
             if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Finished)
             {
                 addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
+                addToTrace(MOD_PEV, "Chademo will now start and then PreCharge will start.");
                 pev_enterState(PEV_STATE_WaitForPreChargeStart);
             }
             else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
@@ -702,7 +703,7 @@ static void stateFunctionWaitForPreChargeStart(void)
     // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 2 :-)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
-    if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
+    if (/*pev_cyclesInState > 66 &&*/ chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
     {
         addToTrace(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);
@@ -1153,12 +1154,19 @@ bool chademoInterface_ccsInEndState() {
 int chademoInterface_ccsChargingVoltageMirrorsTarget() {
     return ChargingVoltageDifferentFromTarget_isSet && not ChargingVoltageDifferentFromTarget;
 }
+//
+//bool chademoInterface_ccsCableCheckDone() {
+//    //This would return true even if SafeShutdown and restart...
+//    //return pev_state > PEV_STATE_WaitForCableCheckResponse;
+//
+//    // ...while this one should only be true when we are in this state, and should allow ccs statemachine restarts
+//    return pev_state == PEV_STATE_WaitForPreChargeStart;
+//}
 
-bool chademoInterface_ccsCableCheckDone() {
+bool chademoInterface_ccsInWaitForPreChargeStart() {
     //This would return true even if SafeShutdown and restart...
     //return pev_state > PEV_STATE_WaitForCableCheckResponse;
 
     // ...while this one should only be true when we are in this state, and should allow ccs statemachine restarts
     return pev_state == PEV_STATE_WaitForPreChargeStart;
 }
-

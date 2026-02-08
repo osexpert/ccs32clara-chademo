@@ -212,7 +212,7 @@ enum class StopReason
     CHARGER_STATE(Start) \
     CHARGER_STATE(WaitForCarSwitchK) \
     CHARGER_STATE(WaitForCarReadyToCharge) \
-    CHARGER_STATE(WaitForPreChargeDone) \
+    CHARGER_STATE(WaitForCcsPreChargeDone) \
     CHARGER_STATE(WaitForCarContactorsClosed) \
     CHARGER_STATE(WaitForCarRequestCurrent) \
     CHARGER_STATE(ChargingLoop) \
@@ -671,7 +671,7 @@ public:
         bool _discovery = true;
 #endif
 
-        bool _preChargeDoneButStalled = false;
+        bool _ccsPreChargeDoneButStalled = false;
         uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
         int _adjustBelowSoc = 0;

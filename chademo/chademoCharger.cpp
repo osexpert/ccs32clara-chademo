@@ -372,7 +372,7 @@ void ChademoCharger::RunStateMachine()
 #ifdef CHADEMO_STANDALONE_TESTING
         if (true)
 #else
-        if (chademoInterface_ccsCableCheckDone())
+        if (chademoInterface_ccsInWaitForPreChargeStart())//chademoInterface_ccsCableCheckDone())
 #endif
         {
             SetState(ChargerState::Start);
@@ -448,7 +448,7 @@ void ChademoCharger::RunStateMachine()
 
                 //PerformInsulationTest();
 
-                SetState(ChargerState::WaitForPreChargeDone);
+                SetState(ChargerState::WaitForCcsPreChargeDone);
             }
         }
         else if (IsTimeoutSec(20))
@@ -456,13 +456,13 @@ void ChademoCharger::RunStateMachine()
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
-    else if (_state == ChargerState::WaitForPreChargeDone)
+    else if (_state == ChargerState::WaitForCcsPreChargeDone)
     {
         // TODO: if we start ccs precharge when we enter WaitForPreChargeDone, how long time can we use, after car is ready to charge and before we set d2, without chademo timeout? I think the spec says 20-22sec.
 		// If chademo allows for enough time, entering state WaitForPreChargeDone could trigger ccs precharge start (allthou we would loose some seconds where things could be run in paralell).
 		// Alternative: add 2 seconds delay between cableCheck done and ccs preCharge start.
 
-        if (_preChargeDoneButStalled)
+        if (_ccsPreChargeDoneButStalled)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
@@ -659,7 +659,7 @@ void ChademoCharger::RunStateMachine()
 
 bool ChademoCharger::PreChargeCompleted()
 {
-    _preChargeDoneButStalled = true;
+    _ccsPreChargeDoneButStalled = true;
     _global.ccsPreChargeDoneButStalledTrigger = true;
 
     if (_precharge_Longer_So_We_Can_Measure_Battery_Voltage)
@@ -703,13 +703,13 @@ extern "C" bool chademoInterface_carContactorsOpened()
 
 bool ChademoCharger::PreChargeCanStart()
 {
-#ifdef CHADEMO_SINGLE_SESSION
+//#ifdef CHADEMO_SINGLE_SESSION
     // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
-    bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
+    bool carReadyToCharge = _state == ChargerState::WaitForCcsPreChargeDone;
     return carReadyToCharge;
-#else
-    return true;
-#endif
+//#else
+  //  return true;
+//#endif
 }
 
 extern "C" bool chademoInterface_preChargeCanStart()
