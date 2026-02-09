@@ -100,7 +100,6 @@ Multimeter test pins fit nicely in the center of Chademo DC pins. The ccs pins o
 My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
 
 ![adapter top 250](https://github.com/user-attachments/assets/5c2cbf2e-dc35-4e17-b48d-6e870a8cd8b1)
-![adapter chademo end 250](https://github.com/user-attachments/assets/4280bf7a-e54e-44fb-ba63-19bde6c79d09)
 
 ### Special mode 4: More logging
 Will log binary Exi-data sent and recieved.
