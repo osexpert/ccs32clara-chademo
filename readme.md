@@ -96,7 +96,11 @@ Extend ccs precharge until after car/adapter contactors are closed, so we may ge
 ### Special mode 3: Contactor unwelding attempt
 The contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the process, to see if the contactor becomes unstuck again.
 What to test: with the adapter buttons up, facing the ccs socket, the bottom right pin will be DC+ (you should see markings). DC+ pin should be always connected to the chademo pin on the same side. The DC- pin on the left goes thru a contactor and should be normally open.
+Multimeter test pins fit nicely in the center of Chademo DC pins. The ccs pins only have metal on the outside.
 My relay got stuck for some reason (be warned) and this is why I made this function, and it helped me, as within a few seconds the relay became unstuck.
+
+![adapter top 250](https://github.com/user-attachments/assets/5c2cbf2e-dc35-4e17-b48d-6e870a8cd8b1)
+![adapter chademo end 250](https://github.com/user-attachments/assets/4280bf7a-e54e-44fb-ba63-19bde6c79d09)
 
 ### Special mode 4: More logging
 Will log binary Exi-data sent and recieved.
