@@ -88,6 +88,8 @@ static uint8_t numberOfWeldingDetectionRounds;
 static bool ChargingVoltageDifferentFromTarget;
 static bool ChargingVoltageDifferentFromTarget_isSet;
 
+static bool CableCheckCompletedTrigger;
+
 /***local function prototypes *****************************************/
 
 static uint8_t pev_isTooLong(void);
@@ -669,6 +671,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
             if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Finished)
             {
                 addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
+                CableCheckCompletedTrigger = true;
                 pev_enterState(PEV_STATE_WaitForPreChargeStart);
             }
             else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
@@ -1045,13 +1048,11 @@ static void stateFunctionStop(void)
 
     hardwareInterface_unlockConnector();
 
-    /* Just stay here, until we get re-initialized after a new SLAC/SDP. */
-
-    // I guess we would want to retry if something failed, but only if we did not reach current demand.
-    if (Param::GetInt(Param::CurrentDemandStopReason) == STOP_REASON_NONE && not hardwareInterface_stopChargeRequested())
+    // I guess we would want to retry if something failed, but only if we did not complete Cablecheck,
+    // because this trigger Chademo start, and we can only start Chademo once.
+    if (not CableCheckCompletedTrigger && not hardwareInterface_stopChargeRequested())
     {
-        // If we did not reach CurrentDemand, so go back to Start and try again.
-        addToTrace(MOD_PEV, "Did not reach CurrentDemand -> restart");
+        addToTrace(MOD_PEV, "Did not complete CableCheck -> restart");
         pev_enterState(PEV_STATE_Start);
         connMgr_restart();
     }
@@ -1126,7 +1127,7 @@ static void pev_runFsm(void)
 
     if (stop)
     {
-        // Make sure we set a stop reason if we pull the rug on CurrentDemand
+        // Make sure we set a CurrentDemandStopReason if we pull the rug on CurrentDemand
         if (pev_state == PEV_STATE_WaitForCurrentDemandResponse && Param::GetInt(Param::CurrentDemandStopReason) == STOP_REASON_NONE)
             Param::SetInt(Param::CurrentDemandStopReason, STOP_REASON_TIMEOUT);
 

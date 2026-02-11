@@ -375,6 +375,7 @@ void ChademoCharger::RunStateMachine()
         if (chademoInterface_ccsCableCheckDone())
 #endif
         {
+            println("[cha] ccs CableCheck done -> start Chademo");
             SetState(ChargerState::Start);
         }
     }
