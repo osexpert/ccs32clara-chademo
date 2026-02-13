@@ -40,13 +40,11 @@ CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/inclu
 # Create a compiler define with the content of the variable. Or, if it does not exist, use replacement value 0.
 EXTRACOMPILERFLAGS := $(shell \
   DATE=$$(date +%Y%m%d); \
-  RUN=$${GITHUB_RUN_NUMBER:-0}; \
-  AF=$${GITHUB_AF:-0}; \
-  if [ "$$AF" -eq 0 ]; then \
-    echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}\\\" -DGITHUB_AF=$${AF}"; \
-  else \
-    echo "-DGITHUB_VERSION=\\\"$${DATE}-$${RUN}-AF$${AF}\\\" -DGITHUB_AF=$${AF}"; \
-  fi \
+  GITHUB_RUN_NUMBER=$${GITHUB_RUN_NUMBER:-0}; \
+  GITHUB_AV=$${GITHUB_AV:-0}; \
+  GITHUB_SS=$${GITHUB_SS:-0}; \
+  GITHUB_V2X=$${GITHUB_V2X:-0}; \
+  echo "-DGITHUB_VERSION=\\\"$${DATE}-$${GITHUB_RUN_NUMBER}$${GITHUB_APPEND_VER}\\\" -DGITHUB_AV=$${GITHUB_AV} -DGITHUB_SS=$${GITHUB_SS} -DGITHUB_V2X=$${GITHUB_V2X}"; \
 )
 
 LDSCRIPT	  = linker.ld

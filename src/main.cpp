@@ -585,6 +585,11 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
+#if GITHUB_V2X == 1
+    print("V2X build -> enable discharge");
+    chademoCharger->EnableDischarge();
+#endif
+
     LedBlinker lb;
     ledBlinker = &lb;
 

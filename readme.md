@@ -207,10 +207,10 @@ Every commit is built automatically and can be downloaded here, as artifact of a
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
 
 ### Alternative function builds
-There are builds named AF#. These are alternative function builds. Currently, these AF-builds exist:
-- **AF1:** For target voltage 410v, use nominal voltage 380v instead of 355v. AF1 should be a better match for Leaf's with 20-30kwh battery.
-- **AF10**: Use a single chademo session, may work better with eg. Lexus.
-- **AF11**: Combination of **AF1** and **AF10**. May work better with Leaf ZE0 or AZE0 when using discharge mode.
+There are builds with modifiers after the version number. These are alternative function builds. Currently, these modifiers exist:
+- **AV1:** For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf's with 20-30kwh battery.
+- **SS**: Use a single chademo session, may work better with eg. Lexus.
+- **V2X**: Permamently activated discharge mode. Should work equally well for charging, but some cars may not like it (speculation).
 
 ## Building
 If you want to compile the software from scratch, you can follow these instructions

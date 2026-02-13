@@ -3,7 +3,7 @@
 #include <type_traits>
 #include "printf.h"
 
-#if defined(GITHUB_AF) && GITHUB_AF >= 10
+#if GITHUB_SS == 1
 #define CHADEMO_SINGLE_SESSION
 #endif
 

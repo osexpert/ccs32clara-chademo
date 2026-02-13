@@ -312,7 +312,7 @@ void ChademoCharger::SetBatteryVoltOverrides()
     }
     else if (_carData.TargetVoltage == 410)
     {
-        if (_global.alternative_function % 10 == 1) // matches 1, 11, 21, etc.
+        if (_global.alternative_voltage == 1)
         {
             // Leaf 20-30
             _nomVoltOverride = 380;
@@ -328,8 +328,8 @@ void ChademoCharger::SetBatteryVoltOverrides()
     }
 
     if (known)
-        println("[cha] AF%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
-            _global.alternative_function, 
+        println("[cha] AV%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
+            _global.alternative_voltage, 
             _carData.TargetVoltage, 
             _nomVoltOverride, 
             _adjustBelowSoc,

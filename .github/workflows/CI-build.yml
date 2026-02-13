@@ -49,7 +49,7 @@ jobs:
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
       # --- Normal build ---
-      - name: Build normal firmware
+      - name: Build default firmware
         run: |
           make clean all
 
@@ -58,45 +58,48 @@ jobs:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}
           path: My407ccs2chademo.bin
 
-      # --- AF1 build ---
-      - name: Build AF1 firmware
+      # --- AV1 build ---
+      - name: Build AV1 firmware
         run: |
-          export GITHUB_AF=1
+          export GITHUB_AV=1
+          export GITHUB_APPEND_VER=-AV1
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF1
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1
           path: My407ccs2chademo.bin
 
-      # --- AF10 build ---
-      - name: Build AF10 firmware
+      # --- SS build ---
+      - name: Build SS firmware
         run: |
-          export GITHUB_AF=10
+          export GITHUB_SS=1
+          export GITHUB_APPEND_VER=-SS
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF10
-          path: My407ccs2chademo.bin
-
-      # --- AF11 build ---
-      - name: Build AF11 firmware
-        run: |
-          export GITHUB_AF=11
-          make clean all
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AF11
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-SS
           path: My407ccs2chademo.bin
           
+      # --- V2X build ---
+      - name: Build V2X firmware
+        run: |
+          export GITHUB_V2X=1
+          export GITHUB_APPEND_VER=-V2X
+          make clean all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X
+          path: My407ccs2chademo.bin
+
       - name: Add info to summary
         run: |
           echo "### Alternative function builds" >> $GITHUB_STEP_SUMMARY
-          echo "- **AF1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AF1 should be a better match for Leaf with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
-          echo "- **AF10**: Use a single chademo session, may work better with eg. Lexus." >> $GITHUB_STEP_SUMMARY
-          echo "- **AF11**: Combination of **AF1** and **AF10**. May work better with Leaf ZE0 or AZE0 when using discharge mode." >> $GITHUB_STEP_SUMMARY
+          echo "- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
+          echo "- **SS**: Use a single chademo session, may work better with eg. Lexus." >> $GITHUB_STEP_SUMMARY
+          echo "- **V2X**: Permamently activated discharge mode. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       
 # Unit tests are currently broken so don't build and run them for now
