@@ -586,7 +586,7 @@ extern "C" int main(void)
     chademoCharger = &cc;
 
 #if GITHUB_V2X == 1
-    print("V2X build -> enable discharge");
+    println("V2X build -> enable discharge");
     chademoCharger->EnableDischarge();
 #endif
 
