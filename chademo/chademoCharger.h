@@ -583,9 +583,7 @@ struct ChargerData
 
     uint8_t DischargeCurrent;
 
-    // just some value seen in can logs.. seen 10, 15. Some say car will allow 10A deviation from what you say? So if we always say we use 10A, we can use anything between 0-20A? 
-    // For any current above 20A then need real measured amps.
-    uint8_t MaxDischargeCurrent = 20; 
+    uint8_t MaxDischargeCurrent;
     uint16_t RemainingDischargeTime;
 
     //bool DischargeEnabled = false;// safe to have this on for all?
@@ -677,7 +675,8 @@ public:
         int _adjustBelowSoc = 0;
         float _adjustBelowFactor = 0.0f;
         bool _dischargeEnabled = false;
-        bool _dischargeUnit = false;
+        bool _isDischargeUnit = false;
+        bool _isDischarging = false;
         bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage

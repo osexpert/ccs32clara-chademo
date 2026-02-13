@@ -516,6 +516,19 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
+        if (_chargerData.OutputCurrent > 0)
+        {
+            if (_chargerData.RemainingChargeTimeCycles > 0)
+                _chargerData.RemainingChargeTimeCycles--;
+
+            // If discharge enabled, make sure there is 5 sec. left, so we can go on forever.
+            // This time can be seen inside the car? So count it down as long as it does not interfere with our plans (the plan is to stop countdown at 5 seconds).
+            if (_dischargeEnabled && _chargerData.RemainingChargeTimeCycles < (CHA_CYCLES_PER_SEC * 5))
+                _chargerData.RemainingChargeTimeCycles = (CHA_CYCLES_PER_SEC * 5);
+
+            _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
+        }
+
         StopReason stopReason = StopReason::NONE;
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
@@ -534,46 +547,98 @@ void ChademoCharger::RunStateMachine()
         {
             SetState(ChargerState::Stopping_Start, stopReason);
         }
-        else
+        else if (_dischargeEnabled)
         {
-            bool dischargeUnit = false;
-            // Discharge is opt-in, so if discharge is activated, don't care about checking if car is compatible or not (if it works, it works).
-            // Problem: some buggy cars seems to set and unset this flag randomly. So just ignore it and do our thing regardless.
-            // If the car don't support it, it does not matter if we send it or not, it will not work in any case:-)
-            if (_dischargeEnabled)// && has_flag(_carData.Status, CarStatus::DISCHARGE_COMPATIBLE))
+            // Static variables to keep state between cycles
+            static int zeroOutputCurrentCycles = 0;
+            static int holdCounter = 0;
+            static bool ampsDirectionFwd = true;
+
+            bool isDischargeUnit = false;
+            bool isDischarging = false;
+            if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
-				// If we say we have discharging left to do, behaviour change completely. No timeout if not charging/discharging amps (allow trickle charge/discharge with long periods of amps not flowing in any direction).
-    	        _chargerData.RemainingDischargeTime = 5;
-
-                // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
-                if (chademoInterface_ccsChargingVoltageMirrorsTarget())
-                {
-                    // one discharger is observed to mirror asked amps as delivered amps.
-                    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
-                    _chargerData.OutputCurrent = 0;
-                    _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
-                    dischargeUnit = true;
-                }
-
-                if (_chargerData.OutputCurrent == 0)
-                {
-                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent); // use 10 (or less). Supposedly the allowed deviation is 10, so this should allow for discharging 0-20 amps.
-                }
-                else // charging
-                {
-                    _chargerData.DischargeCurrent = 0;
-                }
+	            // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
+                // one discharger is observed to mirror asked amps as delivered amps.
+                // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
+                _chargerData.OutputCurrent = 0;
+                _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
+                isDischargeUnit = true;
+                isDischarging = true;
+            }
+            else if (_chargerData.OutputCurrent == 0
+                && (zeroOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 3) || zeroOutputCurrentCycles++ > (CHA_CYCLES_PER_SEC * 3)) // Weird logic? Want to stop counting when reached, to avoid overflow.
+                )
+            {
+                // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
+                // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
+                isDischarging = true;
             }
             else
             {
-                // Only count down if charging. So if discharging, we can go on forever.
-                // The check for _chargerData.RemainingChargeTimeSec is in the start of the state, but not a problem, its only one cycle behind:-)
-                if (_chargerData.RemainingChargeTimeCycles > 0)
-                    _chargerData.RemainingChargeTimeCycles--;
-                _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
+                zeroOutputCurrentCycles = 0;
             }
 
-            COMPARE_SET(_dischargeUnit, dischargeUnit, "[cha] DischargeUnit %d -> %d");
+            COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
+            COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
+
+            if (isDischarging)
+            {
+                _chargerData.RemainingDischargeTime = 5; // seconds?
+
+                const uint8_t step = 10;
+                const uint8_t margin = 10;
+                const uint8_t holdCycles = 5;
+
+                uint8_t maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
+
+                uint8_t minWindow = min(margin, maxDischargeAmps);
+                uint8_t maxWindow = (maxDischargeAmps > 2 * margin) ? (maxDischargeAmps - margin) : maxDischargeAmps;
+
+                int dischargeAmps = _chargerData.DischargeCurrent;
+
+                // Hold current step
+                if (holdCounter < holdCycles)
+                {
+                    holdCounter++;
+                }
+                else
+                {
+                    holdCounter = 0; // reset hold counter
+
+                    // Move one step in current direction
+                    if (ampsDirectionFwd)
+                    {
+                        dischargeAmps += step;
+                        if (dischargeAmps >= maxWindow)
+                        {
+                            dischargeAmps = maxWindow;
+                            ampsDirectionFwd = false;   // reverse
+                        }
+                    }
+                    else // bwd
+                    {
+                        dischargeAmps -= step;
+                        if (dischargeAmps <= minWindow)
+                        {
+                            dischargeAmps = minWindow;
+                            ampsDirectionFwd = true;  // reverse
+                        }
+
+                    }
+                }
+
+                _chargerData.DischargeCurrent = (uint8_t)dischargeAmps;
+            }
+            else
+            {
+                _chargerData.DischargeCurrent = 0;
+
+                ampsDirectionFwd = true;
+                holdCounter = 0;
+            }
+
+
         }
     }
     else if (_state == ChargerState::Stopping_Start)
@@ -764,6 +829,8 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     {
         _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
+
+    _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS, _chargerData.MaxAvailableOutputCurrent);
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()

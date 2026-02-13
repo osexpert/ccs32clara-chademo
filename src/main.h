@@ -29,6 +29,10 @@ extern "C" {
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
+// just some value seen in can logs.. seen 10, 15. Some say car will allow 10A deviation from what you say? So if we always say we use 10A, we can use anything between 0-20A? 
+// For any current above 20A then need real measured amps.
+#define MAX_DISCHARGE_AMPS 20
+
 //#define CHADEMO_STANDALONE_TESTING
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
