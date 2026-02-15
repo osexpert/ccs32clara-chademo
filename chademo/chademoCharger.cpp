@@ -442,8 +442,6 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
-                _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
-
                 LockChargingPlug();
                 set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
@@ -479,28 +477,25 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // chademo 0.9 (and earlier) did not have the flag, use RequestCurrent as trigger
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.RequestCurrent > _idleRequestCurrent)
+            // chademo 0.9 (and earlier) did not have the flag, use 2 seconds...
+            // Also: https://github.com/osexpert/ccs32clara-chademo/issues/50#issuecomment-3877240606 some weird stuff. ProtocolNumber 2, but 102.5.3 is never cleared?
+            || HasElapsedSec(2) // problem: if some car follow spec and close _after_ 2 seconds, it will now probably fail, because it will sense voltage at the inlet. It seems unlikely that a car would close this slow thou.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
-			println("[cha] Car contactors closed");
+			println("[cha] Car contactors assumingly closed");
             _carContactorsClosed = true;
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarRequestCurrent);
         }
-        else if (IsTimeoutSec(20))
-        {
-            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
-        }
     }
     else if (_state == ChargerState::WaitForCarRequestCurrent)
     {
-        if (_carData.RequestCurrent > _idleRequestCurrent) // 1-2 sec after 102.5.3
+        if (_carData.RequestCurrent > 0) // 1-2 sec after 102.5.3
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             // Spec: set these flags <= 0.5sec after RequestCurrent > 0
@@ -643,6 +638,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_Start)
     {
+        // If this flag is already set here, we can not trust it later...
+        _weldingDetectionDoneFlagSetInStoppingStart = has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE);
+
 		// TODO: what about discharge and chargerData.OutputVoltage/chargerData.DischargeCurrent?
 		// DischargeCurrent will be left at what we set them to last, while OutputVoltage will suddenly rise to Target voltage... Not sure if it matters thou, at this stage.
 		// We have no way to know if any discharge is still happening...so just hope it is not...
@@ -667,9 +665,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // Spec: car should perform WD within 4 seconds after amps drops <= 5
-            || IsTimeoutSec(10))
+        // We can only trust the flag if it was not set earlier
+        if ((not _weldingDetectionDoneFlagSetInStoppingStart && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
+            || HasElapsedSec(4)) // Spec: car should perform WD within 4 seconds after amps drops <= 5
         {
             // welding detection done & car contactors open
             _carContactorsClosed = false;

@@ -662,6 +662,7 @@ public:
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
         bool _carContactorsClosed = false;
+        bool _weldingDetectionDoneFlagSetInStoppingStart = false;
 
 #ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;
@@ -670,7 +671,6 @@ public:
 #endif
 
         bool _preChargeDoneButStalled = false;
-        uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
         int _adjustBelowSoc = 0;
         float _adjustBelowFactor = 0.0f;
