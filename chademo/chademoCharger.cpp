@@ -771,8 +771,13 @@ bool ChademoCharger::PreChargeCanStart()
 {
 #ifdef CHADEMO_SINGLE_SESSION
     // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
-    bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
-    return carReadyToCharge;
+    //bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
+    //return carReadyToCharge;
+
+    // To avoid waiting too long before sending first PreChargeReq, do it after switch(k), to save a second. ccs may not like waiting too long between CableCheck and first PreChargeReq.
+    // SOC won't change much between switch(k) and ReadyToCharge anyways, max 2%.
+    bool carSwitchK = _state == ChargerState::WaitForCarReadyToCharge;
+    return carSwitchK;
 #else
     return true;
 #endif

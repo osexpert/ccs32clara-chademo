@@ -15,13 +15,13 @@ constexpr T min(T a, T b) {
     return (a < b) ? a : b;
 }
 
-inline uint8_t clampToUint8(uint16_t value) {
-    return static_cast<uint8_t>(value > 0xFF ? 0xFF : value);
-}
-
 template<typename T>
 constexpr T max(T a, T b) {
     return (a > b) ? a : b;
+}
+
+inline uint8_t clampToUint8(uint16_t value) {
+    return static_cast<uint8_t>(value > 0xFF ? 0xFF : value);
 }
 
 template <typename E>

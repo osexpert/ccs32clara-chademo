@@ -705,6 +705,9 @@ static void stateFunctionWaitForPreChargeStart(void)
     // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 2 :-)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
+    // Gemini: 2 seconds is borderline and would have used 1.5s / 50 cycles...look out for FAILED_SequenceError or FIN's...
+    // Grok: < 10s is very safe
+    // Chatgpt: 2s borderline, 5 sec absolute max.
     if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
     {
         addToTrace(MOD_PEV, "Will send PreChargeReq");
