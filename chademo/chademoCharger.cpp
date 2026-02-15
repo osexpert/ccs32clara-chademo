@@ -550,7 +550,7 @@ void ChademoCharger::RunStateMachine()
         else if (_dischargeEnabled)
         {
             // Static variables to keep state between cycles
-            static int zeroOutputCurrentCycles = 0;
+            static int zeroOutputAmpsCycles = 0;
             static int holdCounter = 0;
             static bool ampsDirectionFwd = true;
 
@@ -567,7 +567,7 @@ void ChademoCharger::RunStateMachine()
                 isDischarging = true;
             }
             else if (_chargerData.OutputCurrent == 0
-                && (zeroOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 3) || zeroOutputCurrentCycles++ > (CHA_CYCLES_PER_SEC * 3)) // Weird logic? Want to stop counting when reached, to avoid overflow.
+                && (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3) || zeroOutputAmpsCycles++ > (CHA_CYCLES_PER_SEC * 3)) // Weird logic? Want to stop counting when reached, to avoid overflow.
                 )
             {
                 // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
@@ -576,7 +576,7 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
-                zeroOutputCurrentCycles = 0;
+                zeroOutputAmpsCycles = 0;
             }
 
             COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
