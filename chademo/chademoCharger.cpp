@@ -442,8 +442,6 @@ void ChademoCharger::RunStateMachine()
             }
             else
             {
-                _idleRequestCurrent = _carData.RequestCurrent; // iMiev ask for 1A from the start
-
                 LockChargingPlug();
                 set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
@@ -471,7 +469,7 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
-        else if (IsTimeoutSec(30))
+        else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
@@ -479,28 +477,28 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // chademo 0.9 (and earlier) did not have the flag, use RequestCurrent as trigger
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && _carData.RequestCurrent > _idleRequestCurrent)
+            // chademo 0.9 (and earlier) did not have the flag, wait 2 seconds (spec: compliance time 2 seconds). TODO: Gemini suggest maybe to use 3 seconds, for slower cars.
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(2))
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
-			println("[cha] Car contactors closed");
+			println("[cha] Car contactors assumingly closed");
             _carContactorsClosed = true;
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarRequestCurrent);
         }
-        else if (IsTimeoutSec(20))
+        else if (IsTimeoutSec(10))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
     else if (_state == ChargerState::WaitForCarRequestCurrent)
     {
-        if (_carData.RequestCurrent > _idleRequestCurrent) // 1-2 sec after 102.5.3
+        if (_carData.RequestCurrent > 0) // 1-2 sec after 102.5.3
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             // Spec: set these flags <= 0.5sec after RequestCurrent > 0
@@ -509,7 +507,7 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::ChargingLoop);
         }
-        else if (IsTimeoutSec(20))
+        else if (IsTimeoutSec(10))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }

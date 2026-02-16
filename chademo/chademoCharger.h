@@ -670,7 +670,6 @@ public:
 #endif
 
         bool _preChargeDoneButStalled = false;
-        uint8_t _idleRequestCurrent = 0;
         int _nomVoltOverride = 0;
         int _adjustBelowSoc = 0;
         float _adjustBelowFactor = 0.0f;
