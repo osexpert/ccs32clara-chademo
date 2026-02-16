@@ -485,7 +485,7 @@ void ChademoCharger::RunStateMachine()
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
-			println("[cha] Car contactors assumingly closed");
+			println("[cha] Car contactors closed");
             _carContactorsClosed = true;
             CloseAdapterContactor();
 
@@ -1086,4 +1086,5 @@ bool ChademoCharger::IsPowerOffOk()
 {
     return not _chargingPlugLocked;
 }
+
 
