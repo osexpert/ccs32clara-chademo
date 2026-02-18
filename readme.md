@@ -210,7 +210,7 @@ Releases are made less often and the difference is, a release has been tested in
 There are builds with modifiers after the version number. These are alternative function builds. Currently, these modifiers exist:
 - **AV1:** For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf's with 20-30kwh battery.
 - **SS**: Use a single chademo session, may work better with eg. Lexus.
-- **V2X**: Discharge support permanently activated. Should work equally well for charging, but some cars may not like it (speculation).
+- **V2X**: Discharge support permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
 
 ## Building
 If you want to compile the software from scratch, you can follow these instructions

@@ -641,12 +641,6 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_Start)
     {
-		// TODO: what about discharge and chargerData.OutputVoltage/chargerData.DischargeCurrent?
-		// DischargeCurrent will be left at what we set them to last, while OutputVoltage will suddenly rise to Target voltage... Not sure if it matters thou, at this stage.
-		// We have no way to know if any discharge is still happening...so just hope it is not...
-        _chargerData.DischargeCurrent = 0;
-        _chargerData.RemainingDischargeTime = 0;
-
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
         SetState(ChargerState::Stopping_WaitForLowAmps);
@@ -657,6 +651,12 @@ void ChademoCharger::RunStateMachine()
         {
             _chargerData.RemainingChargeTimeCycles = 0;
             _chargerData.RemainingChargeTimeSec = 0;
+
+            // TODO: what about discharge and chargerData.OutputVoltage/chargerData.DischargeCurrent?
+            // DischargeCurrent will be left at what we set them to last, while OutputVoltage will suddenly rise to Target voltage... Not sure if it matters thou, at this stage.
+            // We have no way to know if any discharge is still happening...so just hope it is not...
+            _chargerData.DischargeCurrent = 0;
+            _chargerData.RemainingDischargeTime = 0;
 
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 

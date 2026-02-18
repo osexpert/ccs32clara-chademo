@@ -99,14 +99,5 @@ jobs:
           echo "### Alternative function builds" >> $GITHUB_STEP_SUMMARY
           echo "- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
           echo "- **SS**: Use a single chademo session, may work better with eg. Lexus." >> $GITHUB_STEP_SUMMARY
-          echo "- **V2X**: Discharge support permanently activated. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
+          echo "- **V2X**: Discharge support permanently enabled. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-      
-# Unit tests are currently broken so don't build and run them for now
-#- name: Build unit tests on host
-#        run: |
-#          make -C test
-#
-#      - name: Run unit tests on host
-#        run: |
-#          test/test_sine
