@@ -180,8 +180,20 @@ void ChademoCharger::HandlePendingCarMessages()
         }
 
         // soc and the constant both unstable before switch(k)
-        if (_switch_k)
+#ifdef CHADEMO_SINGLE_SESSION
+        if (_carData.Switch_k) // cut corners to save time, so we can start ccs preCharge a bit faster
+#else
+        if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
+#endif
         {
+            // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
+            // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
+            if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
+            {
+                println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
+                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
+            }
+
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else
@@ -194,7 +206,11 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.SocPercent = 100;
             }
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _nomVoltOverride, _adjustBelowSoc, _adjustBelowFactor);
+            // now that TargetVoltage is stable, set overrides, if any
+            SetBatteryVoltOverridesOnce();
+
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _carData.NomVoltOverride, _carData.AdjustBelowSoc, _carData.AdjustBelowFactor);
+            _carData.VoltsReady = true;
         }
 
         _msg102_recieved = true;
@@ -243,7 +259,7 @@ bool ChademoCharger::IsDiscoveryCompleted()
 void ChademoCharger::Run()
 {
     // HandlePendingMessages uses _switch_k
-    COMPARE_SET(_switch_k, GetSwitchK(), "[cha] switch(k) %d -> %d");
+    COMPARE_SET(_carData.Switch_k, GetSwitchK(), "[cha] switch(k) %d -> %d");
 
     SetChargerDataFromCcsParams();
     HandlePendingCarMessages();
@@ -295,19 +311,74 @@ bool ChademoCharger::HasElapsedSec(uint16_t sec)
 //    return result;
 //}
 
-void ChademoCharger::SetBatteryVoltOverrides()
+// Simulate discharge amps waveform (but if max amps is 20A, it will always be max 10:-)
+// But if we ever need to go higher than max 20A, then this may work:-)
+uint8_t ChademoCharger::GetSimulatedDischargeAmps()
 {
+    static int holdCounter = 0;
+    static bool ampsDirectionFwd = true;
+
+    const int step = 10;
+    const int margin = 10;
+    const int holdCycles = 5;
+
+    int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
+
+    int minWindow = min(margin, maxDischargeAmps);
+    int maxWindow = (maxDischargeAmps > 2 * margin) ? (maxDischargeAmps - margin) : maxDischargeAmps;
+
+    int dischargeAmps = _chargerData.DischargeCurrent;
+
+    if (dischargeAmps == 0)
+    {
+        // reset
+        ampsDirectionFwd = true;
+        holdCounter = 0;
+    }
+
+    // Hold current step
+    if (holdCounter < holdCycles)
+    {
+        holdCounter++;
+    }
+    else
+    {
+        holdCounter = 0; // reset hold counter
+
+        // Move one step in current direction
+        if (ampsDirectionFwd)
+        {
+            dischargeAmps = min(dischargeAmps + step, maxWindow);
+            if (dischargeAmps >= maxWindow)
+                ampsDirectionFwd = false;   // reverse
+        }
+        else // bwd
+        {
+            dischargeAmps = max(dischargeAmps - step, minWindow);
+            if (dischargeAmps <= minWindow)
+                ampsDirectionFwd = true;  // reverse
+        }
+    }
+
+    return (uint8_t)dischargeAmps;
+}
+
+void ChademoCharger::SetBatteryVoltOverridesOnce()
+{
+    if (_carData.OverridesJudged)
+        return;
+
     bool known = false;
 
     // Set for some known targets
     if (_carData.TargetVoltage == 370)
     {
-        _nomVoltOverride = 330; // iMiev
+        _carData.NomVoltOverride = 330; // iMiev
         known = true;
     }
     else if (_carData.TargetVoltage == 450)
     {
-        _nomVoltOverride = 400; // BMW i5 M60 
+        _carData.NomVoltOverride = 400; // BMW i5 M60 
         known = true;
     }
     else if (_carData.TargetVoltage == 410)
@@ -315,14 +386,14 @@ void ChademoCharger::SetBatteryVoltOverrides()
         if (_global.alternative_voltage == 1)
         {
             // Leaf 20-30
-            _nomVoltOverride = 380;
-            _adjustBelowSoc = 29;
-            _adjustBelowFactor = 0.7f;
+            _carData.NomVoltOverride = 380;
+            _carData.AdjustBelowSoc = 29;
+            _carData.AdjustBelowFactor = 0.7f;
             known = true;
         }
         else // default
         {
-            _nomVoltOverride = 355; // Leaf 40+
+            _carData.NomVoltOverride = 355; // Leaf 40+
             known = true;
         }
     }
@@ -331,10 +402,12 @@ void ChademoCharger::SetBatteryVoltOverrides()
         println("[cha] AV%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
             _global.alternative_voltage, 
             _carData.TargetVoltage, 
-            _nomVoltOverride, 
-            _adjustBelowSoc,
-            &_adjustBelowFactor // bypass float to double promotion by passing as reference
+            _carData.NomVoltOverride,
+            _carData.AdjustBelowSoc,
+            &_carData.AdjustBelowFactor // bypass float to double promotion by passing as reference
         );
+
+    _carData.OverridesJudged = true;
 }
 
 void ChademoCharger::RunStateMachine()
@@ -390,9 +463,9 @@ void ChademoCharger::RunStateMachine()
 
         SetSwitchD1(true); // will trigger car sending CAN
 
-        SetState(ChargerState::WaitForCarSwitchK);
+        SetState(ChargerState::WaitForCarReadyToCharge);
     }
-    else if (_state == ChargerState::WaitForCarSwitchK)
+    else if (_state == ChargerState::WaitForCarReadyToCharge)
     {
         /* may be updated until switch(k) is on:
         100.4+5 max volt
@@ -403,35 +476,10 @@ void ChademoCharger::RunStateMachine()
         102.1+2 target volt
         */
 
-        if (_switch_k)
+        // will take a few seconds (approx 3) from D1 until car READY_TO_CHARGE
+        // will take approx/max one second after _switch_k until car READY_TO_CHARGE
+        if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
         {
-            // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
-            // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
-            if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
-            {
-                println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
-                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
-            }
-            else
-            {
-                // now that TargetVoltage is stable, set overrides, if any
-                SetBatteryVoltOverrides();
-
-                SetState(ChargerState::WaitForCarReadyToCharge);
-            }
-        }
-        else if (IsTimeoutSec(20))
-        {
-            SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
-        }
-    }
-    else if (_state == ChargerState::WaitForCarReadyToCharge)
-    {
-        // will take a few seconds (ca. 3) from D1 until car is ready
-        // will take approx one second after _switch_k
-        if (has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
-        {
-            // SOC may change a couple of % even after SwitchK, so SOC is not completely stable until READY_TO_CHARGE. If it was not for this, we could end discovery at SwitchK.
             if (_discovery)
             {
                 SetSwitchD1(false); // PS: even if we set to false, car may continue to send 102 for a short time
@@ -445,12 +493,11 @@ void ChademoCharger::RunStateMachine()
                 LockChargingPlug();
                 set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
-                //PerformInsulationTest();
-
                 SetState(ChargerState::WaitForPreChargeDone);
             }
         }
-        else if (IsTimeoutSec(20))
+        // Spec: max time from D1 set, to switch(k) and READY_TO_CHARGE set is 8 seconds.
+        else if (IsTimeoutSec(10))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
@@ -486,11 +533,12 @@ void ChademoCharger::RunStateMachine()
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
 			println("[cha] Car contactors closed");
-            _carContactorsClosed = true;
+            _carData.ContactorsClosed = true;
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarRequestCurrent);
         }
+        // Spec: max 4 seconds from set D2 to CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE cleared
         else if (IsTimeoutSec(10))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
@@ -507,6 +555,7 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::ChargingLoop);
         }
+        // Spec: max 4 seconds from CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE cleared to RequestCurrent > 0
         else if (IsTimeoutSec(10))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
@@ -532,7 +581,7 @@ void ChademoCharger::RunStateMachine()
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reasons
         if (_carData.CyclesSinceCarLastRequestCurrent++ > LAST_REQUEST_CURRENT_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_REQUEST_CURRENT_TIMEOUT);
-        if (not _switch_k) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
+        if (not _carData.Switch_k) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
         if (not has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
@@ -547,10 +596,7 @@ void ChademoCharger::RunStateMachine()
         }
         else if (_dischargeEnabled)
         {
-            // Static variables to keep state between cycles
             static int zeroOutputAmpsCycles = 0;
-            static int holdCounter = 0;
-            static bool ampsDirectionFwd = true;
 
             bool isDischargeUnit = false;
             bool isDischarging = false;
@@ -583,60 +629,13 @@ void ChademoCharger::RunStateMachine()
             if (isDischarging)
             {
                 _chargerData.RemainingDischargeTime = 5; // seconds?
-
-                const uint8_t step = 10;
-                const uint8_t margin = 10;
-                const uint8_t holdCycles = 5;
-
-                uint8_t maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
-
-                uint8_t minWindow = min(margin, maxDischargeAmps);
-                uint8_t maxWindow = (maxDischargeAmps > 2 * margin) ? (maxDischargeAmps - margin) : maxDischargeAmps;
-
-                int dischargeAmps = _chargerData.DischargeCurrent;
-
-                // Hold current step
-                if (holdCounter < holdCycles)
-                {
-                    holdCounter++;
-                }
-                else
-                {
-                    holdCounter = 0; // reset hold counter
-
-                    // Move one step in current direction
-                    if (ampsDirectionFwd)
-                    {
-                        dischargeAmps += step;
-                        if (dischargeAmps >= maxWindow)
-                        {
-                            dischargeAmps = maxWindow;
-                            ampsDirectionFwd = false;   // reverse
-                        }
-                    }
-                    else // bwd
-                    {
-                        dischargeAmps -= step;
-                        if (dischargeAmps <= minWindow)
-                        {
-                            dischargeAmps = minWindow;
-                            ampsDirectionFwd = true;  // reverse
-                        }
-
-                    }
-                }
-
-                _chargerData.DischargeCurrent = (uint8_t)dischargeAmps;
+                _chargerData.DischargeCurrent = GetSimulatedDischargeAmps();
             }
             else
             {
+                // keep RemainingDischargeTime at 5, discharge indefinitely
                 _chargerData.DischargeCurrent = 0;
-
-                ampsDirectionFwd = true;
-                holdCounter = 0;
             }
-
-
         }
     }
     else if (_state == ChargerState::Stopping_Start)
@@ -665,12 +664,12 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)
+        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
             || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // Spec: car should perform WD within 4 seconds after amps drops <= 5
-            || IsTimeoutSec(10))
+            || IsTimeoutSec(10)) // Chademo 1.0 spec: max 10 seconds
         {
             // welding detection done & car contactors open
-            _carContactorsClosed = false;
+            _carData.ContactorsClosed = false;
             println("[cha] Car contactors opened");
 
             SetSwitchD2(false);
@@ -680,7 +679,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
-        // cha spec says <= 10 but we need to play by ccs rules here. Seen some chargers never drop below 28v. Clara uses 40.
+        // cha spec says <= 10V but we need to play by ccs rules here. Seen some chargers never drop below 28V. Clara uses 40V.
         if (_chargerData.OutputVoltage <= 40 || IsTimeoutSec(10))
         {
             OpenAdapterContactor();
@@ -744,9 +743,9 @@ bool ChademoCharger::PreChargeCompleted()
     else
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
-        if (not _carContactorsClosed)
+        if (not _carData.ContactorsClosed)
             println("[cha] PreCharge stalled until car contactors closed");
-        return _carContactorsClosed;
+        return _carData.ContactorsClosed;
     }
 }
 
@@ -757,7 +756,7 @@ extern "C" bool chademoInterface_preChargeCompleted()
 
 bool ChademoCharger::CarContactorsOpened()
 {
-    return not _carContactorsClosed;
+    return not _carData.ContactorsClosed;
 }
 
 extern "C" bool chademoInterface_carContactorsOpened()
@@ -774,8 +773,7 @@ bool ChademoCharger::PreChargeCanStart()
 
     // To avoid waiting too long before sending first PreChargeReq, do it after switch(k), to save a second. ccs may not like waiting too long between CableCheck and first PreChargeReq.
     // SOC won't change much between switch(k) and ReadyToCharge anyways, max 2%.
-    bool carSwitchK = _state == ChargerState::WaitForCarReadyToCharge;
-    return carSwitchK;
+    return _carData.VoltsReady;
 #else
     return true;
 #endif

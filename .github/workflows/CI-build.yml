@@ -94,6 +94,19 @@ jobs:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X
           path: My407ccs2chademo.bin
 
+      # --- AV1-V2X build ---
+      - name: Build AV1-V2X firmware
+        run: |
+          export GITHUB_AV=1
+          export GITHUB_V2X=1
+          export GITHUB_APPEND_VER=-AV1-V2X
+          make clean all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1-V2X
+          path: My407ccs2chademo.bin
+
       - name: Add info to summary
         run: |
           echo "### Alternative function builds" >> $GITHUB_STEP_SUMMARY

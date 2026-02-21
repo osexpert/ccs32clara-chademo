@@ -210,7 +210,6 @@ enum class StopReason
 #define CHARGER_STATE_LIST \
     CHARGER_STATE(PreStart_DiscoveryCompleted_WaitForCableCheckDone) \
     CHARGER_STATE(Start) \
-    CHARGER_STATE(WaitForCarSwitchK) \
     CHARGER_STATE(WaitForCarReadyToCharge) \
     CHARGER_STATE(WaitForPreChargeDone) \
     CHARGER_STATE(WaitForCarContactorsClosed) \
@@ -543,6 +542,16 @@ struct CarData
     ExtendedFunction1Flags ExtendedFunction1;
 
     uint8_t MaxDischargeCurrent;
+
+    bool VoltsReady = false;
+    int NomVoltOverride = 0;
+    int AdjustBelowSoc = 0;
+    float AdjustBelowFactor = 0.0f;
+    bool OverridesJudged = false;
+
+    bool Switch_k = false;
+
+    bool ContactorsClosed = false;
 };
 
 enum ProtocolNumber
@@ -619,11 +628,11 @@ public:
     void SetCcsParamsFromCarData();
     void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
     bool GetSwitchK();
-    void SetBatteryVoltOverrides();
+    void SetBatteryVoltOverridesOnce();
     void CloseAdapterContactor();
     bool PreChargeCanStart();
     void Log();
-
+    uint8_t GetSimulatedDischargeAmps();
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
@@ -658,10 +667,8 @@ public:
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
         bool _chargingPlugLocked = false;
-        bool _switch_k = false;
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
-        bool _carContactorsClosed = false;
 
 #ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;
@@ -670,9 +677,6 @@ public:
 #endif
 
         bool _preChargeDoneButStalled = false;
-        int _nomVoltOverride = 0;
-        int _adjustBelowSoc = 0;
-        float _adjustBelowFactor = 0.0f;
         bool _dischargeEnabled = false;
         bool _isDischargeUnit = false;
         bool _isDischarging = false;
