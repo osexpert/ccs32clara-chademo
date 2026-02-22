@@ -202,6 +202,15 @@ WARNING: there is no guarantee that adding a relay will make it work, you may cr
 
 Discussion here: https://github.com/osexpert/ccs32clara-chademo/discussions/34
 
+### Orion BMS
+Some has tried the adapter on Orion BMS without luck. The log show similar behaviour as iMiev: After D2 is set, car start asking for amps, but no amp flowing.
+Charger start increasing the voltage, eventually reaching max voltage. But no amps flowing. Charger eventually fails.
+It is the same behaviour as iMiev: HV seems to be open circuit (car contactors not closing).
+Looking at the Orion BMS manual, I see the problem: https://www.orionbms.com/manuals/pdf/chademo_integration.pdf
+They are following the suggested setup from the Chademo spec. and seem to be powering the car contactors directly from D2.
+So either it has to be rewired with a setup that a modern Chademo car uses (they do not power contactors directly from D2),
+or maybe try a different brand adapter eg. Electway (small chance that other adapter brands follow the Chademo spec better).
+
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
