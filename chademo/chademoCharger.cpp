@@ -571,6 +571,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
+        _global.auto_power_off_timer_count_up_ms = 0;
+		
         if (_chargerData.OutputCurrent > 0)
         {
             if (_chargerData.RemainingChargeTimeCycles > 0)
@@ -641,13 +643,14 @@ void ChademoCharger::RunStateMachine()
             if (isDischarging)
             {
                 _chargerData.RemainingDischargeTime = 5; // seconds?
-                _chargerData.DischargeCurrent = GetSimulatedDischargeAmps();
+                //_chargerData.DischargeCurrent = GetSimulatedDischargeAmps();
+				_chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
             }
             else
             {
                 // keep RemainingDischargeTime at 5, discharge indefinitely
                 _chargerData.DischargeCurrent = 0;
-				GetSimulatedDischargeAmps(true); // reset
+				//GetSimulatedDischargeAmps(true); // reset
             }
         }
     }
@@ -1097,6 +1100,7 @@ bool ChademoCharger::IsPowerOffOk()
 {
     return not _chargingPlugLocked;
 }
+
 
 
 
