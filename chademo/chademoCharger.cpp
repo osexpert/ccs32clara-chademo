@@ -610,13 +610,17 @@ void ChademoCharger::RunStateMachine()
                 isDischargeUnit = true;
                 isDischarging = true;
             }
-            else if (_chargerData.OutputCurrent == 0
-                && (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3) || zeroOutputAmpsCycles++ > (CHA_CYCLES_PER_SEC * 3)) // Weird logic? Want to stop counting when reached, to avoid overflow.
-                )
+            else if (_chargerData.OutputCurrent == 0)
             {
-                // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
+				// zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
                 // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
-                isDischarging = true;
+				
+                if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
+                    zeroOutputAmpsCycles++;
+                }
+                if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
+                    isDischarging = true;
+                }				
             }
             else
             {
@@ -1084,5 +1088,6 @@ bool ChademoCharger::IsPowerOffOk()
 {
     return not _chargingPlugLocked;
 }
+
 
 
