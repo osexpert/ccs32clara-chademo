@@ -632,7 +632,7 @@ public:
     void CloseAdapterContactor();
     bool PreChargeCanStart();
     void Log();
-    uint8_t GetSimulatedDischargeAmps();
+    uint8_t GetSimulatedDischargeAmps(bool reset = false);
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
@@ -715,3 +715,4 @@ public:
         ChargerData _chargerData = {};
 
 };
+
