@@ -313,7 +313,7 @@ bool ChademoCharger::HasElapsedSec(uint16_t sec)
 
 // Simulate discharge amps waveform (but if max amps is 20A, it will always be max 10:-)
 // But if we ever need to go higher than max 20A, then this may work:-)
-uint8_t ChademoCharger::GetSimulatedDischargeAmps()
+uint8_t ChademoCharger::GetSimulatedDischargeAmps(bool reset)
 {
     static int holdCounter = 0;
     static bool ampsDirectionFwd = true;
@@ -322,6 +322,14 @@ uint8_t ChademoCharger::GetSimulatedDischargeAmps()
     const int margin = 10;
     const int holdCycles = 5;
 
+    if (reset)
+    {
+        // reset
+        ampsDirectionFwd = true;
+        holdCounter = 0;
+        return 0;
+    }
+	
     int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
 
     int minWindow = min(margin, maxDischargeAmps);
@@ -639,6 +647,7 @@ void ChademoCharger::RunStateMachine()
             {
                 // keep RemainingDischargeTime at 5, discharge indefinitely
                 _chargerData.DischargeCurrent = 0;
+				GetSimulatedDischargeAmps(true); // reset
             }
         }
     }
@@ -1088,6 +1097,7 @@ bool ChademoCharger::IsPowerOffOk()
 {
     return not _chargingPlugLocked;
 }
+
 
 
 
