@@ -585,7 +585,7 @@ struct ChargerData
     bool SupportWeldingDetection = true;
 
     uint8_t MaxAvailableOutputCurrent;
-    uint8_t AvailableOutputCurrent;
+    uint8_t DynAvailableOutputCurrent;
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;

@@ -610,6 +610,7 @@ void ChademoCharger::RunStateMachine()
 
             bool isDischargeUnit = false;
             bool isDischarging = false;
+
             if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
 	            // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
@@ -640,16 +641,46 @@ void ChademoCharger::RunStateMachine()
             COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
             COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
 
+            static int fakeOutputCurrentCycles = 0;
+            static bool fakeOutputCurrentOnce = true; // first time, when we are not returning from real charging but starting up
+
             if (isDischarging)
             {
                 _chargerData.RemainingDischargeTime = 5; // seconds?
+
+                // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
                 //_chargerData.DischargeCurrent = GetSimulatedDischargeAmps();
 				_chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
+
+                // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
+                // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
+                // So fake a RequestCurrent to max allowed, and see if it makes a difference.
+                // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
+                int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
+                _carData.RequestCurrent = maxDischargeAmps; // ovveride it for every cycle
+
+                // HACK: my car seems to time out after 6 minutes, if no current flows?
+                // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
+                // maybe the car does not like it (in this case the hack is not needed, but its impossible for us to know!).
+                // I am starting to wonder, if the Chademo discharge messages has any purpose at all...because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless.
+                // Dynamic control seems to be what keeps it alive more than 3 seconds in ChargingLoop,
+                // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
+                // So is it possible...that V2X can be implemented, completely without using the V2X messages?
+                fakeOutputCurrentCycles++;
+                if (fakeOutputCurrentOnce || fakeOutputCurrentCycles > (CHA_CYCLES_PER_SEC * 60))
+                {
+                    _chargerData.DischargeCurrent = 0;
+                    _chargerData.OutputCurrent = 1;
+
+                    fakeOutputCurrentCycles = 0;
+                    fakeOutputCurrentOnce = false;
+                }
             }
             else
             {
                 // keep RemainingDischargeTime at 5, discharge indefinitely
                 _chargerData.DischargeCurrent = 0;
+                fakeOutputCurrentCycles = 0;
 				//GetSimulatedDischargeAmps(true); // reset
             }
         }
@@ -840,11 +871,11 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
         && (has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(_carData.Status, CarStatus::LEGACY_DYNAMIC_CONTROL))
         )
     {
-        _chargerData.AvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+        _chargerData.DynAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
     }
     else
     {
-        _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
+        _chargerData.DynAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 
     _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS, _chargerData.MaxAvailableOutputCurrent);
@@ -890,7 +921,7 @@ void ChademoCharger::Log()
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
-            _chargerData.AvailableOutputCurrent,
+            _chargerData.DynAvailableOutputCurrent,
             _chargerData.MaxAvailableOutputCurrent,
             _chargerData.RemainingChargeTimeSec,
             _chargerData.Status,
@@ -1047,7 +1078,7 @@ void ChademoCharger::SendChargerMessages()
 void ChademoCharger::UpdateChargerMessages()
 {
     COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "108.WeldingDetection %d -> %d");
-    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.AvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
+    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.DynAvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
     COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "108.AvailableOutputVoltage %d -> %d");
     COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "108.ThresholdVoltage %d -> %d");
 
