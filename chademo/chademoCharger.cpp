@@ -337,13 +337,6 @@ uint8_t ChademoCharger::GetSimulatedDischargeAmps(bool reset)
 
     int dischargeAmps = _chargerData.DischargeCurrent;
 
-    if (dischargeAmps == 0)
-    {
-        // reset
-        ampsDirectionFwd = true;
-        holdCounter = 0;
-    }
-
     // Hold current step
     if (holdCounter < holdCycles)
     {
@@ -642,7 +635,7 @@ void ChademoCharger::RunStateMachine()
             COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
 
             static int fakeOutputCurrentCycles = 0;
-            static bool fakeOutputCurrentOnce = true; // first time, when we are not returning from real charging but starting up
+            static bool fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
 
             if (isDischarging)
             {
@@ -667,13 +660,13 @@ void ChademoCharger::RunStateMachine()
                 // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
                 // So is it possible...that V2X can be implemented, completely without using the V2X messages?
                 fakeOutputCurrentCycles++;
-                if (fakeOutputCurrentOnce || fakeOutputCurrentCycles > (CHA_CYCLES_PER_SEC * 60))
+                if (not(fakeOutputCurrentOnce) || fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
                 {
                     _chargerData.DischargeCurrent = 0;
                     _chargerData.OutputCurrent = 1;
 
                     fakeOutputCurrentCycles = 0;
-                    fakeOutputCurrentOnce = false;
+                    fakeOutputCurrentOnce = true;
                 }
             }
             else
@@ -864,7 +857,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     _chargerData.OutputCurrent = clampToUint8(outA);
 
     // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
-    // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
+    // we adjust DynAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
     if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS
@@ -1131,8 +1124,3 @@ bool ChademoCharger::IsPowerOffOk()
 {
     return not _chargingPlugLocked;
 }
-
-
-
-
-
