@@ -186,14 +186,6 @@ void ChademoCharger::HandlePendingCarMessages()
         if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
 #endif
         {
-            // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
-            // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
-            if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
-            {
-                println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
-                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
-            }
-
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
             else
@@ -488,6 +480,13 @@ void ChademoCharger::RunStateMachine()
                 println("[cha] Discovery completed");
 
                 SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone);
+            }
+            else if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
+            {
+                // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
+                // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
+                println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
+                set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
             else
             {
