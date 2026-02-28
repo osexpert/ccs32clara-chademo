@@ -216,11 +216,12 @@ enum class StopReason
     CHARGER_STATE(WaitForCarRequestCurrent) \
     CHARGER_STATE(ChargingLoop) \
     CHARGER_STATE(Stopping_Start) \
+    CHARGER_STATE(Stopping_WaitForSwitchKOff) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
+    CHARGER_STATE(Stopping_SetSwitchD1Off) \
     CHARGER_STATE(Stopping_WaitForLowVolts) \
-    CHARGER_STATE(Stopping_End) \
-    CHARGER_STATE(Stopped) \
+    CHARGER_STATE(Stopping_UnlockChargingPlug) \
     CHARGER_STATE(End)
 
 enum ChargerState {
@@ -639,9 +640,9 @@ public:
 
     int _delayCycles = 0;
 
-    StopReason GetStopReason()
+    bool IsStoppingOrLater()
     {
-        return _stopReason;
+        return _state >= ChargerState::Stopping_Start;
     }
 
     void EnableDischarge()
@@ -669,6 +670,7 @@ public:
         bool _chargingPlugLocked = false;
         bool _switch_d1 = false;
         bool _msg102_recieved = false;
+        bool _send_can = false;
 
 #ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;
@@ -681,6 +683,7 @@ public:
         bool _isDischargeUnit = false;
         bool _isDischarging = false;
         bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
+        //bool _weldingDetectionDoneFlagSetInStoppingStart = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;

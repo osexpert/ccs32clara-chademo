@@ -227,7 +227,11 @@ void power_off_check()
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
-        if (buttonPressedBriefly && _ledState != LedState::WaitForSlacDone && not special_modes_selection_pending())
+        if (buttonPressedBriefly
+#ifndef CHADEMO_STANDALONE_TESTING
+            && _ledState != LedState::WaitForSlacDone
+#endif
+            && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
             println("Stop button pressed briefly and slac not pending. Power off pending...");
@@ -256,11 +260,10 @@ void power_off_check()
             println("Ccs CurrentDemand stop reason 0x%x. Power off pending...", ccsCurrentDemandStopReason);
         }
 
-        StopReason chaStopReason = chademoCharger->GetStopReason();
-        if (chaStopReason != StopReason::NONE)
+        if (chademoCharger->IsStoppingOrLater())
         {
             _global.powerOffPending = true;
-            println("Chademo stop reason 0x%x. Power off pending...", chaStopReason);
+            println("Chademo stopping. Power off pending...");
         }
     }
 

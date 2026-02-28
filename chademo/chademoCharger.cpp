@@ -454,7 +454,8 @@ void ChademoCharger::RunStateMachine()
 //        _chargerData.Status = ChargerStatus::STOPPED;
 //        _stopReason = StopReason::NONE;
 
-        SetSwitchD1(true); // will trigger car sending CAN
+        SetSwitchD1(true);
+        _send_can = true;  // will trigger car sending CAN
 
         SetState(ChargerState::WaitForCarReadyToCharge);
     }
@@ -475,7 +476,8 @@ void ChademoCharger::RunStateMachine()
         {
             if (_discovery)
             {
-                SetSwitchD1(false); // PS: even if we set to false, car may continue to send 102 for a short time
+                SetSwitchD1(false);
+                _send_can = false;  // PS: even if we stop sending, car may continue to send 102 for a short time
                 _discovery = false;
                 println("[cha] Discovery completed");
 
@@ -496,18 +498,14 @@ void ChademoCharger::RunStateMachine()
                 SetState(ChargerState::WaitForPreChargeDone);
             }
         }
-        // Spec: max time from D1 set, to switch(k) and READY_TO_CHARGE set is 8 seconds.
-        else if (IsTimeoutSec(10))
+        // Spec: T-time from D1 set, to switch(k) and READY_TO_CHARGE set is 8 seconds.
+        else if (IsTimeoutSec(8))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        // TODO: if we start ccs precharge when we enter WaitForPreChargeDone, how long time can we use, after car is ready to charge and before we set d2, without chademo timeout? I think the spec says 20-22sec.
-		// If chademo allows for enough time, entering state WaitForPreChargeDone could trigger ccs precharge start (allthou we would loose some seconds where things could be run in paralell).
-		// Alternative: add 2 seconds delay between cableCheck done and ccs preCharge start.
-
         if (_preChargeDoneButStalled)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
@@ -516,6 +514,7 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
+        // Spec: C-time 20 seconds or less from Switch(k) && CarStatus::READY_TO_CHARGE to D2 is set. T-time not defined, but 20 seconds should be plenty!
         else if (IsTimeoutSec(20))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
@@ -532,21 +531,21 @@ void ChademoCharger::RunStateMachine()
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
-			println("[cha] Car contactors closed");
+            println("[cha] Car contactors closed");
             _carData.ContactorsClosed = true;
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarRequestCurrent);
         }
         // Spec: max 4 seconds from set D2 to CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE cleared
-        else if (IsTimeoutSec(10))
+        else if (IsTimeoutSec(4))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
     }
     else if (_state == ChargerState::WaitForCarRequestCurrent)
     {
-        if (_carData.RequestCurrent > 0) // 1-2 sec after 102.5.3
+        if (_carData.RequestCurrent > 0) // typ: 1-2 sec after 102.5.3
         {
             // Even thou charger not delivering amps yet, we set these flags (seen in canlogs)
             // Spec: set these flags <= 0.5sec after RequestCurrent > 0
@@ -556,7 +555,7 @@ void ChademoCharger::RunStateMachine()
             SetState(ChargerState::ChargingLoop);
         }
         // Spec: max 4 seconds from CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE cleared to RequestCurrent > 0
-        else if (IsTimeoutSec(10))
+        else if (IsTimeoutSec(4))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
         }
@@ -564,7 +563,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::ChargingLoop)
     {
         _global.auto_power_off_timer_count_up_ms = 0;
-		
+
         if (_chargerData.OutputCurrent > 0)
         {
             if (_chargerData.RemainingChargeTimeCycles > 0)
@@ -605,7 +604,7 @@ void ChademoCharger::RunStateMachine()
 
             if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
-	            // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
+                // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
                 // one discharger is observed to mirror asked amps as delivered amps.
                 // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
                 _chargerData.OutputCurrent = 0;
@@ -615,9 +614,9 @@ void ChademoCharger::RunStateMachine()
             }
             else if (_chargerData.OutputCurrent == 0)
             {
-				// zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
+                // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
                 // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
-				
+
                 if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
                     zeroOutputAmpsCycles++;
                 }
@@ -642,7 +641,7 @@ void ChademoCharger::RunStateMachine()
 
                 // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
                 //_chargerData.DischargeCurrent = GetSimulatedDischargeAmps();
-				_chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
+                _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
 
                 // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
                 // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
@@ -673,18 +672,32 @@ void ChademoCharger::RunStateMachine()
                 // keep RemainingDischargeTime at 5, discharge indefinitely
                 _chargerData.DischargeCurrent = 0;
                 fakeOutputCurrentCycles = 0;
-				//GetSimulatedDischargeAmps(true); // reset
+                //GetSimulatedDischargeAmps(true); // reset
             }
         }
     }
     else if (_state == ChargerState::Stopping_Start)
     {
+        // If this flag is already set here, we can not trust it later...
+        //_weldingDetectionDoneFlagSetInStoppingStart = has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE);
+
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
-        SetState(ChargerState::Stopping_WaitForLowAmps);
+        SetState(ChargerState::Stopping_WaitForSwitchKOff);
+    }
+    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
+    {
+        // Spec: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
+        // Normally this check is pointless, because we wont get past Stopping_WaitForCarContactorsOpen anyways, before CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE is set.
+        // BUT maybe it can have use as a safety valve, in case some car set CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE incorrectly (too early)? Or maybe for Chademo 0.9 cars?
+        if (not(_carData.Switch_k) || IsTimeoutSec(4))
+        {
+            SetState(ChargerState::Stopping_WaitForLowAmps);
+        }
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
     {
+        // Spec: C-time: 0.5 seconds timeout from Switch_k cleared to OutputCurrent <= 5. But no timeout in the spec...failure is not an option?
         if (_chargerData.OutputCurrent <= 5 || IsTimeoutSec(10))
         {
             _chargerData.RemainingChargeTimeCycles = 0;
@@ -703,9 +716,11 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
+        // C-time <= 4.0s / T-time 10.0s (after Switch(k) cleared)
+        // TODO: add detection of CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE being set in Stopping_Start?
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4)) // Spec: car should perform WD within 4 seconds after amps drops <= 5
-            || IsTimeoutSec(10)) // Chademo 1.0 spec: max 10 seconds
+            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4))
+            || IsTimeoutSec(10))
         {
             // welding detection done & car contactors open
             _carData.ContactorsClosed = false;
@@ -713,48 +728,49 @@ void ChademoCharger::RunStateMachine()
 
             SetSwitchD2(false);
 
+            SetState(ChargerState::Stopping_SetSwitchD1Off);
+        }
+    }
+    else if (_state == ChargerState::Stopping_SetSwitchD1Off)
+    {
+        // spec says, after setting D2:false wait 500ms before setting D1:false
+        if (_cyclesInState >= 5)
+        {
+            SetSwitchD1(false);
+
             SetState(ChargerState::Stopping_WaitForLowVolts);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForLowVolts)
     {
+        // C-time <= 2.0s / T-time 4.0s
         // cha spec says <= 10V but we need to play by ccs rules here. Seen some chargers never drop below 28V. Clara uses 40V.
-        if (_chargerData.OutputVoltage <= 40 || IsTimeoutSec(10))
+        // This check may be completely pointless?
+        if (_chargerData.OutputVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION || IsTimeoutSec(4))
         {
             OpenAdapterContactor();
 
+            // stop CAN in later state to make sure we send this message to car before we kill CAN
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
-            // do stop CAN in own state to make sure we send this message to car before we kill CAN
-            SetState(ChargerState::Stopping_End);
+            SetState(ChargerState::Stopping_UnlockChargingPlug);
         }
     }
-    else if (_state == ChargerState::Stopping_End)
+    else if (_state == ChargerState::Stopping_UnlockChargingPlug)
     {
-        // spec says, after setting D2:false wait 500ms before setting D1:false. We have passed 2 state changes already, so we have 300ms left.
-        if (_cyclesInState > 3)
-        {
-            // this stops CAN
-            SetSwitchD1(false);
-
-            SetState(ChargerState::Stopped);
-        }
-    }
-    else if (_state == ChargerState::Stopped)
-    {
-        if (_stopReason == StopReason::NONE)
-        {
-            println("[cha] BUG: StopReason not set. Failover to UNKNOWN");
-            _stopReason = StopReason::UNKNOWN;
-        }
-
     	UnlockChargingPlug();
 
         SetState(ChargerState::End);
     }
     else if (_state == ChargerState::End)
     {
-        // terminal state. No code should exist here. We can never leave.
+        // terminal state. We can never leave.
+
+        // Keep sending can for as long as the car does (use msg102 as trigger).
+//        _send_can = _msg102_recieved;
+//        _msg102_recieved = false;
+
+        _send_can = false;
     }
 
 }
@@ -830,8 +846,8 @@ void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
     _cyclesInState = 0;
 
     set_flag(&_stopReason, stopReason);
-    if (_stopReason != StopReason::NONE)
-        println("[cha] Stopping: 0x%02x", _stopReason);
+    if (stopReason != StopReason::NONE)
+        println("[cha] Stopping: 0x%02x", stopReason);
 };
 
 const char* ChademoCharger::GetStateName()
@@ -1048,7 +1064,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 
 void ChademoCharger::SendChargerMessages()
 {
-    if (_switch_d1 && _msg102_recieved)
+    if (_send_can && /*_switch_d1 && */_msg102_recieved)
     {
         UpdateChargerMessages();
 
