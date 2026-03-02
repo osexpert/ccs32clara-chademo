@@ -678,26 +678,14 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_Start)
     {
-        // If this flag is already set here, we can not trust it later...
-        //_weldingDetectionDoneFlagSetInStoppingStart = has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE);
-
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
-        SetState(ChargerState::Stopping_WaitForSwitchKOff);
-    }
-    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
-    {
-        // Spec: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
-        // Normally this check is pointless, because we wont get past Stopping_WaitForCarContactorsOpen anyways, before CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE is set.
-        // BUT maybe it can have use as a safety valve, in case some car set CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE incorrectly (too early)? Or maybe for Chademo 0.9 cars?
-        if (not(_carData.Switch_k) || IsTimeoutSec(4))
-        {
-            SetState(ChargerState::Stopping_WaitForLowAmps);
-        }
+        SetState(ChargerState::Stopping_WaitForLowAmps);
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
     {
-        // Spec: C-time: 0.5 seconds timeout from Switch_k cleared to OutputCurrent <= 5. But no timeout in the spec...failure is not an option?
+        // Spec: C-time: 0.5 seconds timeout from Switch_k cleared to OutputCurrent <= 5. Car timeout after switch(k): 2.5 seconds.
+        // For the charger, no timeout is specified (failure to drop amps is not an option), but lets use 10 sec.
         if (_chargerData.OutputCurrent <= 5 || IsTimeoutSec(10))
         {
             _chargerData.RemainingChargeTimeCycles = 0;
@@ -711,6 +699,20 @@ void ChademoCharger::RunStateMachine()
 
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
+            if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0)
+                SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
+            else
+                SetState(ChargerState::Stopping_WaitForSwitchKOff);
+        }
+    }
+    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
+    {
+        // Spec: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
+        // In Chademo 1.0, this check is supposed to be before the OutputCurrent <= 5 check, but it seems pointless...
+        // Chademo 2.0 also specifically allows not waiting for switch(k) to be cleared, before checck OutputCurrent <= 5 and clear ChargerStatus::CHARGING, so they also realized it was pointless...
+        // BUT: since Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use this as a synchronization point for the 4 second wait, until clearing D2.
+        if (not(_carData.Switch_k) || IsTimeoutSec(4))
+        {
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }

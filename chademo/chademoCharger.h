@@ -216,8 +216,8 @@ enum class StopReason
     CHARGER_STATE(WaitForCarRequestCurrent) \
     CHARGER_STATE(ChargingLoop) \
     CHARGER_STATE(Stopping_Start) \
-    CHARGER_STATE(Stopping_WaitForSwitchKOff) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
+    CHARGER_STATE(Stopping_WaitForSwitchKOff) \
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
     CHARGER_STATE(Stopping_SetSwitchD1Off) \
     CHARGER_STATE(Stopping_WaitForLowVolts) \
@@ -683,7 +683,6 @@ public:
         bool _isDischargeUnit = false;
         bool _isDischarging = false;
         bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
-        //bool _weldingDetectionDoneFlagSetInStoppingStart = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
