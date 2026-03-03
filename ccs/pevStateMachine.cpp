@@ -66,7 +66,6 @@ const char* pevSttString = STRINGIFY(STATE_LIST);
 const char pevSttLabels[][MAX_LABEL_LEN] = { STATE_LIST };
 #undef STATE_ENTRY
 
-#define MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION 40 /* 40V is considered to be sufficiently low to not harm. The Ioniq already finishes at 65V. */
 #define MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS 10 /* The process time is specified with 1.5s. Ten loops should be fine. */
 
 #define LEN_OF_EVCCID 6 /* The EVCCID is the MAC according to spec. Ioniq uses exactly these 6 byte. */

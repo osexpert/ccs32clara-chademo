@@ -33,6 +33,8 @@ extern "C" {
 // For any current above 20A then need real measured amps? Try 40.
 #define MAX_DISCHARGE_AMPS 40
 
+#define MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION 40 /* 40V is considered to be sufficiently low to not harm. The Ioniq already finishes at 65V. */
+
 //#define CHADEMO_STANDALONE_TESTING
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
