@@ -633,7 +633,6 @@ public:
     void CloseAdapterContactor();
     bool PreChargeCanStart();
     void Log();
-    uint8_t GetSimulatedDischargeAmps(bool reset = false);
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
@@ -668,7 +667,6 @@ public:
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
         bool _chargingPlugLocked = false;
-        bool _switch_d1 = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
 

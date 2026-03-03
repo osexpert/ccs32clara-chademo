@@ -16,12 +16,6 @@ extern ChademoCharger* chademoCharger;
 
 #define SWAP16(x) (uint16_t)((((x) & 0x00FF) << 8) | (((x) & 0xFF00) >> 8))
 
-// only for bytes
-//#define set_flag(x, flag)    ((x) = static_cast<decltype(x)>((x) | (flag)))
-//#define clear_flag(x, flag)  ((x) = static_cast<decltype(x)>((x) & ~(flag)))
-//#define has_flag(x, flag)    (((x) & (flag)) != static_cast<decltype(x)>(0))
-//#define has_flags(x, flags) (((x) & (flags)) == static_cast<decltype(x)>(flags))
-
 #define COMPARE_SET(oldval, newval, fmt) \
     do { \
         if ((oldval) != (newval)) { \
@@ -292,70 +286,6 @@ bool ChademoCharger::HasElapsedSec(uint16_t sec)
     return (_cyclesInState > (sec * CHA_CYCLES_PER_SEC));
 }
 
-// car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-)
-//static const int offsets[] = { 20, 0, -20, 0 };
-//static int offset_index = 0;
-//
-//static int GetCyclicOffset()
-//{
-//    int result = offsets[offset_index];
-//    offset_index = (offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
-//    return result;
-//}
-
-// Simulate discharge amps waveform (but if max amps is 20A, it will always be max 10:-)
-// But if we ever need to go higher than max 20A, then this may work:-)
-uint8_t ChademoCharger::GetSimulatedDischargeAmps(bool reset)
-{
-    static int holdCounter = 0;
-    static bool ampsDirectionFwd = true;
-
-    const int step = 10;
-    const int margin = 10;
-    const int holdCycles = 5;
-
-    if (reset)
-    {
-        // reset
-        ampsDirectionFwd = true;
-        holdCounter = 0;
-        return 0;
-    }
-	
-    int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
-
-    int minWindow = min(margin, maxDischargeAmps);
-    int maxWindow = (maxDischargeAmps > 2 * margin) ? (maxDischargeAmps - margin) : maxDischargeAmps;
-
-    int dischargeAmps = _chargerData.DischargeCurrent;
-
-    // Hold current step
-    if (holdCounter < holdCycles)
-    {
-        holdCounter++;
-    }
-    else
-    {
-        holdCounter = 0; // reset hold counter
-
-        // Move one step in current direction
-        if (ampsDirectionFwd)
-        {
-            dischargeAmps = min(dischargeAmps + step, maxWindow);
-            if (dischargeAmps >= maxWindow)
-                ampsDirectionFwd = false;   // reverse
-        }
-        else // bwd
-        {
-            dischargeAmps = max(dischargeAmps - step, minWindow);
-            if (dischargeAmps <= minWindow)
-                ampsDirectionFwd = true;  // reverse
-        }
-    }
-
-    return (uint8_t)dischargeAmps;
-}
-
 void ChademoCharger::SetBatteryVoltOverridesOnce()
 {
     if (_carData.OverridesJudged)
@@ -449,10 +379,6 @@ void ChademoCharger::RunStateMachine()
     {
         // reset (set during discovery)
         _msg102_recieved = false;
-//        _carData.Faults = {};
-//        _carData.Status = {};
-//        _chargerData.Status = ChargerStatus::STOPPED;
-//        _stopReason = StopReason::NONE;
 
         SetSwitchD1(true);
         _send_can = true;  // will trigger car sending CAN
@@ -523,7 +449,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // chademo 0.9 (and earlier) did not have the flag, wait 2 seconds (spec: compliance time 2 seconds). TODO: Gemini suggest maybe to use 3 seconds, for slower cars.
+            // chademo 0.9 (and earlier) did not have the flag, wait 2 seconds (spec: compliance time 2 seconds). TODO: AI suggest maybe to use 3 seconds, for slower cars.
             || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(2))
             )
         {
@@ -640,7 +566,6 @@ void ChademoCharger::RunStateMachine()
                 _chargerData.RemainingDischargeTime = 5; // seconds?
 
                 // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
-                //_chargerData.DischargeCurrent = GetSimulatedDischargeAmps();
                 _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
 
                 // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
@@ -672,7 +597,6 @@ void ChademoCharger::RunStateMachine()
                 // keep RemainingDischargeTime at 5, discharge indefinitely
                 _chargerData.DischargeCurrent = 0;
                 fakeOutputCurrentCycles = 0;
-                //GetSimulatedDischargeAmps(true); // reset
             }
         }
     }
@@ -718,7 +642,6 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
         // C-time <= 4.0s / T-time 10.0s (after Switch(k) cleared)
-        // TODO: add detection of CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE being set in Stopping_Start?
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
             || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4))
             || IsTimeoutSec(10))
@@ -766,10 +689,6 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::End)
     {
         // terminal state. We can never leave.
-
-        // Keep sending can for as long as the car does (use msg102 as trigger).
-//        _send_can = _msg102_recieved;
-//        _msg102_recieved = false;
 
         _send_can = false;
     }
@@ -1065,7 +984,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 
 void ChademoCharger::SendChargerMessages()
 {
-    if (_send_can && /*_switch_d1 && */_msg102_recieved)
+    if (_send_can && _msg102_recieved)
     {
         UpdateChargerMessages();
 
