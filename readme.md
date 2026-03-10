@@ -197,7 +197,8 @@ The bonus with modifying the car is, that the car also work on stubborn chademo 
 WARNING: it does not _seem_ like the procedure exposes high voltage wires, but be carefull.
 
 I don't own a i-Miev, so I can not test it. I could modify my adapter, but it would only prove it is possible to add a relay, but this I already know:-)
-Update: I ended up modifying my own adapter, so you don't have to:-) Info and images in add_d2_relay folder.
+
+Update: I ended up modifying my own adapter, so you don't have to:-) Info and images in [[https://github.com/osexpert/ccs32clara-chademo/add_d2_relay](https://github.com/osexpert/ccs32clara-chademo/tree/main/add_d2_relay)].
 
 WARNING: there is no guarantee that adding a relay will make it work, you may create new problems and there may be additional problems as well.
 
