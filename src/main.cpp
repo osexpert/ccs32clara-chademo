@@ -48,6 +48,8 @@
 #include "stm32scheduler.h"
 #include "special_modes.h"
 
+
+#if false
 #define WARM_BOOT_MAGIC  0xDEADCAFEU
 
 static void bkp_write(uint32_t val)
@@ -67,7 +69,7 @@ bool isWarmRestart(void)
 {
     return bkp_read() == WARM_BOOT_MAGIC;
 }
-
+#endif
 
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
@@ -585,9 +587,11 @@ extern "C" int main(void)
 
     DigIo::power_on_out.Set();
 
+#if false
     bool warm = isWarmRestart();
     bkp_write(WARM_BOOT_MAGIC);   // mark for next reset
     println("Warm boot %d", warm);
+#endif
 
     // spi
     DigIo::spi_cs_out.Set();
@@ -651,7 +655,7 @@ extern "C" int main(void)
 
     Param::SetInt(Param::MaxCurrent, ADAPTER_MAX_AMPS);
 
-    if (warm)
+    if (false)//warm) Disable for now, I am not sure if there are more use cases for the USB-C besides charging.
     {
         led_on();
         scheduler->AddTask(Ms500TaskCharging, 500);

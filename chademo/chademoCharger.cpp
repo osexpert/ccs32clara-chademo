@@ -424,6 +424,11 @@ void ChademoCharger::RunStateMachine()
                 SetState(ChargerState::WaitForPreChargeDone);
             }
         }
+        else if (_discovery)
+        {
+            // just let the default inactivity timeout handle it (3 minutes)
+        }
+        // Not discovery, so we are "live", and ccs is waiting for us
         // Spec: T-time from D1 set, to switch(k) and READY_TO_CHARGE set is 8 seconds.
         else if (IsTimeoutSec(8))
         {
