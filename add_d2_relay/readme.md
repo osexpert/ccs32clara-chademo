@@ -1,3 +1,4 @@
+<pre>
 Pictures:
 1 Unscrew 6 screws (torx 10)
 2 Unscrew 2 screws to the left, inside ccs socket (torx 10)
@@ -38,3 +39,28 @@ Silicone wires:
 Aliexpress Listing: 16 18 20 22 24 26 28 30 Gauge Silicone Electrical Wire Kit 6 Color Each 5ft Flexible 18 AWG Stranded Tinned Copper Wire
 
 Soldering paste (flux) is nice to have.
+</pre>
+
+![Image1](1.jpg)
+![Image2](2.jpg)
+![Image3](3.jpg)
+![Image4](4.jpg)
+![Image5](5.jpg)
+![Image6](6.jpg)
+![Image7](7.jpg)
+![Image8](8.jpg)
+![Image9](9.jpg)
+![Image10](10.jpg)
+![Image11](11.jpg)
+![Image12](12.jpg)
+![Image13](13.jpg)
+![Image14](14.jpg)
+![Image15](15.jpg)
+![Image16](16.jpg)
+![Image17](17.jpg)
+![Image18](18.jpg)
+![Image19](19.jpg)
+![Image20](20.jpg)
+![Image21](21.jpg)
+![Image22](22.jpg)
+
