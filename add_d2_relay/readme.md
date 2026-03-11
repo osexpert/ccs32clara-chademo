@@ -41,26 +41,69 @@ Aliexpress Listing: 16 18 20 22 24 26 28 30 Gauge Silicone Electrical Wire Kit 6
 Soldering paste (flux) is nice to have.
 </pre>
 
+### Image 1
 ![Image1](1.jpg)
+
+### Image 2
 ![Image2](2.jpg)
+
+### Image 3
 ![Image3](3.jpg)
+
+### Image 4
 ![Image4](4.jpg)
+
+### Image 5
 ![Image5](5.jpg)
+
+### Image 6
 ![Image6](6.jpg)
+
+### Image 7
 ![Image7](7.jpg)
+
+### Image 8
 ![Image8](8.jpg)
+
+### Image 9
 ![Image9](9.jpg)
+
+### Image 10
 ![Image10](10.jpg)
+
+### Image 11
 ![Image11](11.jpg)
+
+### Image 12
 ![Image12](12.jpg)
+
+### Image 13
 ![Image13](13.jpg)
+
+### Image 14
 ![Image14](14.jpg)
+
+### Image 15
 ![Image15](15.jpg)
+
+### Image 16
 ![Image16](16.jpg)
+
+### Image 17
 ![Image17](17.jpg)
+
+### Image 18
 ![Image18](18.jpg)
+
+### Image 19
 ![Image19](19.jpg)
+
+### Image 20
 ![Image20](20.jpg)
+
+### Image 21
 ![Image21](21.jpg)
+
+### Image 22
 ![Image22](22.jpg)
 
