@@ -17,6 +17,7 @@ Pictures:
 22 cover relay with electric tape
 23 Between D1 and GND, nothing changed here. 1.4A but still far from the spec that demand 2A.
 24 Between D1 and D2. Now same as Between D1 and GND. Better. But still not 2A. So is this good for anything? Who knows. It is more according to spec, but it may still be too little amps for the triplets.
+25 Voltage in both cases is 10V. So 10 x 1.4 = 14W. It is less than I measured on the main page, but maybe the battery was fully charged then.
 
 So...I do not recomend anyone to do this, its a bit too complicated and not sure how reliable it is in the long run. Maybe some wires can come loose and other bad things.
 Maybe I should have used silicone on the relay wires, if they come loose and touch high voltage, it will be bad! I will do this later.
@@ -111,3 +112,9 @@ Soldering paste (flux) is nice to have.
 
 ### Image 23
 ![Image23](23.jpg)
+
+### Image 24
+![Image24](24.jpg)
+
+### Image 25
+![Image25](25.jpg)
