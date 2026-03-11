@@ -10,6 +10,7 @@ on:
       - '**/*.txt'
       - 'doc/**'
       - 'volts/**'
+      - 'add_d2_relay/**'
       - '.github/**'
   pull_request:
     paths-ignore:
@@ -17,6 +18,7 @@ on:
       - '**/*.txt'
       - 'doc/**'
       - 'volts/**'
+      - 'add_d2_relay/**'
       - '.github/**'
 
 jobs:
