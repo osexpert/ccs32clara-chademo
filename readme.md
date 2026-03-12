@@ -139,7 +139,6 @@ Charging via usb is not part of the software, its only hardware.
 While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, this is the bootloader starting.
 Meaning, charging automatically triggers power on, then adapter will auto power off due to inactivity and then auto powered on again by charging, and this goes on forever.
 Charging via USB is very slow, and can take up to 10 hours if the internal battery is really empty.
-In releases after (not including) 20260304-311, charging is detected (warm boot) and then most logic is disabled, the led stays on permanently, and adapter never times out (never restart).
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
