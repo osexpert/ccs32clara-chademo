@@ -28,7 +28,6 @@
 #include <libopencm3/cm3/systick.h>
 #include <libopencmsis/core_cm3.h>
 #include <libopencm3/stm32/gpio.h>
-#include <libopencm3/stm32/rtc.h>
 
 #include "params.h"
 #include "digio.h"
@@ -47,30 +46,6 @@
 #include "main.h"
 #include "stm32scheduler.h"
 #include "special_modes.h"
-
-
-#if false
-#define WARM_BOOT_MAGIC  0xDEADCAFEU
-
-static void bkp_write(uint32_t val)
-{
-    rcc_periph_clock_enable(RCC_PWR);
-    pwr_disable_backup_domain_write_protect();
-    RTC_BKPXR(0) = val;          // register index 0–19 on STM32F4
-    pwr_enable_backup_domain_write_protect();
-}
-
-static uint32_t bkp_read(void)
-{
-    return RTC_BKPXR(0);
-}
-
-bool isWarmRestart(void)
-{
-    return bkp_read() == WARM_BOOT_MAGIC;
-}
-#endif
-
 
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
@@ -428,24 +403,6 @@ void special_mode_selected(enum SpecialMode mode)
         _global.moreLogging = true;
 }
 
-static void Ms500TaskCharging()
-{
-    bool stopPressed = not DigIo::stop_button_in_inverted.Get();
-
-    iwdg_reset();
-
-    if (stopPressed) {
-        _global.stopButtonCounter++;
-    }
-    else {
-        _global.stopButtonCounter = 0;
-    }
-
-    power_off_check();
-
-    print_sysinfo();
-}
-
 static void Ms100Task(void)
 {
     bool stopPressed = not DigIo::stop_button_in_inverted.Get();
@@ -587,12 +544,6 @@ extern "C" int main(void)
 
     DigIo::power_on_out.Set();
 
-#if false
-    bool warm = isWarmRestart();
-    bkp_write(WARM_BOOT_MAGIC);   // mark for next reset
-    println("Warm boot %d", warm);
-#endif
-
     // spi
     DigIo::spi_cs_out.Set();
     DigIo::spi_clock_out.Set();
@@ -655,16 +606,8 @@ extern "C" int main(void)
 
     Param::SetInt(Param::MaxCurrent, ADAPTER_MAX_AMPS);
 
-    if (false)//warm) Disable for now, I am not sure if there are more use cases for the USB-C besides charging.
-    {
-        led_on();
-        scheduler->AddTask(Ms500TaskCharging, 500);
-    }
-    else
-    {
-        scheduler->AddTask(Ms30Task, 30);
-        scheduler->AddTask(Ms100Task, 100);
-    }
+    scheduler->AddTask(Ms30Task, 30);
+    scheduler->AddTask(Ms100Task, 100);
 
     while (true)
     {
