@@ -22,6 +22,10 @@ Pictures:
 So...I do not recomend anyone to do this, its a bit too complicated and not sure how reliable it is in the long run. Maybe some wires can come loose and other bad things.
 Maybe I should have used silicone on the relay wires, if they come loose and touch high voltage, it will be bad! I will do this later.
 
+But how much is really needed? Google thinks that iMiev need:
+- Approx 0.2A per contactor continously (so 0.4A total). Easy.
+- Combined in-rush current: 3-5A for 50ms. Worse... So the 5A relay absolutely make sense. Thou it depends if the adapter is capable of delivering such a spike.
+
 Relay:
 Listing: 5Pcs HF49FD-005-1H11 HF49FD-024-1H12 HF49FD 005 012 024 1H11 1H11T 1H12 1H12T 24VDC 4Pin DIP Power RELAY
 Part: HF49FD-012-1H11T
