@@ -42,10 +42,6 @@ jobs:
           echo "Number of processors:" `nproc`
           make get-deps -j `nproc`
 
-      - name: Build ccs32clara-chademo firmware
-        run: |
-          make clean all
-
       - name: Set build date
         id: set_date
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
