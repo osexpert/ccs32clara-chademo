@@ -213,6 +213,11 @@ They are following the suggested setup from the Chademo spec. and seem to be pow
 So either it has to be rewired with a setup that a modern Chademo car uses (they do not power contactors directly from D2),
 or maybe try a different brand adapter eg. Electway (small chance that other adapter brands follow the Chademo spec better).
 
+## Dischargers / V2X
+The following are known to work, but may not work on all cars (Leaf ZE1 typically works best):
+- SigenStor EVDC domestic 12.5kW charger #49
+- EVniculus 7kW discharger #53
+
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
