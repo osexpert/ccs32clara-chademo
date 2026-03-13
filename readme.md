@@ -215,8 +215,8 @@ or maybe try a different brand adapter eg. Electway (small chance that other ada
 
 ## Dischargers / V2X
 The following are known to work, but may not work on all cars (Leaf ZE1 typically works best):
-- SigenStor EVDC domestic 12.5kW charger #49
-- EVniculus 7kW discharger #53
+- SigenStor EVDC domestic 12.5kW charger https://github.com/osexpert/ccs32clara-chademo/discussions/49
+- EVniculus 7kW discharger https://github.com/osexpert/ccs32clara-chademo/discussions/53
 
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
