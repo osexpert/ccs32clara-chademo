@@ -11,16 +11,16 @@ Pictures:
 16 put on silicone (I think the idea is, that if for some reason the soldering would come loose, the cables would not roam freely and by accident get in contact with high voltage)
 17 route cables, attach with some silicone
 18 attach relay with double sided tape, front side down. solder on the wires. Relay pins to the left, coil pins to the right. I used 30 gauge wire for the 12V.
-19 finally solder GND cable (26 gauge)
-20 collect the cables with some black electric tape
+19 solder the black GND cable (26 gauge). Solder 1N4148 diode. Cathode/black line towards red wire (12V). This is called a flyback diode, to protect the driver transistor, when coil is turned off.
+20 closeup
 21 note the plastic corner, make room for it (do not put the relay too far to the pcb corner edge)
-22 cover relay with electric tape
+22 cover relay with electric tape, spanning both relays, creating a roof:-) I also used some silicone on the wires.
 23 Between D1 and GND, nothing changed here. 1.4A but still far from the spec that demand 2A.
 24 Between D1 and D2. Now same as Between D1 and GND. Better. But still not 2A. So is this good for anything? Who knows. It is more according to spec, but it may still be too little amps for the triplets.
 25 Voltage in both cases is 10V. So 10 x 1.4 = 14W. It is less than I measured on the main page, but maybe the battery was fully charged then.
 
-So...I do not recomend anyone to do this, its a bit too complicated and not sure how reliable it is in the long run. Maybe some wires can come loose and other bad things.
-Maybe I should have used silicone on the relay wires, if they come loose and touch high voltage, it will be bad! I will do this later.
+So...I do not recomend anyone to do this, its a bit too complicated and not sure how reliable it is in the long run.
+If some wires come loose and touch high voltage, it will be bad!
 
 But how much is really needed? Google thinks that iMiev need:
 - Approx 0.2A per contactor continously (so 0.4A total). Easy.
@@ -46,6 +46,8 @@ Silicone wires:
 Aliexpress Listing: 16 18 20 22 24 26 28 30 Gauge Silicone Electrical Wire Kit 6 Color Each 5ft Flexible 18 AWG Stranded Tinned Copper Wire
 
 Soldering paste (flux) is nice to have.
+Listing: Solder Paste Rosin Flux 10g/30g/100g Lead-free Welding Flux Iron Repair Welding Paste Soldering Tin Soldering Oil Soldering Flux
+
 </pre>
 
 ### Image 1
