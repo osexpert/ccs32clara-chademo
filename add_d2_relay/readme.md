@@ -12,6 +12,7 @@ Pictures:
 17 route cables, attach with some silicone
 18 attach relay with double sided tape, front side down. solder on the wires. Coil pins: red and yellow wires. Switch pins: blue and black wires. I used 30 gauge wire for the red 12V.
 19 solder the black GND cable (26 gauge). Solder 1N4148 diode. Cathode/black stripe towards red wire (12V). This is called a flyback diode, to protect the driver transistor, when coil is turned off.
+IMPORTANT: If you put the diode the wrong way, you will instead of adding protection, create a short circuit, and the transistor and diode will burn up, destroying the adapter!!!
 20 closeup
 21 note the plastic corner, make room for it (do not put the relay too far to the pcb corner edge)
 22 cover relay with electric tape, spanning both relays, creating a roof:-) I also used some silicone on the wires.
