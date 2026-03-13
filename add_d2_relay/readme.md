@@ -10,8 +10,8 @@ Pictures:
 13 wires soldered on. 26 gauge silicone wires.
 16 put on silicone (I think the idea is, that if for some reason the soldering would come loose, the cables would not roam freely and by accident get in contact with high voltage)
 17 route cables, attach with some silicone
-18 attach relay with double sided tape, front side down. solder on the wires. Relay pins to the left, coil pins to the right. I used 30 gauge wire for the 12V.
-19 solder the black GND cable (26 gauge). Solder 1N4148 diode. Cathode/black line towards red wire (12V). This is called a flyback diode, to protect the driver transistor, when coil is turned off.
+18 attach relay with double sided tape, front side down. solder on the wires. Coil pins: red and yellow wires. Switch pins: blue and black wires. I used 30 gauge wire for the red 12V.
+19 solder the black GND cable (26 gauge). Solder 1N4148 diode. Cathode/black stripe towards red wire (12V). This is called a flyback diode, to protect the driver transistor, when coil is turned off.
 20 closeup
 21 note the plastic corner, make room for it (do not put the relay too far to the pcb corner edge)
 22 cover relay with electric tape, spanning both relays, creating a roof:-) I also used some silicone on the wires.
