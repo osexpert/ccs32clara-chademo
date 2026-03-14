@@ -4,6 +4,7 @@ Pictures:
 2 Unscrew 2 screws to the left, inside ccs socket (torx 10)
 7 I measure 12V on left coil pin on main relay
 8 Plan: to avoid dissassembly of everything, cut pcb trace above 10_S2 (SS2, D2).
+TODO: Future improvement: figure out what wire goes to D2 and can cut the wire instead of the pcb trace?
 9 Right square pad i measure GND
 11 with very little flat screwdriver, i scraped off the paint, exposing the copper. Then i very carefully cut the trace above 10_S2. If not being careful, this can quickly cause great damage.
 12 small screwdriver I used
