@@ -16,7 +16,7 @@ TODO: Future improvement: figure out what wire goes to D2 and can cut the wire i
 IMPORTANT: If you put the diode the wrong way, you will instead of adding protection, create a short circuit, and the transistor and diode will burn up, destroying the adapter!!!
 20 closeup
 21 note the plastic corner, make room for it (do not put the relay too far to the pcb corner edge)
-22 cover relay with electric tape, spanning both relays, creating a roof:-) I also used some silicone on the wires.
+22 cover relay with electric tape, spanning both relays, creating a roof:-) I used some silicone on the wires and also enpacsulated the diode body (can be seen to the left of the electric tape).
 23 Between D1 and GND, nothing changed here. 1.4A but still far from the spec that demand 2A.
 24 Between D1 and D2. Now same as Between D1 and GND. Better. But still not 2A. So is this good for anything? Who knows. It is more according to spec, but it may still be too little amps for the triplets.
 25 Voltage in both cases is 10V. So 10 x 1.4 = 14W. It is less than I measured on the main page, but maybe the battery was fully charged then.
