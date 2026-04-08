@@ -157,7 +157,8 @@ Currently, all chargers I have tested has worked.
 This firmware emulate chademo 1.0 and is tested on Leaf 40kwh.
 
 ### i-Miev
-Tests has been made on old i-Miev's but without success. From logs collected, the car ask for amps and the charger gradually increase voltage up to max 370v, but no amps ever flow.
+Tests has been made on old i-Miev's but without success: https://github.com/osexpert/ccs32clara-chademo/issues/7
+From logs collected, the car ask for amps and the charger gradually increase voltage up to max 370v, but no amps ever flow.
 Meaning, CAN and signalling works, but seem like there is no high voltage contact. I suspected the contactors did not close and added more delay to give more time for contactors to close, but no success.
 I remebered when probing the GPIO's and were testing chademo d1 and d2. I heard a click when activating d1, but nothing when activating d2. Why was d2 not using a relay? In the chademo circuit schema, d1 and d2 are two equal switches and the chademo spec says charger must be able to continously deliver 12V 2A between pin2(d1) and pin10(d2).
 So I assumed d2 was a semiconductor. It could still be a solid state relay, but seemed unlikely when a cheaper mechanical relay would have sufficed.
@@ -205,7 +206,8 @@ WARNING: there is no guarantee that adding a relay will make it work, you may cr
 Discussion here: https://github.com/osexpert/ccs32clara-chademo/discussions/34
 
 ### Orion BMS
-Some has tried the adapter on Orion BMS without luck. The log show similar behaviour as iMiev: After D2 is set, car start asking for amps, but no amp flowing.
+Some has tried the adapter on Orion BMS without luck: https://github.com/osexpert/ccs32clara-chademo/discussions/50
+The log show similar behaviour as iMiev: After D2 is set, car start asking for amps, but no amp flowing.
 Charger start increasing the voltage, eventually reaching max voltage. But no amps flowing. Charger eventually fails.
 It is the same behaviour as iMiev: HV seems to be open circuit (car contactors not closing).
 Looking at the Orion BMS manual, I see the problem: https://www.orionbms.com/manuals/pdf/chademo_integration.pdf
