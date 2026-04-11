@@ -263,11 +263,24 @@ void ChademoCharger::SetCcsParamsFromCarData()
     Param::SetInt(Param::MaxVoltage, _carData.TargetVoltage + 1);
     Param::SetInt(Param::soc, _carData.SocPercent);
     Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
-
-    // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
-    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
-
     Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
+
+    if (_state != ChargerState::ChargingLoop)
+    {
+        // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
+        Param::SetInt(Param::ChargeCurrent, 0);
+    }
+    else if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS
+        && not(has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(_carData.Status, CarStatus::LEGACY_DYNAMIC_CONTROL))
+        )
+    {
+        // if NOT dynamic control (dynamic available amps), instead hide from the charger, the fact that car ask for (much) more than the charger deliver
+        Param::SetInt(Param::ChargeCurrent, _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS);
+    }
+    else
+    {
+        Param::SetInt(Param::ChargeCurrent, _carData.RequestCurrent);
+    }
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t sec)
