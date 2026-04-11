@@ -38,6 +38,8 @@ extern global_data _global;
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
+#define MAX_UNDERSUPPLY_AMPS 10
+
 /// <summary>
 /// get estimated battery volt from target and soc.
 /// make a lot of assumtions:-)
@@ -792,8 +794,6 @@ const char* ChademoCharger::GetStateName()
 {
     return _stateNames[_state];
 };
-
-#define MAX_UNDERSUPPLY_AMPS 10
 
 void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
 {
