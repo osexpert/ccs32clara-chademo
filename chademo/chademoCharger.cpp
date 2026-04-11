@@ -526,7 +526,7 @@ void ChademoCharger::RunStateMachine()
         {
             SetState(ChargerState::Stopping_Start, stopReason);
         }
-        else if (_dischargeEnabled)
+        else if (_dischargeEnabled) // it may be discharging works even without the discharge messages?
         {
             static int zeroOutputAmpsCycles = 0;
 
@@ -801,13 +801,14 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
     if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS
-        && (has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(_carData.Status, CarStatus::LEGACY_DYNAMIC_CONTROL))
+        //&& (has_flag(_carData.ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(_carData.Status, CarStatus::LEGACY_DYNAMIC_CONTROL))
         )
     {
         _chargerData.DynAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
     }
     else
     {
+        // Hmmmm...it seems _chargerData.MaxAvailableOutputCurrent is dynamic in itself...or it can be...if we update it from CurrentDemandRes 
         _chargerData.DynAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 

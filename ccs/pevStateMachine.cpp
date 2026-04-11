@@ -877,6 +877,12 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
                 uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
 
+                //if (dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed)
+                //{
+                //    int evseMaxCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit);
+                //    Param::SetInt(Param::EvseMaxCurrent, evseMaxCurrent);
+                //}
+
                 Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
                 Param::SetInt(Param::EvseCurrent, evsePresentCurrent);
 
