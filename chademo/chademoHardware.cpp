@@ -1,7 +1,6 @@
 ﻿#include <stdint.h>
 #include "chademoCharger.h"
 #include <libopencm3/stm32/can.h>
-#include "params.h"
 #include "digio.h"
 #include "hwinit.h"
 #include "main.h"

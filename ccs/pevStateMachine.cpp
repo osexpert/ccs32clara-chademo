@@ -3,6 +3,7 @@
 
 #include "main.h"
 extern global_data _global;
+ccs_params _ccs_params;
 
 /* The Charging State Machine for the car */
 //STATE_ENTRY(internalName, friendlyName, timeout in s)
@@ -195,18 +196,18 @@ static void pev_sendChargeParameterDiscoveryReq(void)
     //cp->DC_EVStatus.EVCabinConditioning_isUsed /* The Ioniq sends this with 1, but let's assume it is not mandatory. */
     //cp->DC_EVStatus.RESSConditioning_isUsed /* The Ioniq sends this with 1, but let's assume it is not mandatory. */
     cp->DC_EVStatus.EVRESSSOC = hardwareInterface_getSoc();
-    cp->EVMaximumCurrentLimit.Value = Param::GetInt(Param::MaxCurrent);
+    cp->EVMaximumCurrentLimit.Value = _ccs_params.MaxCurrent;
     cp->EVMaximumCurrentLimit.Multiplier = 0; /* -3 to 3. The exponent for base of 10. */
     cp->EVMaximumCurrentLimit.Unit_isUsed = 1;
     cp->EVMaximumCurrentLimit.Unit = dinunitSymbolType_A;
 
     cp->EVMaximumPowerLimit_isUsed = 1; /* The Ioniq sends 1 here. */
-    cp->EVMaximumPowerLimit.Value = Param::GetInt(Param::MaxPower) * 10; /* maxpower is kW, then x10 x 100 by Multiplier */
+    cp->EVMaximumPowerLimit.Value = _ccs_params.MaxPower * 10; /* maxpower is kW, then x10 x 100 by Multiplier */
     cp->EVMaximumPowerLimit.Multiplier = 2; /* 10^2 */
     cp->EVMaximumPowerLimit.Unit_isUsed = 1;
     cp->EVMaximumPowerLimit.Unit = dinunitSymbolType_W; /* Watt */
 
-    cp->EVMaximumVoltageLimit.Value = Param::GetInt(Param::MaxVoltage);
+    cp->EVMaximumVoltageLimit.Value = _ccs_params.MaxVoltage;
     cp->EVMaximumVoltageLimit.Multiplier = 0; /* -3 to 3. The exponent for base of 10. */
     cp->EVMaximumVoltageLimit.Unit_isUsed = 1;
     cp->EVMaximumVoltageLimit.Unit = dinunitSymbolType_V;
@@ -320,7 +321,7 @@ static void pev_sendCurrentDemandReq(void)
 #undef st
     // EVTargetVoltage
     uint16_t UTarget = hardwareInterface_getChargingTargetVoltage(); /* The charging target. Scaling is 1V. */
-    uint16_t EVMaximumVoltageLimit = Param::GetInt(Param::MaxVoltage);
+    uint16_t EVMaximumVoltageLimit = _ccs_params.MaxVoltage;
     if (EVMaximumVoltageLimit > 1 && UTarget > EVMaximumVoltageLimit) {
         /* Some chargers run into emergency shutdown, if the requested or actual voltage is above the announced EVMaximumVoltageLimit. */
         UTarget = EVMaximumVoltageLimit;
@@ -360,17 +361,17 @@ static void pev_sendCurrentDemandReq(void)
     req.EVMaximumVoltageLimit.Multiplier = 0;
     req.EVMaximumVoltageLimit.Unit = dinunitSymbolType_V;
     req.EVMaximumVoltageLimit.Unit_isUsed = 1;
-    req.EVMaximumVoltageLimit.Value = Param::GetInt(Param::MaxVoltage);
+    req.EVMaximumVoltageLimit.Value = _ccs_params.MaxVoltage;
 
     req.EVMaximumCurrentLimit_isUsed = 1;
     req.EVMaximumCurrentLimit.Multiplier = 0;
     req.EVMaximumCurrentLimit.Unit = dinunitSymbolType_A;
     req.EVMaximumCurrentLimit.Unit_isUsed = 1;
-    req.EVMaximumCurrentLimit.Value = Param::GetInt(Param::MaxCurrent);
+    req.EVMaximumCurrentLimit.Value = _ccs_params.MaxCurrent;
 
     // evgo-vehicle-oem-best-practices.pdf
     req.EVMaximumPowerLimit_isUsed = 1; /* The Ioniq sends 1 here. */
-    req.EVMaximumPowerLimit.Value = Param::GetInt(Param::MaxPower) * 10; /* maxpower is kW, then x10 x 100 by Multiplier */
+    req.EVMaximumPowerLimit.Value = _ccs_params.MaxPower * 10; /* maxpower is kW, then x10 x 100 by Multiplier */
     req.EVMaximumPowerLimit.Multiplier = 2; /* 10^2 */
     req.EVMaximumPowerLimit.Unit_isUsed = 1;
     req.EVMaximumPowerLimit.Unit = dinunitSymbolType_W; /* Watt */
@@ -402,7 +403,7 @@ static void stateFunctionConnected(void)
     addToTrace(MOD_PEV, "Checkpoint400: Sending the initial SupportedApplicationProtocolReq");
     setCheckpoint(400);
     addV2GTPHeaderAndTransmit(exiDemoSupportedApplicationProtocolRequestIoniq, sizeof(exiDemoSupportedApplicationProtocolRequestIoniq));
-    Param::SetInt(Param::CurrentDemandStopReason, STOP_REASON_NONE);
+    _ccs_params.CurrentDemandStopReason = STOP_REASON_NONE;
     pev_enterState(PEV_STATE_WaitForSupportedApplicationProtocolResponse);
 }
 
@@ -601,8 +602,8 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                 int evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
                 int evseMinimumVoltage = combineValueAndMultiplier(dcparm.EVSEMinimumVoltageLimit);
 #undef dcparm
-                Param::SetInt(Param::EvseMaxVoltage, evseMaxVoltage);
-                Param::SetInt(Param::EvseMaxCurrent, evseMaxCurrent);
+                _ccs_params.EvseMaxVoltage = evseMaxVoltage;
+                _ccs_params.EvseMaxCurrent = evseMaxCurrent;
 
                 if (hardwareInterface_getAccuVoltage() < evseMinimumVoltage) {
                     // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
@@ -663,7 +664,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
         {
             rc = dinDocDec.V2G_Message.Body.CableCheckRes.ResponseCode;
             proc = dinDocDec.V2G_Message.Body.CableCheckRes.EVSEProcessing;
-            Param::SetInt(Param::EvseVoltage, 0);
+            _ccs_params.EvseVoltage = 0;
             // We have two cases here:
             // 1) The charger says "cable check is finished and cable ok", by setting ResponseCode=OK and EVSEProcessing=Finished.
             // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
@@ -736,7 +737,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
             _global.auto_power_off_timer_count_up_ms = 0;
 
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
-            Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
+            _ccs_params.EvseVoltage = EVSEPresentVoltage;
 
             uint16_t inletVtg = hardwareInterface_getInletVoltage();
             uint16_t batVtg = hardwareInterface_getAccuVoltage();
@@ -865,7 +866,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
 
             if (currentDemandStopReason != STOP_REASON_NONE)
             {
-                Param::SetInt(Param::CurrentDemandStopReason, currentDemandStopReason);
+                _ccs_params.CurrentDemandStopReason = currentDemandStopReason;
                 setCheckpoint(800);
                 pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                                 sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
@@ -877,8 +878,16 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
                 uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
 
-                Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
-                Param::SetInt(Param::EvseCurrent, evsePresentCurrent);
+                if (dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed) {
+                    int evseMaxCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit);
+                    _ccs_params.EvseMaxCurrentInCurrentDemandRes = evseMaxCurrent;
+                }
+                else {
+                    _ccs_params.EvseMaxCurrentInCurrentDemandRes = 0;
+                }
+
+                _ccs_params.EvseVoltage = EVSEPresentVoltage;
+                _ccs_params.EvseCurrent = evsePresentCurrent;
 
                 if (EVSEPresentVoltage != hardwareInterface_getChargingTargetVoltage()) ChargingVoltageDifferentFromTarget = true;
                 ChargingVoltageDifferentFromTarget_isSet = true;
@@ -955,7 +964,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                round will show a quite high voltage, because the contactors are just opening. We
                need to repeat the requests, until the voltage is at a non-dangerous level. */
             EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-            Param::SetInt(Param::EvseVoltage, EVSEPresentVoltage);
+            _ccs_params.EvseVoltage = EVSEPresentVoltage;
             addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", EVSEPresentVoltage);
             bool voltageIsLow = EVSEPresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
             if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
@@ -1046,7 +1055,7 @@ static void stateFunctionSafeShutDownWaitForChargerShutdown(void)
 static void stateFunctionStop(void)
 {
     /* Set voltage to 0 so rest of system sees safe state */
-    Param::SetInt(Param::EvseVoltage, 0);
+    _ccs_params.EvseVoltage = 0;
 
     hardwareInterface_unlockConnector();
 
@@ -1074,7 +1083,7 @@ static void pev_enterState(pevstates n)
     //addToTrace("[PEV] from %d entering %d", pev_state, n);
     pev_state = n;
     pev_cyclesInState = 0;
-    Param::SetInt(Param::opmode, n);
+    _ccs_params.opmode = n;
 }
 
 static uint8_t pev_isTooLong(void)
@@ -1103,7 +1112,7 @@ static void pev_runFsm(void)
     stateFunctions[pev_state](); //call state function
 
     if (pev_state != PEV_STATE_WaitForCurrentDemandResponse) //only in currentDemand we have meaningful current values
-        Param::SetInt(Param::EvseCurrent, 0);
+        _ccs_params.EvseCurrent = 0;
 
     bool stop = false;
     if (pev_isTooLong())
@@ -1130,8 +1139,8 @@ static void pev_runFsm(void)
     if (stop)
     {
         // Make sure we set a CurrentDemandStopReason if we pull the rug on CurrentDemand
-        if (pev_state == PEV_STATE_WaitForCurrentDemandResponse && Param::GetInt(Param::CurrentDemandStopReason) == STOP_REASON_NONE)
-            Param::SetInt(Param::CurrentDemandStopReason, STOP_REASON_TIMEOUT);
+        if (pev_state == PEV_STATE_WaitForCurrentDemandResponse && _ccs_params.CurrentDemandStopReason == STOP_REASON_NONE)
+            _ccs_params.CurrentDemandStopReason = STOP_REASON_TIMEOUT;
 
         pev_enterState(PEV_STATE_SafeShutDown);
 	}

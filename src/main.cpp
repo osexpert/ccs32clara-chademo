@@ -29,7 +29,7 @@
 #include <libopencmsis/core_cm3.h>
 #include <libopencm3/stm32/gpio.h>
 
-#include "params.h"
+#include "ccs_params.h"
 #include "digio.h"
 #include "hwinit.h"
 #include "printf.h"
@@ -56,6 +56,7 @@ LedBlinker* ledBlinker;
 Stm32Scheduler* scheduler;
 
 global_data _global;
+extern ccs_params _ccs_params;
 
 volatile uint32_t system_millis;
 
@@ -101,7 +102,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForSlacDone)
     {
-        if (Param::GetInt(Param::checkpoint) >= 200) // SDP (service discovery, slac is done)
+        if (_ccs_params.checkpoint >= 200) // SDP (service discovery, slac is done)
         {
             ledBlinker->setPattern(blink_1);
             _ledState = LedState::WaitForTcpConnected;
@@ -109,7 +110,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForTcpConnected)
     {
-        if (Param::GetInt(Param::checkpoint) >= 303) // tcp connected
+        if (_ccs_params.checkpoint >= 303) // tcp connected
         {
             ledBlinker->setPattern(blink_2);
             _ledState = LedState::WaitForPreChargeStart;
@@ -117,7 +118,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForPreChargeStart)
     {
-        if (Param::GetInt(Param::checkpoint) >= 570)
+        if (_ccs_params.checkpoint >= 570)
         {
             ledBlinker->setPattern(blink_3);
             _ledState = LedState::WaitForPreChargeDoneButStalled;
@@ -133,7 +134,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForCurrentDemandLoop)
     {
-        if (Param::GetInt(Param::checkpoint) >= 700)
+        if (_ccs_params.checkpoint >= 700)
         {
             // barely noticable, removed blink
             _ledState = LedState::WaitForDeliveringAmps;
@@ -142,7 +143,7 @@ void RunLedStateMachine()
     else if (_ledState == LedState::WaitForDeliveringAmps)
     {
         // TODO: or check if we are in ccs CurrentDemand state?
-        if (Param::GetInt(Param::EvseCurrent) > 0)
+        if (_ccs_params.EvseCurrent > 0)
         {
             ledBlinker->setPattern(blink_working);
             _ledState = LedState::Charging;
@@ -253,7 +254,7 @@ void power_off_check()
             println("Ccs ended. Power off pending...");
         }
 
-        int ccsCurrentDemandStopReason = Param::GetInt(Param::CurrentDemandStopReason);
+        int ccsCurrentDemandStopReason = _ccs_params.CurrentDemandStopReason;
         if (ccsCurrentDemandStopReason != STOP_REASON_NONE)
         {
             _global.powerOffPending = true;
@@ -369,22 +370,23 @@ static void print_ccs_trace()
     static uint32_t nextPrint = 0;
     if (system_millis >= nextPrint)
     {
-        int state = Param::GetInt(Param::opmode);
+        int state = _ccs_params.opmode;
         const char* label = pevSttLabels[state];
 
-        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
+        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
             label,
             tcp_getTotalNumberOfRetries(),
-            Param::GetInt(Param::EvseVoltage),
-            Param::GetInt(Param::EvseCurrent),
-            Param::GetInt(Param::EvseMaxVoltage),
-            Param::GetInt(Param::EvseMaxCurrent),
+            _ccs_params.EvseVoltage,
+            _ccs_params.EvseCurrent,
+            _ccs_params.EvseMaxVoltage,
+            _ccs_params.EvseMaxCurrent,
+            _ccs_params.EvseMaxCurrentInCurrentDemandRes,
             // car
-            Param::GetInt(Param::ChargeCurrent),
-            Param::GetInt(Param::TargetVoltage),
-            Param::GetInt(Param::BatteryVoltage),
-            Param::GetInt(Param::MaxVoltage),
-            Param::GetInt(Param::MaxCurrent)
+            _ccs_params.TargetCurrent,
+            _ccs_params.TargetVoltage,
+            _ccs_params.BatteryVoltage,
+            _ccs_params.MaxVoltage,
+            _ccs_params.MaxCurrent
         );
 
         nextPrint = system_millis + SYSINFO_EVERY_MS;
@@ -604,7 +606,7 @@ extern "C" int main(void)
     nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
     nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
 
-    Param::SetInt(Param::MaxCurrent, ADAPTER_MAX_AMPS);
+    _ccs_params.MaxCurrent = ADAPTER_MAX_AMPS;
 
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);

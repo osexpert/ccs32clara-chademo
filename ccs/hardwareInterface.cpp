@@ -3,39 +3,39 @@
 #include "ccs32_globals.h"
 
 extern global_data _global;
-
+extern ccs_params _ccs_params;
 
 int16_t hardwareInterface_getInletVoltage(void)
 {
     // we have no inlet voltage sensor. 
-    return Param::GetInt(Param::EvseVoltage);
+    return _ccs_params.EvseVoltage;
 }
 
 int16_t hardwareInterface_getAccuVoltage(void)
 {
-    return Param::GetInt(Param::BatteryVoltage);
+    return _ccs_params.BatteryVoltage;
 }
 
 int16_t hardwareInterface_getChargingTargetVoltage(void)
 {
-    return Param::GetInt(Param::TargetVoltage);
+    return _ccs_params.TargetVoltage;
 }
 
 int16_t hardwareInterface_getChargingTargetCurrent(void)
 {
-    return Param::GetInt(Param::ChargeCurrent);
+    return _ccs_params.TargetCurrent;
 }
 
 uint8_t hardwareInterface_getSoc(void)
 {
     /* SOC in percent */
-    return Param::GetInt(Param::soc);
+    return _ccs_params.soc;
 }
 
 bool hardwareInterface_getIsAccuFull(void)
 {
     // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
-    return Param::GetInt(Param::soc) == 100;
+    return _ccs_params.soc == 100;
 }
 
 void hardwareInterface_setPowerRelayOn(void)

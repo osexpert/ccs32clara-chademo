@@ -2,17 +2,19 @@
 
 #include "ccs32_globals.h"
 
+extern ccs_params _ccs_params;
+
 uint16_t checkpointNumber;
 
 /* Helper functions */
 
 void setCheckpoint(uint16_t newcheckpoint) {
     checkpointNumber = newcheckpoint;
-    Param::SetInt(Param::checkpoint, newcheckpoint);
+    _ccs_params.checkpoint = newcheckpoint;
 }
 
 void addToTrace(enum Module module, const char* format, ...) {
-    if (Param::GetInt(Param::logging) & module)
+    if (_ccs_params.logging & module)
     {
         va_list args;
         va_start(args, format);
@@ -22,7 +24,7 @@ void addToTrace(enum Module module, const char* format, ...) {
 }
 
 void addToTrace_bytes(enum Module module, const char * s, uint8_t* data, uint16_t len) {
-   if (Param::GetInt(Param::logging) & module) {
+   if (_ccs_params.logging & module) {
       printf("%s ", s);
       for (uint16_t i = 0; i < len; i++)
          printf("%02x", data[i]);

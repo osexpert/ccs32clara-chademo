@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "chademoCharger.h"
-#include "params.h"
+#include "ccs_params.h"
 #include "main.h"
 #include "pevStateMachine.h"
 
@@ -34,7 +34,7 @@ extern ChademoCharger* chademoCharger;
 
 extern volatile uint32_t system_millis;
 extern global_data _global;
-
+extern ccs_params _ccs_params;
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
@@ -260,14 +260,14 @@ void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
     // TODO: use _carData.MaxVoltage? But what is the point? We always just ask for target voltage anyways...
-    Param::SetInt(Param::MaxVoltage, _carData.TargetVoltage + 1);
-    Param::SetInt(Param::soc, _carData.SocPercent);
-    Param::SetInt(Param::BatteryVoltage, _carData.EstimatedBatteryVoltage);
+    _ccs_params.MaxVoltage = _carData.TargetVoltage + 1;
+    _ccs_params.soc = _carData.SocPercent;
+    _ccs_params.BatteryVoltage = _carData.EstimatedBatteryVoltage;
 
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
-    Param::SetInt(Param::ChargeCurrent, _state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
+    _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
 
-    Param::SetInt(Param::TargetVoltage, _carData.TargetVoltage);
+    _ccs_params.TargetVoltage = _carData.TargetVoltage;
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t sec)
@@ -835,10 +835,10 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     {
         // mirror these values
        SetChargerData(
-            Param::GetInt(Param::EvseMaxVoltage),
-            Param::GetInt(Param::EvseMaxCurrent),
-            Param::GetInt(Param::EvseVoltage),
-            Param::GetInt(Param::EvseCurrent)
+           _ccs_params.EvseMaxVoltage,
+           _ccs_params.EvseMaxCurrent,
+           _ccs_params.EvseVoltage,
+           _ccs_params.EvseCurrent
         );
     }
 }

@@ -25,7 +25,7 @@
 #include "udpChecksum.h"
 #include "my_math.h"
 #include "digio.h"
-#include "params.h"
+#include "ccs_params.h"
 #include "hwinit.h"
 #include "my_string.h"
 #include "libopencm3/cm3/cortex.h"
