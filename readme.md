@@ -220,6 +220,8 @@ The following are known to work, but may not work on all cars (Leaf ZE1 typicall
 - SigenStor EVDC domestic 12.5kW charger https://github.com/osexpert/ccs32clara-chademo/discussions/49
 - EVniculus 7kW discharger https://github.com/osexpert/ccs32clara-chademo/discussions/53
 
+If using on a regular basis, its easiest to use a V2X build, else you must enable V2X every time you power on the adapter.
+
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
