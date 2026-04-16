@@ -646,7 +646,7 @@ extern "C" int main(void)
     systick_setup(rcc_ahb_frequency / 1000 - 1); // 1ms
 
     int batteryLevel = battery_level_from_voltage(adc_4_volt);
-    println("battery level:%d (1:low, 2:good, 3:great)", batteryLevel);
+    println("battery level:%d (1:low, 2:ok, 3:good)", batteryLevel);
 
     bool stopPressed = not DigIo::stop_button_in_inverted.Get();
     special_modes_init(stopPressed);
