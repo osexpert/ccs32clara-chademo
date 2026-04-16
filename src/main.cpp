@@ -282,7 +282,6 @@ void power_off_check()
 
 void adc_setup(void)
 {
-    // Enable required clocks
     rcc_periph_clock_enable(RCC_ADC1);
 
     adc_enable_temperature_sensor(); // enables vrefint too
@@ -506,7 +505,6 @@ static void SetRandomStartPort()
     rng_enable();
     uint32_t rand_num = rng_get_random_blocking(); // Get a random number
     rng_disable(); // Disable RNG when finished to save power
-    rcc_periph_clock_disable(RCC_RNG);
 
     uint16_t start_port = setStartPort(rand_num);
     println("Random start port:%u", start_port);
@@ -543,6 +541,8 @@ int adapter_charging()
     // Turn off ADC to save power
     adc_power_off(ADC1);
     rcc_periph_clock_disable(RCC_ADC1);
+    rcc_periph_clock_disable(RCC_CAN1);
+    rcc_periph_clock_disable(RCC_RNG);
 
     systick_setup(rcc_ahb_frequency - 1); // 1 sec
 
