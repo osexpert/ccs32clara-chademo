@@ -74,6 +74,8 @@ When delivering amps, medium blinking [*****_____]
 When stop/power off pending, fast blinking [*_]
 
 Charging the adapter itself, always on: [*]
+
+When power off adapter manually by pression stop, it will blink 1, 2 or 3 times to show battery level: 1:low, 2:ok, 3:good.
 </pre>
 
 ## Special modes
@@ -151,6 +153,8 @@ Measuring the power the adapter uses during charging is ca. 1 Watt, and some of 
 Ideally a fully charged adapter should have vcc4 over 4 volts.
 
 The adapter is also charged when charging the car, and the adapter may charge faster this way than via usb-c?
+
+When powering off the adapter manually by pressing stop, it will blink 1, 2 or 3 times to show battery level: 1:low, 2:ok, 3:good.
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.
