@@ -18,6 +18,7 @@
  */
 
 #include "myLogging.h"
+#include "main.h"
 
 /***** enums ******/
 
@@ -48,7 +49,7 @@ struct ccs_params
 
     int MaxPower = 100; // kW
     int MaxVoltage = 410; // V
-    int MaxCurrent = 125; // A
+    int MaxCurrent = ADAPTER_MAX_AMPS;// 125; // A
 
     int TargetVoltage = 0;
     int TargetCurrent = 0;

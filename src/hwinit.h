@@ -28,11 +28,12 @@ extern "C"
 
 void can_setup(void);
 void clock_setup(void);
+void gpio_clocks_enable();
 //void nvic_setup(void);
 //void rtc_setup(void);
 uint32_t rtc_get_ms(void);
 void usart1_setup(void);
-void systick_setup(void);
+void systick_setup(uint32_t period);
 
 //void tim_setup(int variant);
 //void write_bootloader_pininit();

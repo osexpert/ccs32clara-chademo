@@ -72,6 +72,8 @@ When PreCharge started, three blinks [**___**___**_________]
 When PreCharge is done, but stalled waiting for chademo, four blinks [**___**___**___**_________]
 When delivering amps, medium blinking [*****_____]
 When stop/power off pending, fast blinking [*_]
+
+Charging the adapter itself, always on: [*]
 </pre>
 
 ## Special modes
@@ -135,10 +137,20 @@ Firmware update is done and you can let go of the power button.
 Finally, adapter turns on and adapter led is flashing.
 Press the stop button to turn adapter off.
 
-Charging via usb is not part of the software, its only hardware.
-While charging, you will see the led flashing. Periodically, you will see led flashes rapidly, this is the bootloader starting.
+### Charging the adapter
+Charging via usb is not part of the software, AFAICS its only hardware.
+
+Original fw: while charging, you will see the led flashing. Periodically, you will see led flashes rapidly, this is the bootloader starting.
 Meaning, charging automatically triggers power on, then adapter will auto power off due to inactivity and then auto powered on again by charging, and this goes on forever.
+
+This fw: charging is detected based on the ADC voltages: if vcc4 is close to 0.00 volt and vcc12 is close to 4.20 volt, adapter charging is assumed, and the led is permanently on and the fw tries to do as little as possible (sleep).
+It does not periodically restart. You can stop it with the stop button, but it will power itself on again:-)
+
 Charging via USB is very slow, and can take up to 10 hours if the internal battery is really empty.
+Measuring the power the adapter uses during charging is ca. 1 Watt, and some of this is to run the hardware itself. But why is it so low? It does not make any sense to me.
+Ideally a fully charged adapter should have vcc4 over 4 volts.
+
+The adapter is also charged when charging the car, and the adapter may charge faster this way than via usb-c?
 
 ## Original firmware
 Original firmware seems to be based on open-plc-utils. I think it uses a rtos of some kind, with a preemtive scheduler.

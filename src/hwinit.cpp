@@ -47,23 +47,20 @@ void clock_setup(void)
    // Configure to use 16 group priorities with no sub-priorities, ensuring interrupts are prioritized solely by their group priority.
    // Without this, the system uses the default priority grouping (8 groups with 2 sub-priorities)
    SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_PRIGROUP_GROUP16_NOSUB;
-
-   rcc_periph_clock_enable(RCC_GPIOA);
-   rcc_periph_clock_enable(RCC_GPIOB);
-   rcc_periph_clock_enable(RCC_GPIOC);
-   rcc_periph_clock_enable(RCC_GPIOD);
-   rcc_periph_clock_enable(RCC_GPIOE);
-
-   rcc_periph_clock_enable(RCC_ADC1);
-
-   rcc_periph_clock_enable(RCC_CAN1);
-
-   rcc_periph_clock_enable(RCC_RNG);
 }
 
-void systick_setup(void)
+void gpio_clocks_enable()
 {
-    systick_set_reload(rcc_ahb_frequency / 1000 - 1); // 1ms
+    rcc_periph_clock_enable(RCC_GPIOA);
+    rcc_periph_clock_enable(RCC_GPIOB);
+    rcc_periph_clock_enable(RCC_GPIOC);
+    rcc_periph_clock_enable(RCC_GPIOD);
+    rcc_periph_clock_enable(RCC_GPIOE);
+}
+
+void systick_setup(uint32_t period)
+{
+    systick_set_reload(period);
     systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
     systick_counter_enable();
     systick_interrupt_enable();

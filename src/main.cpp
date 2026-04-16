@@ -280,7 +280,7 @@ void power_off_check()
     }
 }
 
-void adc_battery_init(void)
+void adc_setup(void)
 {
     adc_enable_temperature_sensor(); // enables vrefint too
 
@@ -347,6 +347,11 @@ void print_sysinfo()
         // after charging via usb-c for one day... vcc4:4v vcc12:11.56v vdd:3.16v (vdd was low here)
         // during charging car, vcc12 seen between 12.19-12.31V
         // Min values seen and working: vcc4:3.78V vcc12:11.46V
+
+        // When charging via usb: vcc4 between 0.00 and 0.01, vcc12 between 4.16 and 4.18, vdd around 3.30v. Usb 5.1V and 1.0W.
+        // I can hear that the main relay does not click during usb charging. This is what would engange the 12V step-up converter.
+        // But it is strange, I would have expected the opposite, that vcc4 was still battery voltage and but vcc12 being 0.
+        // I assume vcc12 between 4.16 and 4.18 is the charging voltage. And no way to know when fully charged?
         println("[sysinfo] uptime:%dsec vcc4:%fV vcc12:%fV vdd:%fV cpu:%d%% pwroff_cnt:%d pwr_off:%d/%d/%d led_state:%d conn_lvl:%d",
             system_millis / 1000,
             &adc_4_volt, // bypass float to double promotion by passing as reference
@@ -497,9 +502,11 @@ static void SetMacAddress()
 
 static void SetRandomStartPort()
 {
+    rcc_periph_clock_enable(RCC_RNG);
     rng_enable();
     uint32_t rand_num = rng_get_random_blocking(); // Get a random number
     rng_disable(); // Disable RNG when finished to save power
+    rcc_periph_clock_disable(RCC_RNG);
 
     uint16_t start_port = setStartPort(rand_num);
     println("Random start port:%u", start_port);
@@ -529,6 +536,35 @@ void enable_all_faults(void)
  //   SCB_CCR |= SCB_CCR_DIV_0_TRP_Msk; // Trap divide-by-zero
 }
 
+int adapter_charging()
+{
+    led_on();
+
+    // Turn off ADC to save power
+    adc_power_off(ADC1);
+    rcc_periph_clock_disable(RCC_ADC1);
+
+    systick_setup(rcc_ahb_frequency - 1); // 1 sec
+
+    while (1)
+    {
+        __WFI();
+
+        if (system_millis)
+        {
+            system_millis = 0;
+
+            iwdg_reset();
+
+            bool stopPressed = not DigIo::stop_button_in_inverted.Get();
+            if (stopPressed)
+                power_off_no_return("Stop pressed -> power off");
+        }
+    }
+
+    return 0;
+}
+
 extern "C" int main(void)
 {
     // set new vector table in a safe way (bootloader does not set it)
@@ -539,7 +575,7 @@ extern "C" int main(void)
     __enable_irq();                   // Re-enable interrupts
 
     clock_setup(); //Must always come first?
-
+    gpio_clocks_enable();
     iwdg_configure(5000);
 
     DIG_IO_CONFIGURE(DIG_IO_LIST);
@@ -574,12 +610,23 @@ extern "C" int main(void)
     println("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
     // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
+    adc_setup();
+    adc_read_all();
+
+    if (adc_4_volt < 1 &&  // 0 - 0.7 during charging of adapter
+        adc_12_volt > 4 && adc_12_volt < 5  // 4.16 - 4.20 during charging of adapter
+        )
+    {
+        println("adapter is charging (vcc4:%f vcc12:%f) -> do as little as possible", &adc_4_volt, &adc_12_volt);
+        return adapter_charging();
+    }
+
+    systick_setup(rcc_ahb_frequency / 1000 - 1); // 1ms
+
     bool stopPressed = not DigIo::stop_button_in_inverted.Get();
     special_modes_init(stopPressed);
 
-    systick_setup();
     can_setup();
-    adc_battery_init();
 
     hardwareInterface_setStateB();
     SetMacAddress();
@@ -603,13 +650,11 @@ extern "C" int main(void)
     Stm32Scheduler s(TIM4);
     scheduler = &s;
 
-    nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
-    nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
-
-    _ccs_params.MaxCurrent = ADAPTER_MAX_AMPS;
-
     scheduler->AddTask(Ms30Task, 30);
     scheduler->AddTask(Ms100Task, 100);
+
+    nvic_set_priority(NVIC_TIM4_IRQ, IRQ_PRIORITY_SCHED); //second lowest priority
+    nvic_enable_irq(NVIC_TIM4_IRQ); // will now fire tim4_isr
 
     while (true)
     {
