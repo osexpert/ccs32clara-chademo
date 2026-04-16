@@ -538,7 +538,7 @@ int adapter_charging()
 {
     led_on();
 
-    // Turn off ADC to save power
+    // Turn off to save power
     adc_power_off(ADC1);
     rcc_periph_clock_disable(RCC_ADC1);
     rcc_periph_clock_disable(RCC_CAN1);
