@@ -282,12 +282,12 @@ void power_off_check()
 
 void adc_setup(void)
 {
+    // Enable required clocks
+    rcc_periph_clock_enable(RCC_ADC1);
+
     adc_enable_temperature_sensor(); // enables vrefint too
 
     gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
-
-    // Enable required clocks
-    rcc_periph_clock_enable(RCC_ADC1);
 
     adc_power_off(ADC1);
     // ADC clock: PCLK2/8 = 168/2/8 = 10.5 MHz
