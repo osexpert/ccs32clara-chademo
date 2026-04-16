@@ -194,6 +194,20 @@ static float adc_3_3_volt = 0.0f;
 static float adc_4_volt = 0.0f;
 static float adc_12_volt = 0.0f;
 
+void showBatteryLevel()
+{
+    int batteryLevel = battery_level_from_voltage(adc_4_volt);
+    led_off();
+    msleep(150);
+    for (int i = 0; i < batteryLevel; i++)
+    {
+        led_off();
+        msleep(150);
+        led_on();
+        msleep(150);
+    }
+}
+
 void power_off_no_return(const char* reason)
 {
     println("Power off: %s. Bye!", reason);
@@ -206,20 +220,6 @@ void power_off_no_return(const char* reason)
         println("Contactor was closed! This may be bad...");
         DigIo::contactor_out.Clear();
         msleep(100);
-    }
-
-    if (_global.showBatteryLevel)
-    {
-        int batteryLevel = battery_level_from_voltage(adc_4_volt);
-        led_off();
-        msleep(150);
-        for (int i = 0; i < batteryLevel; i++)
-        {
-            led_off();
-            msleep(150);
-            led_on();
-            msleep(150);
-        }
     }
 
     DigIo::power_on_out.Clear();
@@ -260,7 +260,6 @@ void power_off_check()
             && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
-            _global.showBatteryLevel = true;
             println("Stop button pressed briefly and slac not pending. Power off pending...");
         }
         if (buttonPressed5Seconds)
@@ -301,6 +300,7 @@ void power_off_check()
 
         if (powerOffOkCcs && powerOffOkCha)
         {
+            showBatteryLevel();
             power_off_no_return("powerOffPending and both ccs and chademo says power off is ok");
         }
     }

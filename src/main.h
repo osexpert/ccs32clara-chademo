@@ -50,7 +50,6 @@ struct global_data
 
     bool ccsKickoff = false;
     bool powerOffPending = false;
-    bool showBatteryLevel = false;
     bool ccsEnded = false;
     bool moreLogging = false;
     int alternative_voltage = GITHUB_AV;
