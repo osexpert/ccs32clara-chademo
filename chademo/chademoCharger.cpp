@@ -45,9 +45,12 @@ extern ccs_params _ccs_params;
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float adjustBelowSoc = 0, float adjustBelowFactor = 0.0f)
+static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float maxVolt = 0, float adjustBelowSoc = 0, float adjustBelowFactor = 0.0f)
 {
-    float maxVolt = target - 10;
+    if (maxVolt == 0)
+    {
+        maxVolt = target - 10;
+    }
 
     if (nomVolt == 0)
     {
@@ -195,7 +198,12 @@ void ChademoCharger::HandlePendingCarMessages()
             // now that TargetVoltage is stable, set overrides, if any
             SetBatteryVoltOverridesOnce();
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, _carData.SocPercent, _carData.NomVoltOverride, _carData.AdjustBelowSoc, _carData.AdjustBelowFactor);
+            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
+                _carData.SocPercent, 
+                _carData.NomVoltOverride, 
+                _carData.MaxVoltOverride,
+                _carData.AdjustBelowSoc, 
+                _carData.AdjustBelowFactor);
             _carData.VoltsReady = true;
         }
 
@@ -297,6 +305,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     if (_carData.TargetVoltage == 370)
     {
         _carData.NomVoltOverride = 330; // iMiev
+        _carData.MaxVoltOverride = 370; // max is not target - 10
         known = true;
     }
     else if (_carData.TargetVoltage == 450)
@@ -320,12 +329,20 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
             known = true;
         }
     }
+    // Peugeot e-Partner 2017-2020. 80 cells in series. 80x—4.2V=336V
+    else if (_carData.TargetVoltage == 336)
+    {
+        _carData.NomVoltOverride = 300;
+        _carData.MaxVoltOverride = 336; // max is not target - 10
+        known = true;
+    }
 
     if (known)
-        println("[cha] AV%d: known target %dv => nomVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
+        println("[cha] AV%d: known target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
             _global.alternative_voltage, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
+            _carData.MaxVoltOverride,
             _carData.AdjustBelowSoc,
             &_carData.AdjustBelowFactor // bypass float to double promotion by passing as reference
         );
