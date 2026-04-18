@@ -81,12 +81,15 @@ static pevstates pev_state = PEV_STATE_Start;
 static uint16_t pev_numberOfContractAuthenticationReq;
 static uint16_t pev_numberOfChargeParameterDiscoveryReq;
 static uint16_t pev_numberOfCableCheckReq;
-static int EVSEPresentVoltage;
-static int LastChargingVoltage;
+static int LastCurrentDemandResPresentVoltage;
+static int LastTargetCurrent;
 static uint8_t numberOfWeldingDetectionRounds;
 
 static bool ChargingVoltageDifferentFromTarget;
 static bool ChargingVoltageDifferentFromTarget_isSet;
+
+static bool ChargingCurrentDifferentFromTarget;
+static bool ChargingCurrentDifferentFromTarget_isSet;
 
 static bool CableCheckCompletedTrigger;
 
@@ -280,8 +283,9 @@ static void pev_sendPowerDeliveryReq(bool isOn)
 {
     if (isOn) {
         // reset if set from previous session
-        LastChargingVoltage = 0;
+        LastCurrentDemandResPresentVoltage = 0;
         ChargingVoltageDifferentFromTarget = ChargingVoltageDifferentFromTarget_isSet = false;
+        ChargingCurrentDifferentFromTarget = ChargingCurrentDifferentFromTarget_isSet = false;
     }
 
     projectExiConnector_prepare_DinExiDocument();
@@ -338,6 +342,7 @@ static void pev_sendCurrentDemandReq(void)
     req.EVTargetCurrent.Unit = dinunitSymbolType_A;
     req.EVTargetCurrent.Unit_isUsed = 1;
     req.EVTargetCurrent.Value = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
+    LastTargetCurrent = req.EVTargetCurrent.Value;
 
     req.ChargingComplete = 0; /* boolean. Is it fine that the PEV just sends a PowerDeliveryReq with STOP, if it decides to stop the charging? */
 
@@ -736,8 +741,8 @@ static void stateFunctionWaitForPreChargeResponse(void)
         {
             _global.auto_power_off_timer_count_up_ms = 0;
 
-            EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
-            _ccs_params.EvseVoltage = EVSEPresentVoltage;
+            int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
+            _ccs_params.EvseVoltage = evsePresentVoltage;
 
             uint16_t inletVtg = hardwareInterface_getInletVoltage();
             uint16_t batVtg = hardwareInterface_getAccuVoltage();
@@ -875,7 +880,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             else
             {
                 /* continue charging loop */
-                EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
+                int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
                 uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
 
                 if (dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed) {
@@ -886,13 +891,16 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                     _ccs_params.EvseMaxCurrentInCurrentDemandRes = 0;
                 }
 
-                _ccs_params.EvseVoltage = EVSEPresentVoltage;
+                _ccs_params.EvseVoltage = evsePresentVoltage;
                 _ccs_params.EvseCurrent = evsePresentCurrent;
+                LastCurrentDemandResPresentVoltage = evsePresentVoltage;
 
-                if (EVSEPresentVoltage != hardwareInterface_getChargingTargetVoltage()) ChargingVoltageDifferentFromTarget = true;
+                // not using LastTargetVoltage, since assuming target never changes
+                if (evsePresentVoltage != hardwareInterface_getChargingTargetVoltage()) ChargingVoltageDifferentFromTarget = true;
                 ChargingVoltageDifferentFromTarget_isSet = true;
 
-                LastChargingVoltage = EVSEPresentVoltage;
+                if (evsePresentCurrent != LastTargetCurrent) ChargingCurrentDifferentFromTarget = true;
+                ChargingCurrentDifferentFromTarget_isSet = true;
 
                 setCheckpoint(710);
                 pev_sendCurrentDemandReq();
@@ -963,14 +971,14 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
             /* The charger measured the voltage on the cable, and gives us the value. In the first
                round will show a quite high voltage, because the contactors are just opening. We
                need to repeat the requests, until the voltage is at a non-dangerous level. */
-            EVSEPresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-            _ccs_params.EvseVoltage = EVSEPresentVoltage;
-            addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", EVSEPresentVoltage);
-            bool voltageIsLow = EVSEPresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
+            int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
+            _ccs_params.EvseVoltage = evsePresentVoltage;
+            addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", evsePresentVoltage);
+            bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
             if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
 
                 if (not voltageIsLow) {
-                    if (EVSEPresentVoltage == LastChargingVoltage) {
+                    if (evsePresentVoltage == LastCurrentDemandResPresentVoltage) {
                         // Charger still says it has the same voltage as when we were last charging.
                         // If we were welded, the measured voltage should be battery voltage, and its very unlikely that this would be exactly the same as last charging voltage.
                         // It should most certainly be lower, as the charging voltage is always higher than the battery voltage.
@@ -1162,8 +1170,12 @@ bool chademoInterface_ccsInEndState() {
     return pev_state == PEV_STATE_End;
 }
 
-int chademoInterface_ccsChargingVoltageMirrorsTarget() {
+bool chademoInterface_ccsChargingVoltageMirrorsTarget() {
     return ChargingVoltageDifferentFromTarget_isSet && not ChargingVoltageDifferentFromTarget;
+}
+
+bool chademoInterface_ccsChargingCurrentMirrorsTarget() {
+    return ChargingCurrentDifferentFromTarget_isSet && not ChargingCurrentDifferentFromTarget;
 }
 
 bool chademoInterface_ccsCableCheckDone() {

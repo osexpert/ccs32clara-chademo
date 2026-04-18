@@ -399,7 +399,7 @@ static void print_ccs_trace()
         int state = _ccs_params.opmode;
         const char* label = pevSttLabels[state];
 
-        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
+        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA  mirror:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
             label,
             tcp_getTotalNumberOfRetries(),
             _ccs_params.EvseVoltage,
@@ -407,6 +407,8 @@ static void print_ccs_trace()
             _ccs_params.EvseMaxVoltage,
             _ccs_params.EvseMaxCurrent,
             _ccs_params.EvseMaxCurrentInCurrentDemandRes,
+            chademoInterface_ccsChargingVoltageMirrorsTarget(),
+            chademoInterface_ccsChargingCurrentMirrorsTarget(),
             // car
             _ccs_params.TargetCurrent,
             _ccs_params.TargetVoltage,

@@ -539,6 +539,12 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
+        if (chademoInterface_ccsChargingVoltageMirrorsTarget())
+        {
+            // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation amps error.
+            _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
+        }
+
         if (stopReason != StopReason::NONE)
         {
             SetState(ChargerState::Stopping_Start, stopReason);
@@ -550,13 +556,12 @@ void ChademoCharger::RunStateMachine()
             bool isDischargeUnit = false;
             bool isDischarging = false;
 
-            if (chademoInterface_ccsChargingVoltageMirrorsTarget())
+            if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
             {
                 // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
                 // one discharger is observed to mirror asked amps as delivered amps.
                 // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
                 _chargerData.OutputCurrent = 0;
-                _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                 isDischargeUnit = true;
                 isDischarging = true;
             }
