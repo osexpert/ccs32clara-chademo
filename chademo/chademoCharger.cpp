@@ -32,10 +32,6 @@ extern ChademoCharger* chademoCharger;
         } \
     } while (0)
 
-extern volatile uint32_t system_millis;
-extern global_data _global;
-extern ccs_params _ccs_params;
-
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
 /// <summary>
@@ -751,7 +747,7 @@ bool ChademoCharger::PreChargeCompleted()
     }
 }
 
-extern "C" bool chademoInterface_preChargeCompleted()
+bool chademoInterface_preChargeCompleted()
 {
     return chademoCharger->PreChargeCompleted();
 }
@@ -761,7 +757,7 @@ bool ChademoCharger::CarContactorsOpened()
     return not _carData.ContactorsClosed;
 }
 
-extern "C" bool chademoInterface_carContactorsOpened()
+bool chademoInterface_carContactorsOpened()
 {
     return chademoCharger->CarContactorsOpened();
 }
@@ -781,7 +777,7 @@ bool ChademoCharger::PreChargeCanStart()
 #endif
 }
 
-extern "C" bool chademoInterface_preChargeCanStart()
+bool chademoInterface_preChargeCanStart()
 {
     return chademoCharger->PreChargeCanStart();
 }

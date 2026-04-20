@@ -5,10 +5,6 @@
 #include "hwinit.h"
 #include "main.h"
 
-extern volatile uint32_t system_millis;
-
-extern global_data _global;
-
 void ChademoCharger::SetSwitchD2(bool set)
 {
     println("[cha] set switch (d2) -> %d", set);

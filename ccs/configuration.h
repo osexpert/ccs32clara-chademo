@@ -1,4 +1,4 @@
-
+#pragma once
 
 /* Logging verbosity settings */
 //#define VERBOSE_INIT_ETH

@@ -2,8 +2,6 @@
 #include "projectExiConnector.h"
 
 #include "main.h"
-extern global_data _global;
-extern ccs_params _ccs_params;
 
 /* The Charging State Machine for the car */
 //STATE_ENTRY(internalName, friendlyName, timeout in s)

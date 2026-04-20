@@ -1,3 +1,4 @@
+#pragma once
 /* Interface header for udpChecksum.c */
 
 /* Global Defines */

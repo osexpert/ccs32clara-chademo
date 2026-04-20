@@ -1,3 +1,4 @@
+#pragma once
 /*
  * This file is part of the stm32-template project.
  *
@@ -16,12 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __CCS_PARAMS_H
-#define __CCS_PARAMS_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include "myLogging.h"
 #include "main.h"
@@ -39,12 +34,6 @@ enum _stopreasons
    STOP_REASON_CHARGER_EVSE_MALFUNCTION,
    STOP_REASON_TIMEOUT
 };
-
-
-//Generated enum-string for possible errors
-//extern const char* errorListString;
-//Generated enum string for PEV states
-//extern const char* pevSttString;
 
 
 struct ccs_params
@@ -69,11 +58,7 @@ struct ccs_params
     int EvseVoltage = 0;
     int EvseCurrent = 0;
     int EvseMaxCurrentInCurrentDemandRes = 0;
-    _stopreasons CurrentDemandStopReason = STOP_REASON_NONE;
+    int CurrentDemandStopReason = STOP_REASON_NONE;
 };
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __CCS_PARAMS_H */
+extern ccs_params _ccs_params;

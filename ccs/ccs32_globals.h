@@ -1,6 +1,6 @@
-
+#pragma once
 /* global include file, which includes all other include files */
-//#include "controllertype.h"
+
 #include <string.h> /* memcpy */
 //#include <stdio.h>
 //#include <stdlib.h> /* abs */

@@ -335,7 +335,7 @@ float adc_to_voltage(uint16_t adc, float vdd_voltage, float gain)
 void adc_read_all(void)
 {
     uint16_t adc_results[ADC_CHANNEL_COUNT];
-    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF };
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF /* 17 */ };
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);

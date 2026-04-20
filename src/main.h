@@ -1,3 +1,4 @@
+#pragma once
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -17,14 +18,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MAIN_H
-#define __MAIN_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define ADAPTER_MAX_AMPS 200
 #define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
@@ -59,8 +52,6 @@ struct global_data
     uint32_t auto_power_off_timer_count_up_ms = 0;
 };
 
-#ifdef __cplusplus
-}
-#endif
+extern global_data _global;
 
-#endif /* __MAIN_H */
+extern volatile uint32_t system_millis;

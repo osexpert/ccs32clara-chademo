@@ -2,9 +2,6 @@
 
 #include "ccs32_globals.h"
 
-extern global_data _global;
-extern ccs_params _ccs_params;
-
 int16_t hardwareInterface_getInletVoltage(void)
 {
     // we have no inlet voltage sensor. 
