@@ -56,7 +56,7 @@ LedBlinker* ledBlinker;
 Stm32Scheduler* scheduler;
 
 global_data _global;
-extern ccs_params _ccs_params;
+ccs_params _ccs_params;
 
 volatile uint32_t system_millis;
 

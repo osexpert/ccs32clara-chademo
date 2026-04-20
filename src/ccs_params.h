@@ -16,6 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef __CCS_PARAMS_H
+#define __CCS_PARAMS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "myLogging.h"
 #include "main.h"
@@ -65,3 +71,9 @@ struct ccs_params
     int EvseMaxCurrentInCurrentDemandRes = 0;
     _stopreasons CurrentDemandStopReason = STOP_REASON_NONE;
 };
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __CCS_PARAMS_H */
