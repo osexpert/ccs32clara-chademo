@@ -32,10 +32,6 @@ extern ChademoCharger* chademoCharger;
         } \
     } while (0)
 
-extern volatile uint32_t system_millis;
-extern global_data _global;
-extern ccs_params _ccs_params;
-
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
 /// <summary>
@@ -539,6 +535,12 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
+        if (chademoInterface_ccsChargingVoltageMirrorsTarget())
+        {
+            // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation amps error.
+            _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
+        }
+
         if (stopReason != StopReason::NONE)
         {
             SetState(ChargerState::Stopping_Start, stopReason);
@@ -550,13 +552,12 @@ void ChademoCharger::RunStateMachine()
             bool isDischargeUnit = false;
             bool isDischarging = false;
 
-            if (chademoInterface_ccsChargingVoltageMirrorsTarget())
+            if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
             {
                 // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
                 // one discharger is observed to mirror asked amps as delivered amps.
                 // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
                 _chargerData.OutputCurrent = 0;
-                _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                 isDischargeUnit = true;
                 isDischarging = true;
             }
@@ -746,7 +747,7 @@ bool ChademoCharger::PreChargeCompleted()
     }
 }
 
-extern "C" bool chademoInterface_preChargeCompleted()
+bool chademoInterface_preChargeCompleted()
 {
     return chademoCharger->PreChargeCompleted();
 }
@@ -756,7 +757,7 @@ bool ChademoCharger::CarContactorsOpened()
     return not _carData.ContactorsClosed;
 }
 
-extern "C" bool chademoInterface_carContactorsOpened()
+bool chademoInterface_carContactorsOpened()
 {
     return chademoCharger->CarContactorsOpened();
 }
@@ -776,7 +777,7 @@ bool ChademoCharger::PreChargeCanStart()
 #endif
 }
 
-extern "C" bool chademoInterface_preChargeCanStart()
+bool chademoInterface_preChargeCanStart()
 {
     return chademoCharger->PreChargeCanStart();
 }

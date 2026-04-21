@@ -1,3 +1,4 @@
+#pragma once
 /* Interface header for pevStateMachine.c */
 
 /* Global Defines */
@@ -8,10 +9,6 @@
 /* Global Variables */
 extern const char pevSttLabels[][MAX_LABEL_LEN];
 
-/* Global Functions */
-#ifdef __cplusplus
-extern "C" {
-#endif
 /* pev state machine */
 extern void pevStateMachine_Mainfunction(void);
 
@@ -19,10 +16,8 @@ extern void pevStateMachine_Mainfunction(void);
 extern bool chademoInterface_preChargeCompleted();
 extern bool chademoInterface_carContactorsOpened();
 extern bool chademoInterface_ccsInEndState();
-extern int chademoInterface_ccsChargingVoltageMirrorsTarget();
+extern bool chademoInterface_ccsChargingVoltageMirrorsTarget();
+extern bool chademoInterface_ccsChargingCurrentMirrorsTarget();
 extern bool chademoInterface_ccsCableCheckDone();
 extern bool chademoInterface_preChargeCanStart();
 
-#ifdef __cplusplus
-}
-#endif

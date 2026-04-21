@@ -1,3 +1,4 @@
+#pragma once
 /*
  * This file is part of the stm32-template project.
  *
@@ -35,12 +36,6 @@ enum _stopreasons
 };
 
 
-//Generated enum-string for possible errors
-//extern const char* errorListString;
-//Generated enum string for PEV states
-//extern const char* pevSttString;
-
-
 struct ccs_params
 {
     int logging = DEFAULT_LOGGINGMASK;
@@ -63,5 +58,7 @@ struct ccs_params
     int EvseVoltage = 0;
     int EvseCurrent = 0;
     int EvseMaxCurrentInCurrentDemandRes = 0;
-    _stopreasons CurrentDemandStopReason = STOP_REASON_NONE;
+    int CurrentDemandStopReason = STOP_REASON_NONE;
 };
+
+extern ccs_params _ccs_params;

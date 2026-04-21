@@ -1,3 +1,4 @@
+#pragma once
 /*
  * This file is part of the stm32-template project.
  *
@@ -17,15 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef HWINIT_H_INCLUDED
-#define HWINIT_H_INCLUDED
-
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
 void can_setup(void);
 void clock_setup(void);
 void gpio_clocks_enable();
@@ -37,9 +29,3 @@ void systick_setup(uint32_t period);
 
 //void tim_setup(int variant);
 //void write_bootloader_pininit();
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // HWINIT_H_INCLUDED

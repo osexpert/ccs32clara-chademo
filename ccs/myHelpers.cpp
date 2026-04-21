@@ -2,8 +2,6 @@
 
 #include "ccs32_globals.h"
 
-extern ccs_params _ccs_params;
-
 uint16_t checkpointNumber;
 
 /* Helper functions */
@@ -45,7 +43,7 @@ void sanityCheck(const char*) {
     /* todo: check the canaries, config registers, maybe stack, ... */
 }
 
-extern "C" void* memcpy(void* __restrict target, const void* __restrict source, size_t length)
+void* memcpy(void* __restrict target, const void* __restrict source, size_t length)
 {
     uint8_t* dst = (uint8_t*)target;
     const uint8_t* src = (const uint8_t*)source;
@@ -54,6 +52,6 @@ extern "C" void* memcpy(void* __restrict target, const void* __restrict source, 
         *dst++ = *src++;
     }
 
-    return dst;
+    return target;
 };
 

@@ -1,3 +1,4 @@
+#pragma once
 /* Interface header for ipv6.c */
 
 /* Global Defines */

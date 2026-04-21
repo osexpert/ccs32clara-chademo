@@ -1,8 +1,5 @@
-
+#pragma once
 /* definitions for logging */
-
-#ifndef MY_LOGGING_H
-#define MY_LOGGING_H
 
 enum Module
 {
@@ -26,5 +23,3 @@ enum Module
 
 // slimmer
 #define DEFAULT_LOGGINGMASK ( MOD_MODEMFINDER | MOD_HOMEPLUG | MOD_PEV | MOD_SDP | MOD_TCP | MOD_CONNMGR | MOD_HWIF)
-
-#endif

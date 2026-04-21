@@ -56,7 +56,7 @@ LedBlinker* ledBlinker;
 Stm32Scheduler* scheduler;
 
 global_data _global;
-extern ccs_params _ccs_params;
+ccs_params _ccs_params;
 
 volatile uint32_t system_millis;
 
@@ -335,7 +335,7 @@ float adc_to_voltage(uint16_t adc, float vdd_voltage, float gain)
 void adc_read_all(void)
 {
     uint16_t adc_results[ADC_CHANNEL_COUNT];
-    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF };
+    static uint8_t adc_channels[ADC_CHANNEL_COUNT] = { 10 /* PC0 */, 11 /* PC1 */, ADC_CHANNEL_VREF /* 17 */ };
 
     for (int i = 0; i < ADC_CHANNEL_COUNT; i++) {
         adc_set_regular_sequence(ADC1, 1, &adc_channels[i]);
@@ -399,7 +399,7 @@ static void print_ccs_trace()
         int state = _ccs_params.opmode;
         const char* label = pevSttLabels[state];
 
-        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
+        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA  mirror:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
             label,
             tcp_getTotalNumberOfRetries(),
             _ccs_params.EvseVoltage,
@@ -407,6 +407,8 @@ static void print_ccs_trace()
             _ccs_params.EvseMaxVoltage,
             _ccs_params.EvseMaxCurrent,
             _ccs_params.EvseMaxCurrentInCurrentDemandRes,
+            chademoInterface_ccsChargingVoltageMirrorsTarget(),
+            chademoInterface_ccsChargingCurrentMirrorsTarget(),
             // car
             _ccs_params.TargetCurrent,
             _ccs_params.TargetVoltage,

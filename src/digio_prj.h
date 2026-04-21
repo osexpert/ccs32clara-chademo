@@ -1,5 +1,4 @@
-#ifndef PinMode_PRJ_H_INCLUDED
-#define PinMode_PRJ_H_INCLUDED
+#pragma once
 
 /* Here you specify generic IO pins, i.e. digital input or outputs.
  * Inputs can be floating (INPUT_FLT), have a 30k pull-up (INPUT_PU)
@@ -49,4 +48,4 @@
     /* init:0, after car contactor closed:1 */ \
     DIG_IO_ENTRY(contactor_out, GPIOC, GPIO3, PinMode::OUTPUT, GPIO_OSPEED_2MHZ)
 
-#endif // PinMode_PRJ_H_INCLUDED
+

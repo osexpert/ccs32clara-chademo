@@ -68,8 +68,6 @@ void systick_setup(uint32_t period)
     nvic_set_priority(NVIC_SYSTICK_IRQ, 0);
 }
 
-extern volatile uint32_t system_millis;
-
 /**
 * returns the number of milliseconds since startup
 */
