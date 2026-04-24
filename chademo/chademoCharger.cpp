@@ -537,9 +537,21 @@ void ChademoCharger::RunStateMachine()
 
         if (chademoInterface_ccsChargingVoltageMirrorsTarget())
         {
-            // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation amps error.
+            // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation volts error.
             _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
         }
+
+#if false
+        // Is it possible that all the complicated logic below (for discharge support), could be replaced with this simple hack?
+        // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
+        // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
+        // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
+        // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
+        if (_chargerData.OutputCurrent == 0)
+        {
+            _chargerData.OutputCurrent = 1;
+        }
+#endif
 
         if (stopReason != StopReason::NONE)
         {
