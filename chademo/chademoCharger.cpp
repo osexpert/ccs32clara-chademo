@@ -33,6 +33,7 @@ extern ChademoCharger* chademoCharger;
     } while (0)
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
+#define LEAF_CHARGING_CURRENT_LIMIT_AMPS 50
 
 /// <summary>
 /// get estimated battery volt from target and soc.
@@ -162,14 +163,16 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
+        uint8_t limitedRequestCurrent = min((uint8_t)_msg102.m.RequestCurrent, (uint8_t)LEAF_CHARGING_CURRENT_LIMIT_AMPS);
+
+        if (_state == ChargerState::ChargingLoop && limitedRequestCurrent > _chargerData.MaxAvailableOutputCurrent)
         {
-            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
+            println("[cha] Car asking (%d, limited to %d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, limitedRequestCurrent, _chargerData.MaxAvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
         {
-            _carData.RequestCurrent = _msg102.m.RequestCurrent;
+            _carData.RequestCurrent = limitedRequestCurrent;
         }
 
         // soc and the constant both unstable before switch(k)
@@ -269,7 +272,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
     _ccs_params.BatteryVoltage = _carData.EstimatedBatteryVoltage;
 
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
-    _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
+    _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? min((int)_carData.RequestCurrent, LEAF_CHARGING_CURRENT_LIMIT_AMPS) : 0);
 
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
 }
@@ -325,7 +328,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
             known = true;
         }
     }
-    // Peugeot e-Partner 2017-2020. 80 cells in series. 80x—4.2V=336V
+    // Peugeot e-Partner 2017-2020. 80 cells in series. 80x 4.2V=336V
     else if (_carData.TargetVoltage == 336)
     {
         _carData.NomVoltOverride = 300;
@@ -821,6 +824,8 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     _chargerData.MaxAvailableOutputCurrent = clampToUint8(maxA);
     if (_chargerData.MaxAvailableOutputCurrent > ADAPTER_MAX_AMPS)
         _chargerData.MaxAvailableOutputCurrent = ADAPTER_MAX_AMPS;
+    if (_chargerData.MaxAvailableOutputCurrent > LEAF_CHARGING_CURRENT_LIMIT_AMPS)
+        _chargerData.MaxAvailableOutputCurrent = LEAF_CHARGING_CURRENT_LIMIT_AMPS;
 
     _chargerData.OutputVoltage = outV;
 
@@ -840,6 +845,9 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     {
         _chargerData.DynAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
+
+    if (_chargerData.DynAvailableOutputCurrent > _chargerData.MaxAvailableOutputCurrent)
+        _chargerData.DynAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
 
     _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS, _chargerData.MaxAvailableOutputCurrent);
 };
