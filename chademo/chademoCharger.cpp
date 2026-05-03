@@ -33,6 +33,7 @@ extern ChademoCharger* chademoCharger;
     } while (0)
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
+// Limit requested CHAdeMO/CCS charging current for Leaf battery temperature control.
 #define LEAF_CHARGING_CURRENT_LIMIT_AMPS 50
 
 /// <summary>
