@@ -54,6 +54,7 @@ struct ccs_params
 
     int EvseMaxCurrent = 0;
     int EvseMaxVoltage = 0;
+    int EvseMinimumVoltage = 0;
 
     int EvseVoltage = 0;
     int EvseCurrent = 0;

@@ -80,6 +80,7 @@ static uint16_t pev_numberOfContractAuthenticationReq;
 static uint16_t pev_numberOfChargeParameterDiscoveryReq;
 static uint16_t pev_numberOfCableCheckReq;
 static int LastCurrentDemandResPresentVoltage;
+static int LastTargetVoltage;
 static int LastTargetCurrent;
 static uint8_t numberOfWeldingDetectionRounds;
 
@@ -322,25 +323,27 @@ static void pev_sendCurrentDemandReq(void)
     st.EVRESSSOC = hardwareInterface_getSoc();
 #undef st
     // EVTargetVoltage
-    uint16_t UTarget = hardwareInterface_getChargingTargetVoltage(); /* The charging target. Scaling is 1V. */
+    uint16_t targetVoltage = hardwareInterface_getChargingTargetVoltage(); /* The charging target. Scaling is 1V. */
+    uint16_t targetCurrent = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
     uint16_t EVMaximumVoltageLimit = _ccs_params.MaxVoltage;
-    if (EVMaximumVoltageLimit > 1 && UTarget > EVMaximumVoltageLimit) {
+    if (EVMaximumVoltageLimit > 1 && targetVoltage > EVMaximumVoltageLimit) {
         /* Some chargers run into emergency shutdown, if the requested or actual voltage is above the announced EVMaximumVoltageLimit. */
-        UTarget = EVMaximumVoltageLimit;
+        targetVoltage = EVMaximumVoltageLimit;
         addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is above EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
-            UTarget, EVMaximumVoltageLimit);
+            targetVoltage, EVMaximumVoltageLimit);
     }
 #define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
     req.EVTargetVoltage.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
     req.EVTargetVoltage.Unit = dinunitSymbolType_V;
     req.EVTargetVoltage.Unit_isUsed = 1;
-    req.EVTargetVoltage.Value = UTarget; /* The charging target voltage. Scaling is 1V. */
+    req.EVTargetVoltage.Value = targetVoltage; /* The charging target voltage. Scaling is 1V. */
+    LastTargetVoltage = targetVoltage;
 
     req.EVTargetCurrent.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
     req.EVTargetCurrent.Unit = dinunitSymbolType_A;
     req.EVTargetCurrent.Unit_isUsed = 1;
-    req.EVTargetCurrent.Value = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
-    LastTargetCurrent = req.EVTargetCurrent.Value;
+    req.EVTargetCurrent.Value = targetCurrent; /* The charging target current. Scaling is 1A. */
+    LastTargetCurrent = targetCurrent;
 
     req.ChargingComplete = 0; /* boolean. Is it fine that the PEV just sends a PowerDeliveryReq with STOP, if it decides to stop the charging? */
 
@@ -607,11 +610,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
 #undef dcparm
                 _ccs_params.EvseMaxVoltage = evseMaxVoltage;
                 _ccs_params.EvseMaxCurrent = evseMaxCurrent;
-
-                if (hardwareInterface_getAccuVoltage() < evseMinimumVoltage) {
-                    // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
-                    addToTrace(MOD_PEV, "Warning: evseMinimumVoltage:%d is less than battery voltage:%d", evseMinimumVoltage, hardwareInterface_getAccuVoltage());
-                }
+                _ccs_params.EvseMinimumVoltage = evseMinimumVoltage;
 
                 setCheckpoint(550);
                 // pull the CP line to state C here:
@@ -713,6 +712,11 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Chatgpt: 2s borderline, 5 sec absolute max.
     if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
     {
+        if (hardwareInterface_getAccuVoltage() < _ccs_params.EvseMinimumVoltage) {
+            // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
+            addToTrace(MOD_PEV, "Warning: battery voltage:%d is less than evseMinimumVoltage:%d", hardwareInterface_getAccuVoltage(), _ccs_params.EvseMinimumVoltage);
+        }
+
         addToTrace(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);
         pev_sendPreChargeReq();
@@ -893,8 +897,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 _ccs_params.EvseCurrent = evsePresentCurrent;
                 LastCurrentDemandResPresentVoltage = evsePresentVoltage;
 
-                // not using LastTargetVoltage, since assuming target never changes
-                if (evsePresentVoltage != hardwareInterface_getChargingTargetVoltage()) ChargingVoltageDifferentFromTarget = true;
+                if (evsePresentVoltage != LastTargetVoltage) ChargingVoltageDifferentFromTarget = true;
                 ChargingVoltageDifferentFromTarget_isSet = true;
 
                 if (evsePresentCurrent != LastTargetCurrent) ChargingCurrentDifferentFromTarget = true;
