@@ -18,12 +18,18 @@
 #define TCP_ACK_MAX_TIMEOUT_MS     800     // Max per-retry delay
 #define TCP_MAX_TOTAL_RETRY_TIME_MS 4000   // Retry attempts within 4s
 
+#define TCP_SYN_RETRY_INTERVAL_MS 500       // Resend SYN during connection setup
+#define TCP_CONNECT_TIMEOUT_CYCLES ((12 * 33) + 1) // ~12s, was 5s
+
 #define CLIENT_MIN_PORT 49152
 #define CLIENT_MAX_PORT 65535
 
 static uint32_t nextRetryTime = 0;
 static uint32_t retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
 static uint32_t retryTotalElapsed = 0;
+
+static uint32_t nextSynRetryTime = 0;
+static uint8_t synRetryCounter = 0;
 
 static bool lastTransmitAckPending = false;
 
@@ -55,6 +61,8 @@ static void tcp_packRequestIntoEthernet(void);
 static void tcp_packRequestIntoIp(void);
 static void tcp_prepareTcpHeader(uint8_t tcpFlag);
 static void tcp_sendAck(void);
+static void tcp_sendSyn(void);
+static void tcp_checkSynRetry(void);
 
 /*** functions *********************************************************************/
 uint32_t tcp_getTotalNumberOfRetries(void) {
@@ -129,6 +137,8 @@ void evaluateTcpPacket(void)
          addToTrace(MOD_TCP, "[TCP] connected.");
          finPending = peerFinPending = true;
          tcp_connecting_timeout = 0; // disable the timer
+         nextSynRetryTime = 0;
+         synRetryCounter = 0;
          connMgr_setLevel(CONNLEVEL_80_TCP_CONNECTED);
       }
       // Ignore everything else
@@ -180,12 +190,21 @@ void tcp_connect(void)
    addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting from %d", evccPort);
    setCheckpoint(301);
 
+   tcpState = TCP_STATE_SYN_SENT;
+   finPending = peerFinPending = false;
+   lastTransmitAckPending = false;
+   synRetryCounter = 0;
+   nextSynRetryTime = rtc_get_ms() + TCP_SYN_RETRY_INTERVAL_MS;
+
+   tcp_sendSyn();
+}
+
+static void tcp_sendSyn(void)
+{
    tcpHeaderLen = 20; /* 20 bytes normal header, no options */
    tcpPayloadLen = 0;   /* only the TCP header, no data is in the connect message. */
    tcp_prepareTcpHeader(TCP_FLAG_SYN);
    tcp_packRequestIntoIp();
-   tcpState = TCP_STATE_SYN_SENT;
-   finPending = peerFinPending = false;
 }
 
 static void tcp_sendAck(void)
@@ -352,6 +371,8 @@ void tcp_disconnect(void)
 
     tcpState = TCP_STATE_CLOSED;
     lastTransmitAckPending = false;
+    nextSynRetryTime = 0;
+    synRetryCounter = 0;
 }
 
 bool tcp_isClosed(void)
@@ -362,6 +383,22 @@ bool tcp_isClosed(void)
 bool tcp_isConnected(void)
 {
    return (tcpState == TCP_STATE_ESTABLISHED);
+}
+
+static void tcp_checkSynRetry(void)
+{
+    if (tcpState == TCP_STATE_SYN_SENT)
+    {
+        uint32_t now = rtc_get_ms();
+        if (nextSynRetryTime > 0 && now >= nextSynRetryTime)
+        {
+            synRetryCounter++;
+            addToTrace(MOD_TCP, "[TCP] SYN retry #%d", synRetryCounter);
+            tcp_sendSyn();
+            tcp_debug_totalRetryCounter++;
+            nextSynRetryTime = now + TCP_SYN_RETRY_INTERVAL_MS;
+        }
+    }
 }
 
 void tcp_checkRetry(void)
@@ -414,9 +451,10 @@ void tcp_Mainfunction(void)
             evccPort++;
 
         tcp_connect();
-        tcp_connecting_timeout = (5 * 33) + 1; // 5s
+        tcp_connecting_timeout = TCP_CONNECT_TIMEOUT_CYCLES;
     }
 
+    tcp_checkSynRetry();
     tcp_checkRetry();
 
     if (tcp_connecting_timeout > 0)
