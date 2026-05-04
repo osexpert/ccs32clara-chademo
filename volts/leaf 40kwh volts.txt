@@ -14,4 +14,11 @@ leaf 40kwh
 90, 387
 100, 403
 
+Theory:
+same module layout as 24 and 30: 
+96s2p (192 cells)
+96 x 4.2v =  403.2 max
+96 x 3.7v =  355.2 nom
+
+Leaf 60kWh: 96s3p (288 cells)
 

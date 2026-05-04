@@ -1,3 +1,7 @@
 target:450v, max:460V
-
 21%, 384V
+
+Theory:
+108s3p (324 cells)
+108 × 4.2v = 453.6V max
+108 × 3.7v = 399.6V nom

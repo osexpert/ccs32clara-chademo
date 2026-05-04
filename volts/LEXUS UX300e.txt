@@ -1,0 +1,8 @@
+target:404V max:408V
+65%, 369V
+
+Theory:
+54.35 kWh and the newer 72.82 kWh, both use 96 packs in series.
+96s3p (288 cells)
+96 × 4.2V = 403.2V max
+96 × 3.7V = 355.2V nom
