@@ -3,6 +3,7 @@
 #define NEXT_UDP 0x11 /* next protocol is UDP */
 #define NEXT_ICMPv6 0x3a /* next protocol is ICMPv6 */
 #define UDP_PAYLOAD_LEN 100
+#define ICMP_LEN 32 /* bytes in the ICMPv6 Neighbor Advertisement */
 
 
 const uint8_t broadcastIPv6[16] = { 0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
@@ -34,6 +35,8 @@ void ipv6_packRequestIntoEthernet(void);
 void ipv6_packRequestIntoIp(void);
 void ipv6_packRequestIntoUdp(void);
 void evaluateNeighborSolicitation(void);
+void ipv6_sendNeighborAdvertisement(const uint8_t *destinationIp, const uint8_t *destinationMac, uint8_t flags, const char *traceMessage);
+void ipv6_updateEvseMacFromSdpResponse(void);
 
 
 /*** functions **********************************************************/
@@ -74,14 +77,19 @@ void evaluateUdpPayload(void) {
                }
                //# Extract the TCP port, on which the charger will listen:
                seccTcpPort = (((uint16_t)(udpPayload[8+16]))<<8) + udpPayload[8+16+1];
-               /* in case we did not yet found out the chargers MAC, because we jumped-over the SLAC,
-                  we extract the chargers MAC from the SDP response. */
-               if ((evseMac[0]==0) && (evseMac[1]==0)) {
-                  addToTrace(MOD_SDP, "[SDP] Taking evseMac from SDP response because not yet known.");
-                  for (i=0; i<6; i++) {
-                     evseMac[i] = myethreceivebuffer[6+i]; // source MAC starts at offset 6
-                  }
-               }
+               //# The last two bytes are security and transport protocol. We only log them here.
+               addToTrace(MOD_SDP, "[SDP] SECC TCP port %d security 0x%x transport 0x%x", seccTcpPort, udpPayload[8+18], udpPayload[8+19]);
+
+               /* Compatibility: Some chargers answer SDP from a MAC address that is not identical
+                  to the MAC we learned during SLAC. TCP must be sent to the host that answered SDP,
+                  so always prefer the Ethernet source MAC of the SDP response for subsequent TCP. */
+               ipv6_updateEvseMacFromSdpResponse();
+
+               /* Compatibility: proactively advertise our EVCC IPv6 -> MAC mapping to the SECC.
+                  Normally the first TCP SYN should be enough, but some IPv6 stacks are stricter
+                  about neighbor cache state. This is sent before TCP starts and does not touch HV. */
+               ipv6_sendNeighborAdvertisement(SeccIp, evseMac, 0x20, "[SDP] Transmitting unsolicited Neighbor Advertisement to SECC");
+
                addToTrace(MOD_SDP, "[SDP] Now we know the chargers IP.");
                readModemVersions(); /* read the software versions from our modem and from the chargers modem. Just for information/logging. */
                connMgr_setLevel(CONNLEVEL_50_SDP_DONE_TCP_NEXT);
@@ -240,9 +248,86 @@ void ipv6_packRequestIntoEthernet(void) {
    myEthTransmit();
 }
 
-void evaluateNeighborSolicitation(void) {
+void ipv6_updateEvseMacFromSdpResponse(void) {
+   uint8_t i;
+   uint8_t sdpSourceMac[6];
+   bool macChanged = false;
+
+   memcpy(sdpSourceMac, &myethreceivebuffer[6], 6); // Ethernet source MAC starts at offset 6
+
+   addToTrace_bytes(MOD_SDP, "[SDP] SDP response source MAC", sdpSourceMac, 6);
+   addToTrace_bytes(MOD_SDP, "[SDP] EVSE MAC before SDP update", evseMac, 6);
+
+   for (i=0; i<6; i++) {
+      if (evseMac[i] != sdpSourceMac[i]) {
+         macChanged = true;
+      }
+   }
+
+   if (macChanged) {
+      addToTrace(MOD_SDP, "[SDP] Updating EVSE MAC from SDP response source MAC.");
+      memcpy(evseMac, sdpSourceMac, 6);
+   }
+   else {
+      addToTrace(MOD_SDP, "[SDP] EVSE MAC already matches SDP response source MAC.");
+   }
+
+   addToTrace_bytes(MOD_SDP, "[SDP] EVSE MAC used for TCP", evseMac, 6);
+}
+
+void ipv6_sendNeighborAdvertisement(const uint8_t *destinationIp, const uint8_t *destinationMac, uint8_t flags, const char *traceMessage) {
    uint16_t checksum;
    uint8_t i;
+
+   // destination MAC
+   fillDestinationMac((uint8_t*)destinationMac, 0); // bytes 0 to 5 are the destination MAC
+   // source MAC = my MAC
+   fillSourceMac(getOurMac(), 6); // bytes 6 to 11 are the source MAC
+   // Ethertype 86DD
+   myethtransmitbuffer[12] = 0x86; // # 86dd is IPv6
+   myethtransmitbuffer[13] = 0xdd;
+   myethtransmitbuffer[14] = 0x60; // # traffic class, flow
+   myethtransmitbuffer[15] = 0;
+   myethtransmitbuffer[16] = 0;
+   myethtransmitbuffer[17] = 0;
+   // plen
+   myethtransmitbuffer[18] = 0;
+   myethtransmitbuffer[19] = ICMP_LEN;
+   myethtransmitbuffer[20] = NEXT_ICMPv6;
+   myethtransmitbuffer[21] = 0xff;
+   // We are the PEV. So the EvccIp is our own link-local IP address.
+   for (i=0; i<16; i++) {
+      myethtransmitbuffer[22+i] = EvccIp[i]; // source IP address
+   }
+   for (i=0; i<16; i++) {
+      myethtransmitbuffer[38+i] = destinationIp[i]; // destination IP address
+   }
+   /* here starts the ICMPv6 */
+   myethtransmitbuffer[54] = 0x88; /* Neighbor Advertisement */
+   myethtransmitbuffer[55] = 0;
+   myethtransmitbuffer[56] = 0; /* checksum (filled later) */
+   myethtransmitbuffer[57] = 0;
+
+   /* Flags: 0x60 = solicited + override, 0x20 = override only */
+   myethtransmitbuffer[58] = flags;
+   myethtransmitbuffer[59] = 0;
+   myethtransmitbuffer[60] = 0;
+   myethtransmitbuffer[61] = 0;
+
+   memcpy(&myethtransmitbuffer[62], EvccIp, 16); /* The own IP address */
+   myethtransmitbuffer[78] = 2; /* Type 2, Link Layer Address */
+   myethtransmitbuffer[79] = 1; /* Length 1, means 8 byte (?) */
+   memcpy(&myethtransmitbuffer[80], getOurMac(), 6); /* The own Link Layer (MAC) address */
+
+   checksum = calculateUdpAndTcpChecksumForIPv6(&myethtransmitbuffer[54], ICMP_LEN, EvccIp, destinationIp, NEXT_ICMPv6);
+   myethtransmitbuffer[56] = checksum >> 8;
+   myethtransmitbuffer[57] = checksum & 0xFF;
+   myethtransmitbufferLen = 86; /* Length of the NeighborAdvertisement */
+   addToTrace(MOD_IPV6, traceMessage);
+   myEthTransmit();
+}
+
+void evaluateNeighborSolicitation(void) {
    /* The neighbor discovery protocol is used by the charger to find out the
       relation between MAC and IP. */
 
@@ -279,52 +364,6 @@ void evaluateNeighborSolicitation(void) {
    memcpy(NeighborsMac, &myethreceivebuffer[6], 6);
 
    /* send a NeighborAdvertisement as response. */
-   // destination MAC = neighbors MAC
-   fillDestinationMac(NeighborsMac, 0); // bytes 0 to 5 are the destination MAC
-   // source MAC = my MAC
-   fillSourceMac(getOurMac(), 6); // bytes 6 to 11 are the source MAC
-   // Ethertype 86DD
-   myethtransmitbuffer[12] = 0x86; // # 86dd is IPv6
-   myethtransmitbuffer[13] = 0xdd;
-   myethtransmitbuffer[14] = 0x60; // # traffic class, flow
-   myethtransmitbuffer[15] = 0;
-   myethtransmitbuffer[16] = 0;
-   myethtransmitbuffer[17] = 0;
-   // plen
-#define ICMP_LEN 32 /* bytes in the ICMPv6 */
-   myethtransmitbuffer[18] = 0;
-   myethtransmitbuffer[19] = ICMP_LEN;
-   myethtransmitbuffer[20] = NEXT_ICMPv6;
-   myethtransmitbuffer[21] = 0xff;
-   // We are the PEV. So the EvccIp is our own link-local IP address.
-   for (i=0; i<16; i++) {
-      myethtransmitbuffer[22+i] = EvccIp[i]; // source IP address
-   }
-   for (i=0; i<16; i++) {
-      myethtransmitbuffer[38+i] = NeighborsIp[i]; // destination IP address
-   }
-   /* here starts the ICMPv6 */
-   myethtransmitbuffer[54] = 0x88; /* Neighbor Advertisement */
-   myethtransmitbuffer[55] = 0;
-   myethtransmitbuffer[56] = 0; /* checksum (filled later) */
-   myethtransmitbuffer[57] = 0;
-
-   /* Flags */
-   myethtransmitbuffer[58] = 0x60; /* Solicited, override */
-   myethtransmitbuffer[59] = 0;
-   myethtransmitbuffer[60] = 0;
-   myethtransmitbuffer[61] = 0;
-
-   memcpy(&myethtransmitbuffer[62], EvccIp, 16); /* The own IP address */
-   myethtransmitbuffer[78] = 2; /* Type 2, Link Layer Address */
-   myethtransmitbuffer[79] = 1; /* Length 1, means 8 byte (?) */
-   memcpy(&myethtransmitbuffer[80], getOurMac(), 6); /* The own Link Layer (MAC) address */
-
-   checksum = calculateUdpAndTcpChecksumForIPv6(&myethtransmitbuffer[54], ICMP_LEN, EvccIp, NeighborsIp, NEXT_ICMPv6);
-   myethtransmitbuffer[56] = checksum >> 8;
-   myethtransmitbuffer[57] = checksum & 0xFF;
-   myethtransmitbufferLen = 86; /* Length of the NeighborAdvertisement */
-   addToTrace(MOD_IPV6, "transmitting Neighbor Advertisement");
-   myEthTransmit();
+   ipv6_sendNeighborAdvertisement(NeighborsIp, NeighborsMac, 0x60, "transmitting Neighbor Advertisement");
 }
 
