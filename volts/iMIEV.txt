@@ -1,0 +1,6 @@
+target:370
+
+Theory:
+88 packs
+88 x 4.2v = 369.6v max
+88 x 3.7v = 325.6v nom (while 325.6V is "correct" based on 3.7V chem, 330V is the industry-standard label for this pack)

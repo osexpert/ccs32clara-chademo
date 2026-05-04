@@ -1,0 +1,7 @@
+100.MaxVoltage 0 -> 336
+102.TargetVoltage 0 -> 336
+
+Theory:
+Peugeot e-Partner (2017-20): Uses 80 cells in series
+80 x 4.2v = 336v max
+80 x 3.7v = 296v nom
