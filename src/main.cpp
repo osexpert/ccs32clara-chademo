@@ -80,6 +80,9 @@ enum LedState
 
 LedState _ledState = LedState::Init;
 
+static int _lastReleasedStopButtonCounter = 0;
+static bool _stopButtonReleasedEvent = false;
+
 void RunLedStateMachine()
 {
     if (_global.powerOffPending && _ledState != LedState::Stop)
@@ -248,19 +251,27 @@ void power_off_check()
     // Power off pending detector
     if (!_global.powerOffPending)
     {
-        bool buttonPressedBriefly = _global.stopButtonCounter > 0;
+        bool buttonPressedBriefly = _stopButtonReleasedEvent && _lastReleasedStopButtonCounter > 0 && _lastReleasedStopButtonCounter < 10 * 5; // released before 5 seconds
         bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
-        // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
+        // Short STOP click toggles the manual current limit only during the active CHAdeMO charging loop.
+        // Outside ChargingLoop it keeps the old behavior: request a normal power off.
         if (buttonPressedBriefly
 #ifndef CHADEMO_STANDALONE_TESTING
             && _ledState != LedState::WaitForSlacDone
 #endif
             && not special_modes_selection_pending())
         {
-            _global.powerOffPending = true;
-            println("Stop button pressed briefly and slac not pending. Power off pending...");
+            if (chademoCharger->IsChargingLoop())
+            {
+                chademoCharger->ToggleManualCurrentLimitMode();
+            }
+            else
+            {
+                _global.powerOffPending = true;
+                println("Stop button pressed briefly and slac not pending. Power off pending...");
+            }
         }
         if (buttonPressed5Seconds)
         {
@@ -292,6 +303,8 @@ void power_off_check()
             println("Chademo stopping. Power off pending...");
         }
     }
+
+    _stopButtonReleasedEvent = false;
 
     if (_global.powerOffPending)
     {
@@ -421,88 +434,6 @@ static void print_ccs_trace()
     }
 }
 
-
-#define GPIO_DISCOVERY_EVERY_MS 100
-
-static uint16_t read_gpio_idr(uint32_t port)
-{
-    return (uint16_t)(GPIO_IDR(port) & 0xffff);
-}
-
-static void print_gpio_discovery_snapshot(const char* reason,
-                                          uint16_t a,
-                                          uint16_t b,
-                                          uint16_t c,
-                                          uint16_t d,
-                                          uint16_t e,
-                                          uint16_t da,
-                                          uint16_t db,
-                                          uint16_t dc,
-                                          uint16_t dd,
-                                          uint16_t de)
-{
-    println("[gpio] %s t:%ums A:%04x d:%04x B:%04x d:%04x C:%04x d:%04x D:%04x d:%04x E:%04x d:%04x stop_pd3_raw:%d stopPressed:%d power_hold_pb8:%d",
-        reason,
-        system_millis,
-        a, da,
-        b, db,
-        c, dc,
-        d, dd,
-        e, de,
-        DigIo::stop_button_in_inverted.Get(),
-        not DigIo::stop_button_in_inverted.Get(),
-        DigIo::power_on_out.Get());
-}
-
-static void gpio_discovery_log_changes()
-{
-    static bool initialized = false;
-    static uint32_t nextPrint = 0;
-    static uint16_t lastA = 0;
-    static uint16_t lastB = 0;
-    static uint16_t lastC = 0;
-    static uint16_t lastD = 0;
-    static uint16_t lastE = 0;
-
-    if (system_millis < nextPrint)
-        return;
-    nextPrint = system_millis + GPIO_DISCOVERY_EVERY_MS;
-
-    uint16_t a = read_gpio_idr(GPIOA);
-    uint16_t b = read_gpio_idr(GPIOB);
-    uint16_t c = read_gpio_idr(GPIOC);
-    uint16_t d = read_gpio_idr(GPIOD);
-    uint16_t e = read_gpio_idr(GPIOE);
-
-    if (!initialized)
-    {
-        initialized = true;
-        lastA = a;
-        lastB = b;
-        lastC = c;
-        lastD = d;
-        lastE = e;
-        print_gpio_discovery_snapshot("initial", a, b, c, d, e, 0, 0, 0, 0, 0);
-        return;
-    }
-
-    uint16_t da = a ^ lastA;
-    uint16_t db = b ^ lastB;
-    uint16_t dc = c ^ lastC;
-    uint16_t dd = d ^ lastD;
-    uint16_t de = e ^ lastE;
-
-    if (da || db || dc || dd || de)
-    {
-        print_gpio_discovery_snapshot("change", a, b, c, d, e, da, db, dc, dd, de);
-        lastA = a;
-        lastB = b;
-        lastC = c;
-        lastD = d;
-        lastE = e;
-    }
-}
-
 void special_mode_selected(enum SpecialMode mode)
 {
     println("Special mode selected:%d", mode);
@@ -540,8 +471,18 @@ static void Ms100Task(void)
 
     if (stopPressed) {
         _global.stopButtonCounter++;
+        _stopButtonReleasedEvent = false;
     }
     else {
+        if (_global.stopButtonCounter > 0)
+        {
+            _lastReleasedStopButtonCounter = _global.stopButtonCounter;
+            _stopButtonReleasedEvent = true;
+        }
+        else
+        {
+            _stopButtonReleasedEvent = false;
+        }
         _global.stopButtonCounter = 0;
     }
 
@@ -549,7 +490,6 @@ static void Ms100Task(void)
 
     print_sysinfo();
     print_ccs_trace();
-    gpio_discovery_log_changes();
 }
 
 static void Ms30Task()
