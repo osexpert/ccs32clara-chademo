@@ -60,6 +60,13 @@ struct ccs_params
     int EvseCurrent = 0;
     int EvseMaxCurrentInCurrentDemandRes = 0;
     int CurrentDemandStopReason = STOP_REASON_NONE;
+
+    int EvseDynCurrent() const
+    {
+        return EvseMaxCurrentInCurrentDemandRes == 0 ?
+            EvseMaxCurrent :
+            EvseMaxCurrentInCurrentDemandRes;
+    }
 };
 
 extern ccs_params _ccs_params;

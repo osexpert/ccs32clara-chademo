@@ -598,6 +598,7 @@ struct ChargerData
 
     uint8_t MaxAvailableOutputCurrent;
     uint8_t DynAvailableOutputCurrent;
+    uint8_t ChaAvailableOutputCurrent;
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
@@ -638,7 +639,7 @@ public:
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
-    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA);
+    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, uint16_t outA);
     bool GetSwitchK();
     void SetBatteryVoltOverridesOnce();
     void CloseAdapterContactor();

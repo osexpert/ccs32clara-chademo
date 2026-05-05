@@ -812,7 +812,7 @@ const char* ChademoCharger::GetStateName()
 
 #define MAX_UNDERSUPPLY_AMPS 10
 
-void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV, uint16_t outA)
+void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, uint16_t outA)
 {
     _chargerData.AvailableOutputVoltage = maxV;
     if (_chargerData.AvailableOutputVoltage > ADAPTER_MAX_VOLTS)
@@ -822,24 +822,31 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     if (_chargerData.MaxAvailableOutputCurrent > ADAPTER_MAX_AMPS)
         _chargerData.MaxAvailableOutputCurrent = ADAPTER_MAX_AMPS;
 
+    _chargerData.DynAvailableOutputCurrent = clampToUint8(dynA);
+    if (_chargerData.DynAvailableOutputCurrent > ADAPTER_MAX_AMPS)
+        _chargerData.DynAvailableOutputCurrent = ADAPTER_MAX_AMPS;
+
     _chargerData.OutputVoltage = outV;
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
     // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
-    // we adjust DynAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
+    // we adjust ChaAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS && _carData.DynamicControl())
+    if (_carData.DynamicControl())
     {
-        _chargerData.DynAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+        if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS)
+            _chargerData.ChaAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+        else
+            _chargerData.ChaAvailableOutputCurrent = _chargerData.DynAvailableOutputCurrent;
     }
     else
     {
-        _chargerData.DynAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
+        _chargerData.ChaAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 
-    _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS, _chargerData.MaxAvailableOutputCurrent);
+    _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS, _chargerData.ChaAvailableOutputCurrent);
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()
@@ -847,13 +854,19 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     if (_discovery)
     {
         // fake for discovery
-        SetChargerData(ADAPTER_MAX_VOLTS, ADAPTER_MAX_AMPS, 0, 0);
+        SetChargerData(ADAPTER_MAX_VOLTS, 
+            ADAPTER_MAX_AMPS,
+            ADAPTER_MAX_AMPS, // dyn
+            0,
+            0
+        );
     }
 #ifdef CHADEMO_STANDALONE_TESTING
     else if (true)
     {
-        SetChargerData(ADAPTER_MAX_VOLTS, 
-            ADAPTER_MAX_AMPS, 
+        SetChargerData(ADAPTER_MAX_VOLTS,
+            ADAPTER_MAX_AMPS,
+            ADAPTER_MAX_AMPS, // dyn
             _carData.EstimatedBatteryVoltage,
             0 //_carData.RequestCurrent
         );
@@ -865,6 +878,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
        SetChargerData(
            _ccs_params.EvseMaxVoltage,
            _ccs_params.EvseMaxCurrent,
+           _ccs_params.EvseDynCurrent(),
            _ccs_params.EvseVoltage,
            _ccs_params.EvseCurrent
         );
@@ -876,14 +890,14 @@ void ChademoCharger::Log()
     if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second
-        println("[cha] state:%s cycles:%d out:%dV/%dA avail:%dV/%dA max:%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
+        println("[cha] state:%s cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
-            _chargerData.DynAvailableOutputCurrent,
             _chargerData.MaxAvailableOutputCurrent,
+            _chargerData.DynAvailableOutputCurrent,
             _chargerData.RemainingChargeTimeSec,
             _chargerData.Status,
 
@@ -1039,7 +1053,7 @@ void ChademoCharger::SendChargerMessages()
 void ChademoCharger::UpdateChargerMessages()
 {
     COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "108.WeldingDetection %d -> %d");
-    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.DynAvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
+    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.ChaAvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
     COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "108.AvailableOutputVoltage %d -> %d");
     COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "108.ThresholdVoltage %d -> %d");
 
