@@ -1,0 +1,14 @@
+Xpeng G3
+target:434V max:450V
+After charging started (car contactors closed), car ramp up target to 450 as well!
+Soc is not seen until after approx 1 second after d2 = true. This is very strange.
+
+49%, 384
+
+Theory (guessing):
+108s
+
+108 x 4.0 = 432v initial max (trying to prevent charger ramping up too high voltage, until the car knows it is "safe"?)
+108 x 4.2 = 453.6v real max
+
+108 x 3.7 = 399.6v nom

@@ -1,0 +1,12 @@
+target:420V max:430V 
+
+soc:51% 366v
+soc 57% 370v
+soc 71% 378v
+
+Theory:
+Kia Soul (2018-2019)
+100s
+100 x 4.2 = 420v max
+100 x 3.7 = 370v nom
+

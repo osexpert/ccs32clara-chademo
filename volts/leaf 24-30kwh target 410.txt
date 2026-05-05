@@ -1,7 +1,6 @@
 https://github.com/osexpert/ccs32clara-chademo/issues/18
 https://github.com/osexpert/ccs32clara-chademo/issues/35
 
-ZE0
 7% -> 350
 12% -> 360
 15% -> 361
@@ -18,4 +17,7 @@ ZE0
 
 
 
-
+Theory:
+96s2p (192 cells total)
+Same for 24, 30, 40 and 60 kWh.
+Even so, 24 and 30 has completely different soc <-> volt curve.

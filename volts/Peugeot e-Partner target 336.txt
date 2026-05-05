@@ -1,5 +1,4 @@
-100.MaxVoltage 0 -> 336
-102.TargetVoltage 0 -> 336
+target 336, max 336
 
 Theory:
 Peugeot e-Partner (2017-20): Uses 80 cells in series
