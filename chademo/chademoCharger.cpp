@@ -33,8 +33,7 @@ extern ChademoCharger* chademoCharger;
     } while (0)
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
-// Limit requested CHAdeMO/CCS charging current for Leaf battery temperature control.
-#define LEAF_CHARGING_CURRENT_LIMIT_AMPS 50
+#define MANUAL_CURRENT_LIMIT_AMPS 50
 
 /// <summary>
 /// get estimated battery volt from target and soc.
@@ -164,11 +163,12 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        uint8_t limitedRequestCurrent = min((uint8_t)_msg102.m.RequestCurrent, (uint8_t)LEAF_CHARGING_CURRENT_LIMIT_AMPS);
+        uint8_t activeCurrentLimit = GetActiveChargingCurrentLimitAmps();
+        uint8_t limitedRequestCurrent = min((uint8_t)_msg102.m.RequestCurrent, activeCurrentLimit);
 
         if (_state == ChargerState::ChargingLoop && limitedRequestCurrent > _chargerData.MaxAvailableOutputCurrent)
         {
-            println("[cha] Car asking (%d, limited to %d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, limitedRequestCurrent, _chargerData.MaxAvailableOutputCurrent);
+            println("[cha] Car asking (%d, limited to %d in %s mode) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, limitedRequestCurrent, GetManualCurrentLimitModeName(), _chargerData.MaxAvailableOutputCurrent);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
         else
@@ -264,6 +264,38 @@ void ChademoCharger::Run()
     Log();
 }
 
+bool ChademoCharger::IsManualCurrentLimitToggleAllowed()
+{
+    return _state == ChargerState::ChargingLoop;
+}
+
+uint8_t ChademoCharger::GetActiveChargingCurrentLimitAmps()
+{
+    return _manualCurrentLimit50A ? MANUAL_CURRENT_LIMIT_AMPS : ADAPTER_MAX_AMPS;
+}
+
+const char* ChademoCharger::GetManualCurrentLimitModeName()
+{
+    return _manualCurrentLimit50A ? "50A" : "NO_LIMIT";
+}
+
+bool ChademoCharger::IsManualCurrentLimit50AEnabled()
+{
+    return _manualCurrentLimit50A;
+}
+
+void ChademoCharger::ToggleManualCurrentLimit()
+{
+    if (!IsManualCurrentLimitToggleAllowed())
+    {
+        println("[cha] Manual current limit toggle ignored in state:%s", GetStateName());
+        return;
+    }
+
+    _manualCurrentLimit50A = !_manualCurrentLimit50A;
+    println("[cha] Manual current limit mode -> %s (limit:%dA)", GetManualCurrentLimitModeName(), GetActiveChargingCurrentLimitAmps());
+}
+
 void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
@@ -273,7 +305,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
     _ccs_params.BatteryVoltage = _carData.EstimatedBatteryVoltage;
 
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
-    _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? min((int)_carData.RequestCurrent, LEAF_CHARGING_CURRENT_LIMIT_AMPS) : 0);
+    _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? min((int)_carData.RequestCurrent, (int)GetActiveChargingCurrentLimitAmps()) : 0);
 
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
 }
@@ -825,8 +857,9 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t outV,
     _chargerData.MaxAvailableOutputCurrent = clampToUint8(maxA);
     if (_chargerData.MaxAvailableOutputCurrent > ADAPTER_MAX_AMPS)
         _chargerData.MaxAvailableOutputCurrent = ADAPTER_MAX_AMPS;
-    if (_chargerData.MaxAvailableOutputCurrent > LEAF_CHARGING_CURRENT_LIMIT_AMPS)
-        _chargerData.MaxAvailableOutputCurrent = LEAF_CHARGING_CURRENT_LIMIT_AMPS;
+    uint8_t activeCurrentLimit = GetActiveChargingCurrentLimitAmps();
+    if (_chargerData.MaxAvailableOutputCurrent > activeCurrentLimit)
+        _chargerData.MaxAvailableOutputCurrent = activeCurrentLimit;
 
     _chargerData.OutputVoltage = outV;
 
@@ -887,9 +920,11 @@ void ChademoCharger::Log()
     if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second
-        println("[cha] state:%s cycles:%d out:%dV/%dA avail:%dV/%dA max:%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
+        println("[cha] state:%s cycles:%d mode:%s limit:%dA out:%dV/%dA avail:%dV/%dA max:%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             GetStateName(),
             _cyclesInState,
+            GetManualCurrentLimitModeName(),
+            GetActiveChargingCurrentLimitAmps(),
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
             _chargerData.AvailableOutputVoltage,
