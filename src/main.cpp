@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file is part of the stm32-template project.
  *
  * Copyright (C) 2020 Johannes Huebner <dev@johanneshuebner.com>
@@ -249,11 +249,27 @@ void power_off_check()
     if (!_global.powerOffPending)
     {
         bool buttonPressedBriefly = _global.stopButtonCounter > 0;
+        bool buttonPressStarted = _global.stopButtonCounter == 1;
         bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
+        bool buttonHandledAsCurrentLimitToggle = false;
+
+        // During active charging, a short press toggles NO LIMIT <-> 50A instead of powering off.
+        // Holding the button for 5 seconds still requests a normal power off, and 10 seconds still forces power off above.
+        if (buttonPressedBriefly
+            && !buttonPressed5Seconds
+            && !special_modes_selection_pending()
+            && chademoCharger->IsManualCurrentLimitToggleAllowed())
+        {
+            buttonHandledAsCurrentLimitToggle = true;
+            if (buttonPressStarted)
+                chademoCharger->ToggleManualCurrentLimit();
+        }
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
         if (buttonPressedBriefly
+            && !buttonPressed5Seconds
+            && !buttonHandledAsCurrentLimitToggle
 #ifndef CHADEMO_STANDALONE_TESTING
             && _ledState != LedState::WaitForSlacDone
 #endif
