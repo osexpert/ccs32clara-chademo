@@ -638,6 +638,14 @@ public:
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
 
+    // Manual runtime current limit. Default is NO LIMIT.
+    // A short press during ChargingLoop toggles NO LIMIT <-> 50A without stopping the session.
+    bool IsManualCurrentLimitToggleAllowed();
+    void ToggleManualCurrentLimit();
+    uint8_t GetActiveChargingCurrentLimitAmps();
+    const char* GetManualCurrentLimitModeName();
+    bool IsManualCurrentLimit50AEnabled();
+
     int _delayCycles = 0;
 
     bool IsStoppingOrLater()
@@ -682,6 +690,7 @@ public:
         bool _isDischargeUnit = false;
         bool _isDischarging = false;
         bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
+        bool _manualCurrentLimit50A = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
