@@ -875,12 +875,12 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     else
     {
         // mirror these values
-       SetChargerData(
-           _ccs_params.EvseMaxVoltage,
-           _ccs_params.EvseMaxCurrent,
-           _ccs_params.EvseDynCurrent(),
-           _ccs_params.EvseVoltage,
-           _ccs_params.EvseCurrent
+        SetChargerData(
+            _ccs_params.EvseMaxVoltage,
+            _ccs_params.EvseMaxCurrent,
+            _ccs_params.EvseDynCurrent(),
+            _ccs_params.EvseVoltage,
+            _ccs_params.EvseCurrent
         );
     }
 }
