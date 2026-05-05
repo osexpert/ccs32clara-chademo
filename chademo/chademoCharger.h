@@ -554,6 +554,16 @@ struct CarData
     bool Switch_k = false;
 
     bool ContactorsClosed = false;
+
+    /// <summary>
+    /// return true if car allows changing available current during charging (and not only allows, but also take it into account)
+    /// It may be that all chademo cars support it, even thou the spec disagrees.
+    /// But based on discovering this, we can possibly change this to always return true.
+    /// </summary>
+    bool DynamicControl() const
+    {
+        return has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);
+    }
 };
 
 enum ProtocolNumber
