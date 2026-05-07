@@ -253,7 +253,7 @@ static void pev_sendCableCheckReq(void)
 //    connMgr_ApplOk(31);
 }
 
-static void pev_sendPreChargeReq(void)
+static void pev_sendPreChargeReq(uint16_t targetVoltage)
 {
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.PreChargeReq_isUsed = 1u;
@@ -267,7 +267,7 @@ static void pev_sendPreChargeReq(void)
     tvolt.Multiplier = 0; /* -3 to 3. The exponent for base of 10. */
     tvolt.Unit = dinunitSymbolType_V;
     tvolt.Unit_isUsed = 1;
-    tvolt.Value = hardwareInterface_getAccuVoltage(); /* The precharge target voltage. Scaling is 1V. */
+    tvolt.Value = targetVoltage; /* The precharge target voltage. Scaling is 1V. */
 #undef tvolt
 #define tcurr dinDocEnc.V2G_Message.Body.PreChargeReq.EVTargetCurrent
     tcurr.Multiplier = 0; /* -3 to 3. The exponent for base of 10. */
@@ -712,14 +712,16 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Chatgpt: 2s borderline, 5 sec absolute max.
     if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
     {
-        if (hardwareInterface_getAccuVoltage() < _ccs_params.EvseMinimumVoltage) {
+        uint16_t batVtg = hardwareInterface_getAccuVoltage();
+
+        if (batVtg < _ccs_params.EvseMinimumVoltage) {
             // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
-            addToTrace(MOD_PEV, "Warning: battery voltage:%d is less than evseMinimumVoltage:%d", hardwareInterface_getAccuVoltage(), _ccs_params.EvseMinimumVoltage);
+            addToTrace(MOD_PEV, "Warning: batteryVoltage:%d is less than evseMinimumVoltage:%d", batVtg, _ccs_params.EvseMinimumVoltage);
         }
 
-        addToTrace(MOD_PEV, "Will send PreChargeReq");
+        addToTrace(MOD_PEV, "Will send PreChargeReq:%dv", batVtg);
         setCheckpoint(570);
-        pev_sendPreChargeReq();
+        pev_sendPreChargeReq(batVtg);
 //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
         //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
         pev_enterState(PEV_STATE_WaitForPreChargeResponse);
@@ -749,10 +751,11 @@ static void stateFunctionWaitForPreChargeResponse(void)
             uint16_t inletVtg = hardwareInterface_getInletVoltage();
             uint16_t batVtg = hardwareInterface_getAccuVoltage();
 
-            addToTrace(MOD_PEV, "PreCharge aknowledge received. Inlet %dV, accu %dV", inletVtg, batVtg);
-            if ((ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE) && chademoInterface_preChargeCompleted())
+            bool smallDifference = (ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE);
+            addToTrace(MOD_PEV, "PreCharge response:%dv batteryVoltage:%dv small:%d", evsePresentVoltage, batVtg, smallDifference);
+            if (smallDifference && chademoInterface_preChargeCompleted())
             {
-                addToTrace(MOD_PEV, "Difference between accu voltage and inlet voltage is small.");
+                addToTrace(MOD_PEV, "PreCharge completed.");
                 // Turn the power relay on.
                 hardwareInterface_setPowerRelayOn();
                 pev_DelayCycles = 15; /* 15*30ms, explanation see below */
@@ -760,8 +763,8 @@ static void stateFunctionWaitForPreChargeResponse(void)
             }
             else
             {
-                addToTrace(MOD_PEV, "Difference too big. Continuing PreCharge.");
-                pev_sendPreChargeReq();
+                addToTrace(MOD_PEV, "Continuing PreCharge.");
+                pev_sendPreChargeReq(batVtg);
                 pev_DelayCycles = 15; // wait with the next evaluation approx half a second
             }
         }
