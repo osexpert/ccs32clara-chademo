@@ -8,6 +8,7 @@
 void ChademoCharger::SetSwitchD2(bool set)
 {
     println("[cha] set switch (d2) -> %d", set);
+    _d2 = set;
 
     if (set)
         DigIo::switch_d2_out_inverted.Clear(); // 0: on
@@ -18,6 +19,7 @@ void ChademoCharger::SetSwitchD2(bool set)
 void ChademoCharger::SetSwitchD1(bool set)
 {
     println("[cha] set switch (d1) -> %d", set);
+    _d1 = set;
 
     if (set)
         DigIo::switch_d1_out.Set();

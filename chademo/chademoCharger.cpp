@@ -157,7 +157,10 @@ void ChademoCharger::HandlePendingCarMessages()
             println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
-        else
+        // XPeng update TargetVoltage after closing its contactors, (it seems) from real target (battery max at 4.2v) to the same as MaxVolt.
+        // Why? I guess...they think it will give them faster charging? In any case, ignore changes to TargetVoltage after d2 is set
+		// TargetVoltage should normally never change, so alternative could be to snapshot it as soon as switch(k) is set. But this seemed easier.
+        else if (not _d2)
         {
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }

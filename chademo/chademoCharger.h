@@ -681,6 +681,8 @@ public:
         bool _chargingPlugLocked = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
+        bool _d1 = false;
+        bool _d2 = false;
 
 #ifdef CHADEMO_SINGLE_SESSION
         bool _discovery = false;
