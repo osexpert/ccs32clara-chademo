@@ -274,6 +274,14 @@ void ChademoCharger::SetCcsParamsFromCarData()
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
     _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
 
+    if (_ccs_params.TargetCurrent > _chargerData.DynAvailableOutputCurrent)
+    {
+        // If car does not support DynamicControl,
+        // car may ask for more (MaxAvailableOutputCurrent) than is currently available (DynAvailableOutputCurrent),
+        // and the charger may not like this. Asking for more than available is rude in any case, so cap it if is happens.
+        _ccs_params.TargetCurrent = _chargerData.DynAvailableOutputCurrent;
+    }
+
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
 }
 
