@@ -203,7 +203,8 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.MaxVoltOverride,
                 _carData.AdjustBelowSoc, 
                 _carData.AdjustBelowFactor);
-            _carData.VoltsReady = true;
+
+            _carData.EstimatedBatteryVoltageReady = true;
         }
 
         _msg102_recieved = true;
@@ -487,7 +488,7 @@ void ChademoCharger::RunStateMachine()
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
             println("[cha] Car contactors closed");
-            _carData.ContactorsClosed = true;
+            _carData.CarContactorsClosed = true;
             CloseAdapterContactor();
 
             SetState(ChargerState::WaitForCarRequestCurrent);
@@ -546,103 +547,106 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
-        if (chademoInterface_ccsChargingVoltageMirrorsTarget())
-        {
-            // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation volts error.
-            _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
-        }
-
-#if false
-        // Is it possible that all the complicated logic below (for discharge support), could be replaced with this simple hack?
-        // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
-        // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
-        // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
-        // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-        if (_chargerData.OutputCurrent == 0)
-        {
-            _chargerData.OutputCurrent = 1;
-        }
-#endif
-
         if (stopReason != StopReason::NONE)
         {
             SetState(ChargerState::Stopping_Start, stopReason);
         }
-        else if (_dischargeEnabled)
+        else
         {
-            static int zeroOutputAmpsCycles = 0;
-
-            bool isDischargeUnit = false;
-            bool isDischarging = false;
-
-            if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
+            if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
-                // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
-                // one discharger is observed to mirror asked amps as delivered amps.
-                // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
-                _chargerData.OutputCurrent = 0;
-                isDischargeUnit = true;
-                isDischarging = true;
-            }
-            else if (_chargerData.OutputCurrent == 0)
-            {
-                // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
-                // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
-
-                if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
-                    zeroOutputAmpsCycles++;
-                }
-                if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
-                    isDischarging = true;
-                }				
-            }
-            else
-            {
-                zeroOutputAmpsCycles = 0;
+                // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation volts error.
+                _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
             }
 
-            COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
-            COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
-
-            static int fakeOutputCurrentCycles = 0;
-            static bool fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
-
-            if (isDischarging)
+#if false
+            // Is it possible that all the complicated logic below (for discharge support), could be replaced with this simple hack?
+            // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
+            // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
+            // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
+            // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
+            if (_chargerData.OutputCurrent == 0)
             {
-                _chargerData.RemainingDischargeTime = 5; // seconds?
+                _chargerData.OutputCurrent = 1;
+            }
+#endif
 
-                // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
-                _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
+            if (_dischargeEnabled)
+            {
+                static int zeroOutputAmpsCycles = 0;
 
-                // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
-                // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
-                // So fake a RequestCurrent to max allowed, and see if it makes a difference.
-                // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
-                int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
-                _carData.RequestCurrent = maxDischargeAmps; // ovveride it for every cycle
+                bool isDischargeUnit = false;
+                bool isDischarging = false;
 
-                // HACK: my car seems to time out after 6 minutes, if no current flows?
-                // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
-                // maybe the car does not like it (in this case the hack is not needed, but its impossible for us to know!).
-                // I am starting to wonder, if the Chademo discharge messages has any purpose at all...because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless.
-                // Dynamic control seems to be what keeps it alive more than 3 seconds in ChargingLoop,
-                // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
-                // So is it possible...that V2X can be implemented, completely without using the V2X messages?
-                fakeOutputCurrentCycles++;
-                if (not(fakeOutputCurrentOnce) || fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
+                if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
                 {
-                    _chargerData.DischargeCurrent = 0;
-                    _chargerData.OutputCurrent = 1;
-
-                    fakeOutputCurrentCycles = 0;
-                    fakeOutputCurrentOnce = true;
+                    // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
+                    // one discharger is observed to mirror asked amps as delivered amps.
+                    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
+                    _chargerData.OutputCurrent = 0;
+                    isDischargeUnit = true;
+                    isDischarging = true;
                 }
-            }
-            else
-            {
-                // keep RemainingDischargeTime at 5, discharge indefinitely
-                _chargerData.DischargeCurrent = 0;
-                fakeOutputCurrentCycles = 0;
+                else if (_chargerData.OutputCurrent == 0)
+                {
+                    // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
+                    // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
+
+                    if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
+                        zeroOutputAmpsCycles++;
+                    }
+                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
+                        isDischarging = true;
+                    }
+                }
+                else
+                {
+                    zeroOutputAmpsCycles = 0;
+                }
+
+                COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
+                COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
+
+                static int fakeOutputCurrentCycles = 0;
+                static bool fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
+
+                if (isDischarging)
+                {
+                    _chargerData.RemainingDischargeTime = 5; // seconds?
+
+                    // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
+                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
+
+                    // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
+                    // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
+                    // So fake a RequestCurrent to max allowed, and see if it makes a difference.
+                    // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
+                    int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
+                    _carData.RequestCurrent = maxDischargeAmps; // ovveride it for every cycle
+
+                    // HACK: my car seems to time out after 6 minutes, if no current flows?
+                    // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
+                    // maybe the car does not like it (in this case the hack is not needed, but its impossible for us to know!).
+                    // I am starting to wonder, if the Chademo discharge messages has any purpose at all...because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless.
+                    // Dynamic control seems to be what keeps it alive more than 3 seconds in ChargingLoop,
+                    // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
+                    // So is it possible...that V2X can be implemented, completely without using the V2X messages?
+                    fakeOutputCurrentCycles++;
+                    if (not(fakeOutputCurrentOnce) || fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
+                    {
+                        _chargerData.DischargeCurrent = 0;
+                        _chargerData.OutputCurrent = 1;
+
+                        fakeOutputCurrentCycles = 0;
+                        fakeOutputCurrentOnce = true;
+                    }
+                }
+                else
+                {
+                    // keep RemainingDischargeTime at 5, discharge indefinitely
+                    _chargerData.DischargeCurrent = 0;
+                    fakeOutputCurrentCycles = 0;
+                }
             }
         }
     }
@@ -693,7 +697,7 @@ void ChademoCharger::RunStateMachine()
             || IsTimeoutSec(10))
         {
             // welding detection done & car contactors open
-            _carData.ContactorsClosed = false;
+            _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
 
             SetSwitchD2(false);
@@ -764,9 +768,9 @@ bool ChademoCharger::PreChargeCompleted()
     else
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
-        if (not _carData.ContactorsClosed)
+        if (not _carData.CarContactorsClosed)
             println("[cha] PreCharge stalled until car contactors closed");
-        return _carData.ContactorsClosed;
+        return _carData.CarContactorsClosed;
     }
 }
 
@@ -777,7 +781,7 @@ bool chademoInterface_preChargeCompleted()
 
 bool ChademoCharger::CarContactorsOpened()
 {
-    return not _carData.ContactorsClosed;
+    return not _carData.CarContactorsClosed;
 }
 
 bool chademoInterface_carContactorsOpened()
@@ -794,7 +798,7 @@ bool ChademoCharger::PreChargeCanStart()
 
     // To avoid waiting too long before sending first PreChargeReq, do it after switch(k), to save a second. ccs may not like waiting too long between CableCheck and first PreChargeReq.
     // SOC won't change much between switch(k) and ReadyToCharge anyways, max 2%.
-    return _carData.VoltsReady;
+    return _carData.EstimatedBatteryVoltageReady;
 #else
     return true;
 #endif
@@ -966,6 +970,7 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg201_isr.pair[0] = data[0];
         _msg201_isr.pair[1] = data[1];
     }
+    _global.canLifesign = true;
 }
 
 

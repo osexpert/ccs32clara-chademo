@@ -509,6 +509,7 @@ struct CarData
 #endif
 
     uint16_t EstimatedBatteryVoltage;
+    bool EstimatedBatteryVoltageReady = false;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
@@ -544,7 +545,6 @@ struct CarData
 
     uint8_t MaxDischargeCurrent;
 
-    bool VoltsReady = false;
     int NomVoltOverride = 0;
     int MaxVoltOverride = 0;
     int AdjustBelowSoc = 0;
@@ -553,7 +553,7 @@ struct CarData
 
     bool Switch_k = false;
 
-    bool ContactorsClosed = false;
+    bool CarContactorsClosed = false;
 
     /// <summary>
     /// return true if car allows changing available current during charging (and not only allows, but also take it into account)

@@ -184,6 +184,7 @@ static void composeSlacParamReq(void)
 static void evaluateSlacParamCnf(void)
 {
     /* As PEV, we receive the first response from the charger. */
+    _global.ccsLifesign = true;
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint102: received SLAC_PARAM.CNF");
     setCheckpoint(102);
     if (iAmPev)
