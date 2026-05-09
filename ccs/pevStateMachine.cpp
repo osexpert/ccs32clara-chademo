@@ -82,6 +82,7 @@ static uint16_t pev_numberOfCableCheckReq;
 static int LastCurrentDemandResPresentVoltage;
 static int LastTargetVoltage;
 static int LastTargetCurrent;
+static bool PrechargeDifferenceIsSmall;
 static uint8_t numberOfWeldingDetectionRounds;
 
 static bool ChargingVoltageDifferentFromTarget;
@@ -255,6 +256,8 @@ static void pev_sendCableCheckReq(void)
 
 static void pev_sendPreChargeReq(uint16_t targetVoltage)
 {
+    addToTrace(MOD_PEV, "Send PreChargeReq:%dV", targetVoltage);
+
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.PreChargeReq_isUsed = 1u;
     init_dinPreChargeReqType(&dinDocEnc.V2G_Message.Body.PreChargeReq);
@@ -719,6 +722,8 @@ static void stateFunctionWaitForPreChargeStart(void)
             addToTrace(MOD_PEV, "Warning: batteryVoltage:%d is less than evseMinimumVoltage:%d", batVtg, _ccs_params.EvseMinimumVoltage);
         }
 
+        PrechargeDifferenceIsSmall = false; // reset
+
         addToTrace(MOD_PEV, "Will send PreChargeReq:%dv", batVtg);
         setCheckpoint(570);
         pev_sendPreChargeReq(batVtg);
@@ -748,12 +753,21 @@ static void stateFunctionWaitForPreChargeResponse(void)
             int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
             _ccs_params.EvseVoltage = evsePresentVoltage;
 
+            addToTrace(MOD_PEV, "PreCharge response:%dV", evsePresentVoltage);
+
             uint16_t inletVtg = hardwareInterface_getInletVoltage();
             uint16_t batVtg = hardwareInterface_getAccuVoltage();
 
-            bool smallDifference = (ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE);
-            addToTrace(MOD_PEV, "PreCharge response:%dv batteryVoltage:%dv small:%d", evsePresentVoltage, batVtg, smallDifference);
-            if (smallDifference && chademoInterface_preChargeCompleted())
+            if (not PrechargeDifferenceIsSmall)
+            {
+                if (ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE)
+                {
+                    addToTrace(MOD_PEV, "PreCharge difference is small (inlet:%dV batt:%dV)", inletVtg, batVtg);
+                    PrechargeDifferenceIsSmall = true;
+                }
+            }
+
+            if (PrechargeDifferenceIsSmall && chademoInterface_preChargeCompleted())
             {
                 addToTrace(MOD_PEV, "PreCharge completed.");
                 // Turn the power relay on.
@@ -763,7 +777,6 @@ static void stateFunctionWaitForPreChargeResponse(void)
             }
             else
             {
-                addToTrace(MOD_PEV, "Continuing PreCharge.");
                 pev_sendPreChargeReq(batVtg);
                 pev_DelayCycles = 15; // wait with the next evaluation approx half a second
             }
