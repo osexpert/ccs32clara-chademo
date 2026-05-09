@@ -715,7 +715,7 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Chatgpt: 2s borderline, 5 sec absolute max.
     if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
     {
-        uint16_t batVtg = hardwareInterface_getAccuVoltage();
+        uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
         if (batVtg < _ccs_params.EvseMinimumVoltage) {
             // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
@@ -756,7 +756,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
             addToTrace(MOD_PEV, "PreCharge response:%dV", evsePresentVoltage);
 
             uint16_t inletVtg = hardwareInterface_getInletVoltage();
-            uint16_t batVtg = hardwareInterface_getAccuVoltage();
+            uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
             if (not PrechargeDifferenceIsSmall)
             {
@@ -851,7 +851,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
         {
             _global.auto_power_off_timer_count_up_ms = 0;
 
-            /* as long as the accu is not full and no stop-demand from the user, we continue charging */
+            /* as long as the battery is not full and no stop-demand from the user, we continue charging */
             _stopreasons currentDemandStopReason = STOP_REASON_NONE;
             if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Shutdown)
             {
@@ -881,10 +881,10 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
                 currentDemandStopReason = STOP_REASON_POWER_OFF_PENDING;
             }
-            else if (hardwareInterface_getIsAccuFull())
+            else if (hardwareInterface_getIsBatteryFull())
             {
-                addToTrace(MOD_PEV, "Accu is full. Sending PowerDeliveryReq Stop.");
-                currentDemandStopReason = STOP_REASON_ACCU_FULL;
+                addToTrace(MOD_PEV, "Battery is full. Sending PowerDeliveryReq Stop.");
+                currentDemandStopReason = STOP_REASON_BATTERY_FULL;
             }
 
             if (currentDemandStopReason != STOP_REASON_NONE)

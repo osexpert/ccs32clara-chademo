@@ -8,7 +8,7 @@ int16_t hardwareInterface_getInletVoltage(void)
     return _ccs_params.EvseVoltage;
 }
 
-int16_t hardwareInterface_getAccuVoltage(void)
+int16_t hardwareInterface_getBatteryVoltage(void)
 {
     return _ccs_params.BatteryVoltage;
 }
@@ -29,7 +29,7 @@ uint8_t hardwareInterface_getSoc(void)
     return _ccs_params.soc;
 }
 
-bool hardwareInterface_getIsAccuFull(void)
+bool hardwareInterface_getIsBatteryFull(void)
 {
     // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
     return _ccs_params.soc == 100;
