@@ -254,9 +254,9 @@ void power_off_check()
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
         if (buttonPressedBriefly
-#ifndef CHADEMO_STANDALONE_TESTING
+//#ifndef CHADEMO_STANDALONE_TESTING
             && _ledState != LedState::WaitForSlacDone
-#endif
+//#endif
             && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
@@ -427,8 +427,6 @@ void special_mode_selected(enum SpecialMode mode)
 
     if (mode == SpecialMode::Discharge)
         chademoCharger->EnableDischarge();
-    else if (mode == SpecialMode::LongerPrecharge)
-        chademoCharger->EnableLongerPrecharge();
     else if (mode == SpecialMode::MoreLogging)
         _global.moreLogging = true;
 }
@@ -481,15 +479,15 @@ static void Ms30Task()
         println("[cha] discovery completed => ccs kickoff");
     }
 
-#ifdef CHADEMO_STANDALONE_TESTING
-
-    static int delay = 100;
-    if (delay > 0 && --delay == 0)
-    {
-        chademoInterface_preChargeCompleted();
-    }
-    return;
-#endif
+//#ifdef CHADEMO_STANDALONE_TESTING
+//
+//    static int delay = 100;
+//    if (delay > 0 && --delay == 0)
+//    {
+//        chademoInterface_preChargeCompleted();
+//    }
+//    return;
+//#endif
 
     // run eth even after ccsEnded, so we look "alive" to the charger
     // (some chargers complain about contact lost with car after charging, this may fix it?)

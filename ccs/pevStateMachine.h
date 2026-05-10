@@ -20,4 +20,4 @@ extern bool chademoInterface_ccsChargingVoltageMirrorsTarget();
 extern bool chademoInterface_ccsChargingCurrentMirrorsTarget();
 extern bool chademoInterface_ccsCableCheckDone();
 extern bool chademoInterface_preChargeCanStart();
-
+extern bool chademoInterface_ccsCurrentDemand();

@@ -2,10 +2,15 @@
 
 #include <type_traits>
 #include "printf.h"
+#include "main.h"
 
-#if GITHUB_SS == 1
-#define CHADEMO_SINGLE_SESSION
-#endif
+//#if GITHUB_SS == 1
+//#define CHADEMO_SINGLE_SESSION
+//#endif
+//
+//#if GITHUB_SX == 1
+//#define CHADEMO_SINGLE_X
+//#endif
 
 #define CHA_CYCLE_MS 100
 #define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
@@ -500,13 +505,13 @@ struct CarData
 
     uint16_t MaxChargingTimeSec;
 
-#ifdef CHADEMO_SINGLE_SESSION
+//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
     // Valid after kSwitch, but until then, fake something to make ChargeParameterDiscovery MaxVoltage happy
     uint16_t TargetVoltage = 410;
-#else
-    // Valid after kSwitch
-    uint16_t TargetVoltage;
-#endif
+//#else
+//    // Valid after kSwitch
+//    uint16_t TargetVoltage;
+//#endif
 
     uint16_t EstimatedBatteryVoltage;
     bool EstimatedBatteryVoltageReady = false;
@@ -517,13 +522,13 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
-#ifdef CHADEMO_SINGLE_SESSION
+//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
     // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
     uint8_t SocPercent = 20;
-#else
-    // PS: unstable before switch (k)
-    uint8_t SocPercent;
-#endif
+//#else
+//    // PS: unstable before switch (k)
+//    uint8_t SocPercent;
+//#endif
 
     CarStatus Status;
     CarFaults Faults;
@@ -660,11 +665,7 @@ public:
     {
         _dischargeEnabled = true;
     }
-    void EnableLongerPrecharge()
-    {
-        _precharge_Longer_So_We_Can_Measure_Battery_Voltage = true;
-    }
-
+    
     void LockChargingPlug() {
         _chargingPlugLocked = true;
         println("[cha] Lock charging plug");
@@ -683,18 +684,20 @@ public:
         bool _send_can = false;
         bool _d1 = false;
         bool _d2 = false;
+        bool _adapterContactorClosed = false;
 
-#ifdef CHADEMO_SINGLE_SESSION
-        bool _discovery = false;
-#else
-        bool _discovery = true;
-#endif
+//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
+//        bool _discovery = false;
+//#else
+//        bool _discovery = true;
+//#endif
+
+        bool _discovery = (_global.CHADEMO_SINGLE_SESSION || _global.CHADEMO_SINGLE_X) ? false : true;
 
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
-        bool _isDischargeUnit = false;
+        //bool _isDischargeUnit = false;
         bool _isDischarging = false;
-        bool _precharge_Longer_So_We_Can_Measure_Battery_Voltage = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
@@ -719,11 +722,15 @@ public:
 
         StopReason _stopReason = StopReason::NONE;
 
-#ifdef CHADEMO_SINGLE_SESSION
-        ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
-#else
-        ChargerState _state = ChargerState::Start;
-#endif
+//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
+//        ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
+//#else
+//        ChargerState _state = ChargerState::Start;
+//#endif
+
+        ChargerState _state = (_global.CHADEMO_SINGLE_SESSION || _global.CHADEMO_SINGLE_X) ?
+            ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone :
+            ChargerState::Start;
 
         CarData _carData = {};
         ChargerData _chargerData = {};

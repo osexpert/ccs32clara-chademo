@@ -4,6 +4,7 @@ After charging started (car contactors closed), car ramp up target to 450 as wel
 Soc is not seen until after approx 1 second after d2 = true. This is very strange.
 
 49%, 384
+82%, 390
 
 Theory (guessing):
 108s

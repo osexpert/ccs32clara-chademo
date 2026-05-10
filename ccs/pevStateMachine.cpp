@@ -724,12 +724,20 @@ static void stateFunctionWaitForPreChargeStart(void)
 
         PrechargeDifferenceIsSmall = false; // reset
 
-        addToTrace(MOD_PEV, "Will send PreChargeReq:%dv", batVtg);
-        setCheckpoint(570);
-        pev_sendPreChargeReq(batVtg);
-//        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
-        //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
-        pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+        if (_global.CHADEMO_SINGLE_X && not _global.chademoReachedChargingLoop)
+        {
+            addToTrace(MOD_PEV, "CCS Precharge starting, but chademo not reached ChargingLoop (yet). ERROR! Timing is wrong somehow.");
+            pev_enterState(PEV_STATE_SafeShutDown);
+        }
+        else
+        {
+            addToTrace(MOD_PEV, "Will send PreChargeReq:%dv", batVtg);
+            setCheckpoint(570);
+            pev_sendPreChargeReq(batVtg);
+            //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
+                    //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
+            pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+        }
     }
 }
 
@@ -850,6 +858,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
         if (dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed)
         {
             _global.auto_power_off_timer_count_up_ms = 0;
+            _global.ccsReachedCurrentDemand = true;
 
             /* as long as the battery is not full and no stop-demand from the user, we continue charging */
             _stopreasons currentDemandStopReason = STOP_REASON_NONE;
@@ -1203,3 +1212,7 @@ bool chademoInterface_ccsCableCheckDone() {
     return pev_state == PEV_STATE_WaitForPreChargeStart;
 }
 
+bool chademoInterface_ccsCurrentDemand()
+{
+    return pev_state == PEV_STATE_WaitForCurrentDemandResponse;
+}

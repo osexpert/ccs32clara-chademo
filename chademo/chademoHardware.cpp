@@ -47,13 +47,13 @@ bool ChademoCharger::GetSwitchK()
 void ChademoCharger::CloseAdapterContactor()
 {
     println("[cha] Adapter contactor closing");
-
+    _adapterContactorClosed = true;
     DigIo::contactor_out.Set();
 };
 
 void ChademoCharger::OpenAdapterContactor()
 {
     println("[cha] Adapter contactor opening");
-
+    _adapterContactorClosed = false;
     DigIo::contactor_out.Clear();
 };
