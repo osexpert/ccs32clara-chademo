@@ -255,12 +255,13 @@ void power_off_check()
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
         if (buttonPressedBriefly
 //#ifndef CHADEMO_STANDALONE_TESTING
-            && _ledState != LedState::WaitForSlacDone
+//            && _ledState != LedState::WaitForSlacDone
 //#endif
             && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
-            println("Stop button pressed briefly and slac not pending. Power off pending...");
+            //println("Stop button pressed briefly and slac not pending. Power off pending...");
+            println("Stop button pressed briefly. Power off pending...");
         }
         if (buttonPressed5Seconds)
         {
