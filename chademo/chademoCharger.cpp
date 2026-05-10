@@ -172,9 +172,9 @@ void ChademoCharger::HandlePendingCarMessages()
         //    set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         //}
         //else
-        //{
-        //    _carData.RequestCurrent = _msg102.m.RequestCurrent;
-        //}
+        {
+            _carData.RequestCurrent = _msg102.m.RequestCurrent;
+        }
 
         // soc and the constant both unstable before switch(k)
         if ((_global.CHADEMO_SINGLE_SESSION && _carData.Switch_k) // cut corners to save time, so we can start ccs preCharge a bit faster
