@@ -365,10 +365,6 @@ const int SX_RAMP_UP_carDataRequestCurrent = 3;
 const int SX_DONE = 4;
 static int sxState = SX_INITIAL;
 
-static int rampedRequestCurrent = 0;
-const int AMPS_PER_STEP = 2; // Increase by 2A every 100ms (20A per second)
-
-
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
@@ -580,6 +576,7 @@ void ChademoCharger::RunStateMachine()
         }
         else
         {
+            const int AMPS_PER_STEP = 5; // Increase by 5A every 100ms (50A per second)
 
             if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
@@ -590,7 +587,11 @@ void ChademoCharger::RunStateMachine()
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (_global.CHADEMO_SINGLE_X && sxState != SX_DONE)
             {
-                _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10, to avoit the +10 limiter kicking in and out all the time
+                static int rampedRequestCurrent = 0;
+
+                _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10
+                int carRequested = _carData.RequestCurrent;
+                _carData.RequestCurrent = 1; // fake 1A request for ccs
 
                 if (sxState == SX_INITIAL)
                     sxState = SX_WAIT_FOR_preChargeDoneButStalled;
@@ -607,40 +608,28 @@ void ChademoCharger::RunStateMachine()
                 {
                     if (chademoInterface_ccsCurrentDemand())
                     {
-                        rampedRequestCurrent = _chargerData.OutputCurrent;
+                        rampedRequestCurrent = _carData.RequestCurrent;
                         sxState = SX_RAMP_UP_carDataRequestCurrent;
                     }
                 }
                 else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
                 {
-                    // Get the actual maximum the car is asking for
-                    int carRequested = _carData.RequestCurrent;
-
-                    // If our ramped limit is still below the car's request, keep climbing
                     if (rampedRequestCurrent < carRequested)
-                    {
                         rampedRequestCurrent += AMPS_PER_STEP;
-                    }
 
-                    // Ensure we never give MORE than the car is asking for (safety)
                     if (rampedRequestCurrent > carRequested)
-                    {
                         rampedRequestCurrent = carRequested;
-                    }
 
-                    // Overwrite the request sent to the charger with our smaller, ramped value
                     _carData.RequestCurrent = rampedRequestCurrent;
 
-                    // Exit condition: Once the ramp matches the car's demand, we are "Done"
                     if (rampedRequestCurrent >= carRequested)
-                    {
                         sxState = SX_DONE;
-                    }
                 }
             }
             else if (_dischargeEnabled)
             {
                 static int zeroOutputAmpsCycles = 0;
+                static int rampedRequestCurrent = 0;
 
                 //bool isDischargeUnit = false;
                 bool isDischarging = false;
@@ -663,8 +652,9 @@ void ChademoCharger::RunStateMachine()
                     if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
                         zeroOutputAmpsCycles++;
                     }
-                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
-                        rampedRequestCurrent = 0;
+                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) 
+                    {
+                        rampedRequestCurrent = _carData.RequestCurrent;
                         isDischarging = true;
                     }
                 }
@@ -693,19 +683,18 @@ void ChademoCharger::RunStateMachine()
                     // TODO: ramp up RequestCurrent?
                     int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
                     {
-                        // If our ramped limit is still below the car's request, keep climbing
-                        if (rampedRequestCurrent < maxDischargeAmps)
-                        {
-                            rampedRequestCurrent += AMPS_PER_STEP;
-                        }
-
-                        // Ensure we never give MORE than the car is asking for (safety)
-                        if (rampedRequestCurrent > maxDischargeAmps)
+                        if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
                         {
                             rampedRequestCurrent = maxDischargeAmps;
                         }
+                        else
+                        {
+                            if (rampedRequestCurrent < maxDischargeAmps)
+                                rampedRequestCurrent += AMPS_PER_STEP;
 
-                        // Overwrite the request sent to the charger with our smaller, ramped value
+                            if (rampedRequestCurrent > maxDischargeAmps)
+                                rampedRequestCurrent = maxDischargeAmps;
+                        }
                         _carData.RequestCurrent = rampedRequestCurrent;
                     }
 
