@@ -165,15 +165,16 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
-        {
-            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
-        }
-        else
-        {
-            _carData.RequestCurrent = _msg102.m.RequestCurrent;
-        }
+        // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower that adapter max.
+        //if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
+        //{
+        //    println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
+        //    set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
+        //}
+        //else
+        //{
+        //    _carData.RequestCurrent = _msg102.m.RequestCurrent;
+        //}
 
         // soc and the constant both unstable before switch(k)
         if ((_global.CHADEMO_SINGLE_SESSION && _carData.Switch_k) // cut corners to save time, so we can start ccs preCharge a bit faster
@@ -274,12 +275,12 @@ void ChademoCharger::SetCcsParamsFromCarData()
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
     _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
 
-    if (_ccs_params.TargetCurrent > _chargerData.DynAvailableOutputCurrent)
+    if (_ccs_params.TargetCurrent > _ccs_params.EvseDynCurrent())
     {
         // If car does not support DynamicControl,
         // car may ask for more (MaxAvailableOutputCurrent) than is currently available (DynAvailableOutputCurrent),
         // and the charger may not like this. Asking for more than available is rude in any case, so cap it if is happens.
-        _ccs_params.TargetCurrent = _chargerData.DynAvailableOutputCurrent;
+        _ccs_params.TargetCurrent = _ccs_params.EvseDynCurrent();
     }
 
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
