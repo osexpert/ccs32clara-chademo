@@ -590,6 +590,8 @@ void ChademoCharger::RunStateMachine()
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (_global.CHADEMO_SINGLE_X && sxState != SX_DONE)
             {
+                _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10, to avoit the +10 limiter kicking in and out all the time
+
                 if (sxState == SX_INITIAL)
                     sxState = SX_WAIT_FOR_preChargeDoneButStalled;
 
