@@ -567,7 +567,8 @@ struct CarData
     /// </summary>
     bool DynamicControl() const
     {
-        return has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);
+        // Try to pretent all cars allows it (even thou some may not respect it, it should not matter)
+        return true;// has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);
     }
 };
 
