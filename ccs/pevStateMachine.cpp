@@ -713,7 +713,10 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Gemini: 2 seconds is borderline and would have used 1.5s / 50 cycles...look out for FAILED_SequenceError or FIN's...
     // Grok: < 10s is very safe
     // Chatgpt: 2s borderline, 5 sec absolute max.
-    if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
+
+    // there is no need to wait here if _global.CHADEMO_SINGLE_X. clara and pyplc does not wait at all.
+    if (_global.CHADEMO_SINGLE_X || 
+        (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart())) /* 66*30ms=2s */
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
@@ -726,7 +729,7 @@ static void stateFunctionWaitForPreChargeStart(void)
 
         if (_global.CHADEMO_SINGLE_X && not _global.chademoReachedChargingLoop)
         {
-            addToTrace(MOD_PEV, "CCS Precharge starting, but chademo not reached ChargingLoop (yet). ERROR! Timing is wrong somehow.");
+            addToTrace(MOD_PEV, "ERROR! CCS Precharge starting, but chademo not reached ChargingLoop (yet). Timing is wrong somehow.");
             pev_enterState(PEV_STATE_SafeShutDown);
         }
         else
