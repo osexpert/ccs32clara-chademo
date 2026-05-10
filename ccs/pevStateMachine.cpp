@@ -731,7 +731,7 @@ static void stateFunctionWaitForPreChargeStart(void)
         }
         else
         {
-            addToTrace(MOD_PEV, "Will send PreChargeReq:%dv", batVtg);
+            addToTrace(MOD_PEV, "Will send PreChargeReq");
             setCheckpoint(570);
             pev_sendPreChargeReq(batVtg);
             //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
