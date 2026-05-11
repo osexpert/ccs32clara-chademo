@@ -307,46 +307,26 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     if (_carData.OverridesJudged)
         return;
 
-    bool known = false;
+    bool override = false;
 
-    // Set for some known targets
-    if (_carData.TargetVoltage == 370)
+    if (_carData.TargetVoltage == 410)
     {
-        _carData.NomVoltOverride = 330; // iMiev
-        _carData.MaxVoltOverride = 370; // max is not target - 10
-        known = true;
-    }
-    else if (_carData.TargetVoltage == 450)
-    {
-        _carData.NomVoltOverride = 400; // BMW i5 M60 
-        known = true;
-    }
-    else if (_carData.TargetVoltage == 410)
-    {
-        if (_global.alternative_voltage == 1)
+        if (_global.alternative_voltage == 1) // Leaf 20-30
         {
-            // Leaf 20-30
             _carData.NomVoltOverride = 380;
             _carData.AdjustBelowSoc = 29;
             _carData.AdjustBelowFactor = 0.7f;
-            known = true;
+            override = true;
         }
-        else // default
+        else // Leaf 40+ (default)
         {
-            _carData.NomVoltOverride = 355; // Leaf 40+
-            known = true;
+            _carData.NomVoltOverride = 355; 
+            override = true;
         }
-    }
-    // Peugeot e-Partner 2017-2020. 80 cells in series. 80x—4.2V=336V
-    else if (_carData.TargetVoltage == 336)
-    {
-        _carData.NomVoltOverride = 300;
-        _carData.MaxVoltOverride = 336; // max is not target - 10
-        known = true;
     }
 
-    if (known)
-        println("[cha] AV%d: known target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
+    if (override)
+        println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
             _global.alternative_voltage, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,

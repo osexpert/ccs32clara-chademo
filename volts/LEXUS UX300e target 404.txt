@@ -1,6 +1,10 @@
 target:404V max:408V
 65%, 369V
 
+target:399V max:404V soc:47% batt:354V
+109.OutputVoltage 351 -> 350
+
+
 Theory:
 54.35 kWh and the newer 72.82 kWh, both use 96 packs in series.
 96s3p (288 cells)
