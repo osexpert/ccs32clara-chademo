@@ -74,14 +74,13 @@ void evaluateUdpPayload(void) {
                }
                //# Extract the TCP port, on which the charger will listen:
                seccTcpPort = (((uint16_t)(udpPayload[8+16]))<<8) + udpPayload[8+16+1];
-               /* in case we did not yet found out the chargers MAC, because we jumped-over the SLAC,
-                  we extract the chargers MAC from the SDP response. */
-               if ((evseMac[0]==0) && (evseMac[1]==0)) {
-                  addToTrace(MOD_SDP, "[SDP] Taking evseMac from SDP response because not yet known.");
-                  for (i=0; i<6; i++) {
-                     evseMac[i] = myethreceivebuffer[6+i]; // source MAC starts at offset 6
-                  }
+
+               /* Generally trust the SDP source MAC, this is the MAC actually sending IPv6 traffic on the link. */
+               if (memcmp(evseMac, &myethreceivebuffer[6], 6) != 0) {
+                  addToTrace(MOD_SDP, "[SDP] SDP source MAC differs from SLAC source MAC => prefer SDP");
+                  memcpy(evseMac, &myethreceivebuffer[6], 6);
                }
+
                addToTrace(MOD_SDP, "[SDP] Now we know the chargers IP.");
                readModemVersions(); /* read the software versions from our modem and from the chargers modem. Just for information/logging. */
                connMgr_setLevel(CONNLEVEL_50_SDP_DONE_TCP_NEXT);
