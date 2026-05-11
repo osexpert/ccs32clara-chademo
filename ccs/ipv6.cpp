@@ -78,7 +78,7 @@ void evaluateUdpPayload(void) {
                /* Generally trust the SDP source MAC, this is the MAC actually sending IPv6 traffic on the link. */
                if (memcmp(evseMac, &myethreceivebuffer[6], 6) != 0) {
                   addToTrace(MOD_SDP, "[SDP] SDP source MAC differs from SLAC source MAC => prefer SDP");
-                  memcpy(evseMac, &myethreceivebuffer[6], 6);
+                  memcpy(evseMac, &myethreceivebuffer[6], 6); // source MAC starts at offset 6
                }
 
                addToTrace(MOD_SDP, "[SDP] Now we know the chargers IP.");
