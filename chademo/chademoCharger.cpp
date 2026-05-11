@@ -358,13 +358,6 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     _carData.OverridesJudged = true;
 }
 
-const int SX_INITIAL = 0;
-const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
-const int SX_WAIT_FOR_ccsCurrentDemand = 2;
-const int SX_RAMP_UP_carDataRequestCurrent = 3;
-const int SX_DONE = 4;
-static int sxState = SX_INITIAL;
-
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
@@ -584,6 +577,13 @@ void ChademoCharger::RunStateMachine()
                 _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
             }
 
+            const int SX_INITIAL = 0;
+            const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
+            const int SX_WAIT_FOR_ccsCurrentDemand = 2;
+            const int SX_RAMP_UP_carDataRequestCurrent = 3;
+            const int SX_DONE = 4;
+            static int sxState = SX_INITIAL;
+
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (_global.CHADEMO_SINGLE_X && sxState != SX_DONE)
             {
@@ -594,7 +594,10 @@ void ChademoCharger::RunStateMachine()
                 _carData.RequestCurrent = 1; // fake 1A request for ccs
 
                 if (sxState == SX_INITIAL)
+                {
                     sxState = SX_WAIT_FOR_preChargeDoneButStalled;
+                    println("[cha] set sxState:%d", sxState);
+                }
 
                 if (sxState == SX_WAIT_FOR_preChargeDoneButStalled)
                 {
@@ -602,6 +605,7 @@ void ChademoCharger::RunStateMachine()
                     {
                         CloseAdapterContactor(); // will trigger complete of ccs precharge
                         sxState = SX_WAIT_FOR_ccsCurrentDemand;
+                        println("[cha] set sxState:%d", sxState);
                     }
                 }
                 else if (sxState == SX_WAIT_FOR_ccsCurrentDemand)
@@ -610,6 +614,7 @@ void ChademoCharger::RunStateMachine()
                     {
                         rampedRequestCurrent = _carData.RequestCurrent;
                         sxState = SX_RAMP_UP_carDataRequestCurrent;
+                        println("[cha] set sxState:%d", sxState);
                     }
                 }
                 else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
@@ -623,7 +628,10 @@ void ChademoCharger::RunStateMachine()
                     _carData.RequestCurrent = rampedRequestCurrent;
 
                     if (rampedRequestCurrent >= carRequested)
+                    {
                         sxState = SX_DONE;
+                        println("[cha] set sxState:%d", sxState);
+                    }
                 }
             }
             else if (_dischargeEnabled)
@@ -983,7 +991,7 @@ void ChademoCharger::Log()
     if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second
-        println("[cha] state:%s cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh sxs:%d",
+        println("[cha] state:%s cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             GetStateName(),
             _cyclesInState,
             _chargerData.OutputVoltage,
@@ -1003,8 +1011,7 @@ void ChademoCharger::Log()
             _carData.MaxVoltage,
             _carData.SocPercent,
             _carData.EstimatedBatteryVoltage,
-            &_carData.BatteryCapacityKwh,  // bypass float to double promotion by passing as reference
-            sxState
+            &_carData.BatteryCapacityKwh // bypass float to double promotion by passing as reference
         );
 
         _logCycleCounter = 0;
