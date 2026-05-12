@@ -678,7 +678,7 @@ public:
         bool _d2 = false;
         bool _adapterContactorClosed = false;
 
-        bool _discovery = _global.CHADEMO_SINGLE_X ? false : true;
+        bool _discovery = _global.CHADEMO_SX ? false : true;
 
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
@@ -708,7 +708,7 @@ public:
 
         StopReason _stopReason = StopReason::NONE;
 
-        ChargerState _state = _global.CHADEMO_SINGLE_X ?
+        ChargerState _state = _global.CHADEMO_SX ?
             ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone :
             ChargerState::Start;
 

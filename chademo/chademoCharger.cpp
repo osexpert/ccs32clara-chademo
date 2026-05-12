@@ -367,7 +367,7 @@ void ChademoCharger::RunStateMachine()
 
     if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone)
     {
-        if (_global.CHADEMO_SINGLE_X)
+        if (_global.CHADEMO_SX)
         {
             if (_global.ccsLifesign)
             {
@@ -446,7 +446,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        if (_global.CHADEMO_SINGLE_X || _preChargeDoneButStalled)
+        if (_global.CHADEMO_SX || _preChargeDoneButStalled)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
@@ -474,7 +474,7 @@ void ChademoCharger::RunStateMachine()
             println("[cha] Car contactors closed");
             _carData.CarContactorsClosed = true;
 
-            if (_global.CHADEMO_SINGLE_X)
+            if (_global.CHADEMO_SX)
             {
                 // not yet
             }
@@ -562,7 +562,7 @@ void ChademoCharger::RunStateMachine()
             static int sxState = SX_INITIAL;
 
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
-            if (_global.CHADEMO_SINGLE_X && sxState != SX_DONE)
+            if (_global.CHADEMO_SX && sxState != SX_DONE)
             {
                 static int rampedRequestCurrent = 0;
 
@@ -810,7 +810,7 @@ bool ChademoCharger::PreChargeCompleted()
     _preChargeDoneButStalled = true;
     _global.ccsPreChargeDoneButStalledTrigger = true;
 
-    if (_global.CHADEMO_SINGLE_X)
+    if (_global.CHADEMO_SX)
     {
         if (not _adapterContactorClosed)
             println("[cha] PreCharge stalled until adapter contactor closed");
@@ -897,7 +897,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_global.CHADEMO_SINGLE_X && not _global.ccsReachedCurrentDemand)
+    if (_global.CHADEMO_SX && not _global.ccsReachedCurrentDemand)
     {
         SetChargerData(ADAPTER_MAX_VOLTS,
             ADAPTER_MAX_AMPS,

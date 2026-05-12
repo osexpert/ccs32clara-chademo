@@ -15,7 +15,7 @@
    STATE_ENTRY(WaitForContractAuthenticationResponse, ContractAuthentication, 2) \
    STATE_ENTRY(WaitForChargeParameterDiscoveryResponse, ChargeParameterDiscovery, 5) /* On some charger models, the chargeParameterDiscovery needs more than a second. Wait at least 5s. */ \
    STATE_ENTRY(WaitForCableCheckResponse, CableCheck, 30) \
-   STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 60) \
+   STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 10) \
    STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 30) \
    STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 5) \
    STATE_ENTRY(WaitForPowerDeliveryOnResponse, PowerDeliveryOn, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
@@ -713,8 +713,9 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Gemini: 2 seconds is borderline and would have used 1.5s / 50 cycles...look out for FAILED_SequenceError or FIN's...
     // Chatgpt: 2s borderline, 5 sec absolute max.
 
-    // there is no need to wait here if _global.CHADEMO_SINGLE_X. clara and pyplc does not wait at all.
-    if (_global.CHADEMO_SINGLE_X || pev_cyclesInState > 66) /* 66*30ms=2s */
+    // there is no need to wait here if _global.CHADEMO_SX. clara and pyplc does not wait at all.
+    // But in case ccs finish insanely fast and chademo slow (unlikely), we can wait here for a while (max 10sec) until we time out.
+    if (_global.CHADEMO_SX ? _global.chademoReachedChargingLoop : pev_cyclesInState > 66) /* 66*30ms=2s */
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
@@ -725,20 +726,12 @@ static void stateFunctionWaitForPreChargeStart(void)
 
         PrechargeDifferenceIsSmall = false; // reset
 
-        if (_global.CHADEMO_SINGLE_X && not _global.chademoReachedChargingLoop)
-        {
-            addToTrace(MOD_PEV, "ERROR! CCS Precharge starting, but chademo not reached ChargingLoop (yet). Timing is wrong somehow.");
-            pev_enterState(PEV_STATE_SafeShutDown);
-        }
-        else
-        {
-            addToTrace(MOD_PEV, "Will send PreChargeReq");
-            setCheckpoint(570);
-            pev_sendPreChargeReq(batVtg);
-            //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
-                    //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
-            pev_enterState(PEV_STATE_WaitForPreChargeResponse);
-        }
+        addToTrace(MOD_PEV, "Will send PreChargeReq");
+        setCheckpoint(570);
+        pev_sendPreChargeReq(batVtg);
+        //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
+                //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
+        pev_enterState(PEV_STATE_WaitForPreChargeResponse);
     }
 }
 
