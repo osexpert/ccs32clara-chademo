@@ -549,7 +549,7 @@ void ChademoCharger::RunStateMachine()
         }
         else
         {
-            const int AMPS_PER_STEP = 5; // Increase by 5A every 100ms (50A per second)
+            const int RAMP_AMPS_PER_STEP = 5; // Increase by 5A every 100ms (50A per second)
 
             if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
@@ -599,12 +599,7 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
                 {
-                    if (rampedRequestCurrent < carRequested)
-                        rampedRequestCurrent += AMPS_PER_STEP;
-
-                    if (rampedRequestCurrent > carRequested)
-                        rampedRequestCurrent = carRequested;
-
+                    rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
                     _carData.RequestCurrent = rampedRequestCurrent;
 
                     if (rampedRequestCurrent >= carRequested)
@@ -677,11 +672,7 @@ void ChademoCharger::RunStateMachine()
                         }
                         else
                         {
-                            if (rampedRequestCurrent < maxDischargeAmps)
-                                rampedRequestCurrent += AMPS_PER_STEP;
-
-                            if (rampedRequestCurrent > maxDischargeAmps)
-                                rampedRequestCurrent = maxDischargeAmps;
+                            rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
                         }
                         _carData.RequestCurrent = rampedRequestCurrent;
                     }
