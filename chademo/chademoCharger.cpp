@@ -230,6 +230,7 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "200.MaxRemainingCapacityForCharging %d -> %d");
 
         _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaxDischargeCurrentInverted;
+        _carData.MaxDischargeCurrentSet = true;
     }
     if (_msg201_pending)
     {
@@ -599,6 +600,7 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
                 {
+                    // Ramp up 5A per cycle toward target
                     rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
                     _carData.RequestCurrent = rampedRequestCurrent;
 
@@ -708,10 +710,44 @@ void ChademoCharger::RunStateMachine()
             // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
             // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
             // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-            if (not _isDischarging && _chargerData.OutputCurrent == 0)
+            if (not _isDischarging)
             {
-                _chargerData.OutputCurrent = 1;
+                static int rampedRequestCurrent = 0;
+                static bool ramping = false;
+
+                // Reset ramping if output is live or car stops requesting
+                if (_chargerData.OutputCurrent > 0 || _carData.RequestCurrent == 0)
+                    ramping = false;
+
+                if (_chargerData.OutputCurrent == 0)
+                {
+                    // Keep the car alive, believing it is getting some amps
+                    _chargerData.OutputCurrent = 1;
+
+                    // Fake a higher ccs request, in case V2X use request current as how much it can discharge.
+                    if (_carData.RequestCurrent > 0)
+                    {
+                        // Detect transition: init ramp from current request
+                        if (!ramping)
+                        {
+                            rampedRequestCurrent = _carData.RequestCurrent;
+                            ramping = true;
+                        }
+
+                        // car request some, but not getting any.
+                        // Fake it and request from ccs, as much as we can discharge
+                        int maxDischargeCurrent = _carData.MaxDischargeCurrentSet ?
+                            _carData.MaxDischargeCurrent :
+                            MAX_DISCHARGE_AMPS; // no discharge messages from car, Use some hardcoded max
+
+                        // Ramp up 5A per cycle toward target
+                        rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeCurrent);
+                        _carData.RequestCurrent = rampedRequestCurrent;
+                    }
+                }
             }
+
+            
 //#endif
         }
     }

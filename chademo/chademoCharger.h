@@ -549,6 +549,7 @@ struct CarData
     ExtendedFunction1Flags ExtendedFunction1;
 
     uint8_t MaxDischargeCurrent;
+    bool MaxDischargeCurrentSet;
 
     int NomVoltOverride = 0;
     int MaxVoltOverride = 0;
