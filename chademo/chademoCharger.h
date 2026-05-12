@@ -4,14 +4,6 @@
 #include "printf.h"
 #include "main.h"
 
-//#if GITHUB_SS == 1
-//#define CHADEMO_SINGLE_SESSION
-//#endif
-//
-//#if GITHUB_SX == 1
-//#define CHADEMO_SINGLE_X
-//#endif
-
 #define CHA_CYCLE_MS 100
 #define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
 
@@ -505,7 +497,7 @@ struct CarData
 
     uint16_t MaxChargingTimeSec;
 
-//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
+//#ifdef CHADEMO_SINGLE_X
     // Valid after kSwitch, but until then, fake something to make ChargeParameterDiscovery MaxVoltage happy
     uint16_t TargetVoltage = 410;
 //#else
@@ -514,7 +506,7 @@ struct CarData
 //#endif
 
     uint16_t EstimatedBatteryVoltage;
-    bool EstimatedBatteryVoltageReady = false;
+//    bool EstimatedBatteryVoltageReady = false;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
@@ -522,7 +514,7 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
-//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
+//#ifdef CHADEMO_SINGLE_X
     // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
     uint8_t SocPercent = 20;
 //#else
@@ -649,7 +641,6 @@ public:
     bool GetSwitchK();
     void SetBatteryVoltOverridesOnce();
     void CloseAdapterContactor();
-    bool PreChargeCanStart();
     void Log();
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
@@ -687,13 +678,7 @@ public:
         bool _d2 = false;
         bool _adapterContactorClosed = false;
 
-//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
-//        bool _discovery = false;
-//#else
-//        bool _discovery = true;
-//#endif
-
-        bool _discovery = (_global.CHADEMO_SINGLE_SESSION || _global.CHADEMO_SINGLE_X) ? false : true;
+        bool _discovery = _global.CHADEMO_SINGLE_X ? false : true;
 
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
@@ -723,13 +708,7 @@ public:
 
         StopReason _stopReason = StopReason::NONE;
 
-//#ifdef CHADEMO_SINGLE_SESSION || CHADEMO_SINGLE_X
-//        ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
-//#else
-//        ChargerState _state = ChargerState::Start;
-//#endif
-
-        ChargerState _state = (_global.CHADEMO_SINGLE_SESSION || _global.CHADEMO_SINGLE_X) ?
+        ChargerState _state = _global.CHADEMO_SINGLE_X ?
             ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone :
             ChargerState::Start;
 

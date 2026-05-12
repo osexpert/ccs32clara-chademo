@@ -177,10 +177,7 @@ void ChademoCharger::HandlePendingCarMessages()
         }
 
         // soc and the constant both unstable before switch(k)
-        if ((_global.CHADEMO_SINGLE_SESSION && _carData.Switch_k) // cut corners to save time, so we can start ccs preCharge a bit faster
-            ||
-            (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
-            )
+        if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
         {
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
@@ -204,7 +201,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.AdjustBelowSoc, 
                 _carData.AdjustBelowFactor);
 
-            _carData.EstimatedBatteryVoltageReady = true;
+//            _carData.EstimatedBatteryVoltageReady = true;
         }
 
         _msg102_recieved = true;
@@ -599,6 +596,7 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
                 {
+                    // Ramp up 5A per cycle toward target
                     rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
                     _carData.RequestCurrent = rampedRequestCurrent;
 
@@ -843,29 +841,6 @@ bool ChademoCharger::CarContactorsOpened()
 bool chademoInterface_carContactorsOpened()
 {
     return chademoCharger->CarContactorsOpened();
-}
-
-bool ChademoCharger::PreChargeCanStart()
-{
-    if (_global.CHADEMO_SINGLE_SESSION)
-    {
-        // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
-        //bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
-        //return carReadyToCharge;
-
-        // To avoid waiting too long before sending first PreChargeReq, do it after switch(k), to save a second. ccs may not like waiting too long between CableCheck and first PreChargeReq.
-        // SOC won't change much between switch(k) and ReadyToCharge anyways, max 2%.
-        return _carData.EstimatedBatteryVoltageReady;
-    }
-    else
-    {
-        return true;
-    }
-}
-
-bool chademoInterface_preChargeCanStart()
-{
-    return chademoCharger->PreChargeCanStart();
 }
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)

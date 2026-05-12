@@ -47,7 +47,6 @@ struct global_data
     bool moreLogging = false;
     int alternative_voltage = GITHUB_AV;
 
-    bool CHADEMO_SINGLE_SESSION = GITHUB_SS;
     bool CHADEMO_SINGLE_X = GITHUB_SX;
     
     bool chademoReachedChargingLoop = false;

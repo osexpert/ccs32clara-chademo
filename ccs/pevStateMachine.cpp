@@ -711,12 +711,10 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
     // Gemini: 2 seconds is borderline and would have used 1.5s / 50 cycles...look out for FAILED_SequenceError or FIN's...
-    // Grok: < 10s is very safe
     // Chatgpt: 2s borderline, 5 sec absolute max.
 
     // there is no need to wait here if _global.CHADEMO_SINGLE_X. clara and pyplc does not wait at all.
-    if (_global.CHADEMO_SINGLE_X || 
-        (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart())) /* 66*30ms=2s */
+    if (_global.CHADEMO_SINGLE_X || pev_cyclesInState > 66) /* 66*30ms=2s */
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
