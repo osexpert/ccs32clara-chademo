@@ -711,9 +711,10 @@ static void stateFunctionWaitForPreChargeStart(void)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
     // Gemini: 2 seconds is borderline and would have used 1.5s / 50 cycles...look out for FAILED_SequenceError or FIN's...
-    // Grok: < 10s is very safe
     // Chatgpt: 2s borderline, 5 sec absolute max.
-    if (pev_cyclesInState > 66 && chademoInterface_preChargeCanStart()) /* 66*30ms=2s */
+
+    // there is no need to wait here if _global.CHADEMO_SINGLE_X. clara and pyplc does not wait at all.
+    if (_global.CHADEMO_SINGLE_X || pev_cyclesInState > 66) /* 66*30ms=2s */
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
@@ -724,12 +725,20 @@ static void stateFunctionWaitForPreChargeStart(void)
 
         PrechargeDifferenceIsSmall = false; // reset
 
-        addToTrace(MOD_PEV, "Will send PreChargeReq:%dv", batVtg);
-        setCheckpoint(570);
-        pev_sendPreChargeReq(batVtg);
-//        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
-        //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
-        pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+        if (_global.CHADEMO_SINGLE_X && not _global.chademoReachedChargingLoop)
+        {
+            addToTrace(MOD_PEV, "ERROR! CCS Precharge starting, but chademo not reached ChargingLoop (yet). Timing is wrong somehow.");
+            pev_enterState(PEV_STATE_SafeShutDown);
+        }
+        else
+        {
+            addToTrace(MOD_PEV, "Will send PreChargeReq");
+            setCheckpoint(570);
+            pev_sendPreChargeReq(batVtg);
+            //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
+                    //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
+            pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+        }
     }
 }
 
@@ -850,6 +859,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
         if (dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed)
         {
             _global.auto_power_off_timer_count_up_ms = 0;
+            _global.ccsReachedCurrentDemand = true;
 
             /* as long as the battery is not full and no stop-demand from the user, we continue charging */
             _stopreasons currentDemandStopReason = STOP_REASON_NONE;
@@ -1203,3 +1213,7 @@ bool chademoInterface_ccsCableCheckDone() {
     return pev_state == PEV_STATE_WaitForPreChargeStart;
 }
 
+bool chademoInterface_ccsCurrentDemand()
+{
+    return pev_state == PEV_STATE_WaitForCurrentDemandResponse;
+}

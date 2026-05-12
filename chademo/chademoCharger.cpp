@@ -165,22 +165,19 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
-        {
-            println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
-        }
-        else
+        // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower that adapter max.
+        //if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
+        //{
+        //    println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
+        //    set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
+        //}
+        //else
         {
             _carData.RequestCurrent = _msg102.m.RequestCurrent;
         }
 
         // soc and the constant both unstable before switch(k)
-#ifdef CHADEMO_SINGLE_SESSION
-        if (_carData.Switch_k) // cut corners to save time, so we can start ccs preCharge a bit faster
-#else
         if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
-#endif
         {
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
@@ -204,7 +201,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.AdjustBelowSoc, 
                 _carData.AdjustBelowFactor);
 
-            _carData.EstimatedBatteryVoltageReady = true;
+//            _carData.EstimatedBatteryVoltageReady = true;
         }
 
         _msg102_recieved = true;
@@ -275,12 +272,12 @@ void ChademoCharger::SetCcsParamsFromCarData()
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
     _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
 
-    if (_ccs_params.TargetCurrent > _chargerData.DynAvailableOutputCurrent)
+    if (_ccs_params.TargetCurrent > _ccs_params.EvseDynCurrent())
     {
         // If car does not support DynamicControl,
         // car may ask for more (MaxAvailableOutputCurrent) than is currently available (DynAvailableOutputCurrent),
         // and the charger may not like this. Asking for more than available is rude in any case, so cap it if is happens.
-        _ccs_params.TargetCurrent = _chargerData.DynAvailableOutputCurrent;
+        _ccs_params.TargetCurrent = _ccs_params.EvseDynCurrent();
     }
 
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
@@ -307,46 +304,26 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     if (_carData.OverridesJudged)
         return;
 
-    bool known = false;
+    bool override = false;
 
-    // Set for some known targets
-    if (_carData.TargetVoltage == 370)
+    if (_carData.TargetVoltage == 410)
     {
-        _carData.NomVoltOverride = 330; // iMiev
-        _carData.MaxVoltOverride = 370; // max is not target - 10
-        known = true;
-    }
-    else if (_carData.TargetVoltage == 450)
-    {
-        _carData.NomVoltOverride = 400; // BMW i5 M60 
-        known = true;
-    }
-    else if (_carData.TargetVoltage == 410)
-    {
-        if (_global.alternative_voltage == 1)
+        if (_global.alternative_voltage == 1) // Leaf 20-30
         {
-            // Leaf 20-30
             _carData.NomVoltOverride = 380;
             _carData.AdjustBelowSoc = 29;
             _carData.AdjustBelowFactor = 0.7f;
-            known = true;
+            override = true;
         }
-        else // default
+        else // Leaf 40+ (default)
         {
-            _carData.NomVoltOverride = 355; // Leaf 40+
-            known = true;
+            _carData.NomVoltOverride = 355; 
+            override = true;
         }
-    }
-    // Peugeot e-Partner 2017-2020. 80 cells in series. 80x—4.2V=336V
-    else if (_carData.TargetVoltage == 336)
-    {
-        _carData.NomVoltOverride = 300;
-        _carData.MaxVoltOverride = 336; // max is not target - 10
-        known = true;
     }
 
-    if (known)
-        println("[cha] AV%d: known target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
+    if (override)
+        println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
             _global.alternative_voltage, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
@@ -390,14 +367,21 @@ void ChademoCharger::RunStateMachine()
 
     if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone)
     {
-#ifdef CHADEMO_STANDALONE_TESTING
-        if (true)
-#else
-        if (chademoInterface_ccsCableCheckDone())
-#endif
+        if (_global.CHADEMO_SINGLE_X)
         {
-            println("[cha] ccs CableCheck done -> start Chademo");
-            SetState(ChargerState::Start);
+            if (_global.ccsLifesign)
+            {
+                println("[cha] ccsLifesign -> start Chademo");
+                SetState(ChargerState::Start);
+            }
+        }
+        else // std
+        {
+            if (chademoInterface_ccsCableCheckDone())
+            {
+                println("[cha] ccs CableCheck done -> start Chademo");
+                SetState(ChargerState::Start);
+            }
         }
     }
     else if (_state == ChargerState::Start)
@@ -462,7 +446,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        if (_preChargeDoneButStalled)
+        if (_global.CHADEMO_SINGLE_X || _preChargeDoneButStalled)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
@@ -489,7 +473,15 @@ void ChademoCharger::RunStateMachine()
 
             println("[cha] Car contactors closed");
             _carData.CarContactorsClosed = true;
-            CloseAdapterContactor();
+
+            if (_global.CHADEMO_SINGLE_X)
+            {
+                // not yet
+            }
+            else
+            {
+                CloseAdapterContactor();
+            }
 
             SetState(ChargerState::WaitForCarRequestCurrent);
         }
@@ -518,6 +510,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
+        _global.chademoReachedChargingLoop = true;
         _global.auto_power_off_timer_count_up_ms = 0;
 
         if (_chargerData.OutputCurrent > 0)
@@ -553,41 +546,86 @@ void ChademoCharger::RunStateMachine()
         }
         else
         {
+            const int RAMP_AMPS_PER_STEP = 5; // Increase by 5A every 100ms (50A per second)
+
             if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
                 // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation volts error.
                 _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
             }
 
-#if false
-            // Is it possible that all the complicated logic below (for discharge support), could be replaced with this simple hack?
-            // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
-            // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
-            // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
-            // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-            if (_chargerData.OutputCurrent == 0)
-            {
-                _chargerData.OutputCurrent = 1;
-            }
-#endif
+            const int SX_INITIAL = 0;
+            const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
+            const int SX_WAIT_FOR_ccsCurrentDemand = 2;
+            const int SX_RAMP_UP_carDataRequestCurrent = 3;
+            const int SX_DONE = 4;
+            static int sxState = SX_INITIAL;
 
-            if (_dischargeEnabled)
+            // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
+            if (_global.CHADEMO_SINGLE_X && sxState != SX_DONE)
+            {
+                static int rampedRequestCurrent = 0;
+
+                _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10
+                int carRequested = _carData.RequestCurrent;
+                _carData.RequestCurrent = 1; // fake 1A request for ccs
+
+                if (sxState == SX_INITIAL)
+                {
+                    sxState = SX_WAIT_FOR_preChargeDoneButStalled;
+                    println("[cha] set sxState:%d", sxState);
+                }
+
+                if (sxState == SX_WAIT_FOR_preChargeDoneButStalled)
+                {
+                    if (_preChargeDoneButStalled)
+                    {
+                        CloseAdapterContactor(); // will trigger complete of ccs precharge
+                        sxState = SX_WAIT_FOR_ccsCurrentDemand;
+                        println("[cha] set sxState:%d", sxState);
+                    }
+                }
+                else if (sxState == SX_WAIT_FOR_ccsCurrentDemand)
+                {
+                    if (chademoInterface_ccsCurrentDemand())
+                    {
+                        rampedRequestCurrent = _carData.RequestCurrent;
+                        sxState = SX_RAMP_UP_carDataRequestCurrent;
+                        println("[cha] set sxState:%d", sxState);
+                    }
+                }
+                else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
+                {
+                    // Ramp up 5A per cycle toward target
+                    rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
+                    _carData.RequestCurrent = rampedRequestCurrent;
+
+                    if (rampedRequestCurrent >= carRequested)
+                    {
+                        sxState = SX_DONE;
+                        println("[cha] set sxState:%d", sxState);
+                    }
+                }
+            }
+            else if (_dischargeEnabled)
             {
                 static int zeroOutputAmpsCycles = 0;
+                static int rampedRequestCurrent = 0;
 
-                bool isDischargeUnit = false;
+                //bool isDischargeUnit = false;
                 bool isDischarging = false;
 
-                if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
-                {
-                    // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
-                    // one discharger is observed to mirror asked amps as delivered amps.
-                    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
-                    _chargerData.OutputCurrent = 0;
-                    isDischargeUnit = true;
-                    isDischarging = true;
-                }
-                else if (_chargerData.OutputCurrent == 0)
+                //if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
+                //{
+                //    // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
+                //    // one discharger is observed to mirror asked amps as delivered amps.
+                //    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
+                //    _chargerData.OutputCurrent = 0;
+                //    isDischargeUnit = true;
+                //    isDischarging = true;
+                //}
+                //else 
+                if (_chargerData.OutputCurrent == 0)
                 {
                     // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
                     // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
@@ -595,7 +633,9 @@ void ChademoCharger::RunStateMachine()
                     if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
                         zeroOutputAmpsCycles++;
                     }
-                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
+                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) 
+                    {
+                        rampedRequestCurrent = _carData.RequestCurrent;
                         isDischarging = true;
                     }
                 }
@@ -604,7 +644,7 @@ void ChademoCharger::RunStateMachine()
                     zeroOutputAmpsCycles = 0;
                 }
 
-                COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
+                //COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
                 COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
 
                 static int fakeOutputCurrentCycles = 0;
@@ -621,8 +661,19 @@ void ChademoCharger::RunStateMachine()
                     // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
                     // So fake a RequestCurrent to max allowed, and see if it makes a difference.
                     // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
+                    // TODO: ramp up RequestCurrent?
                     int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
-                    _carData.RequestCurrent = maxDischargeAmps; // ovveride it for every cycle
+                    {
+                        if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
+                        {
+                            rampedRequestCurrent = maxDischargeAmps;
+                        }
+                        else
+                        {
+                            rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
+                        }
+                        _carData.RequestCurrent = rampedRequestCurrent;
+                    }
 
                     // HACK: my car seems to time out after 6 minutes, if no current flows?
                     // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
@@ -648,6 +699,18 @@ void ChademoCharger::RunStateMachine()
                     fakeOutputCurrentCycles = 0;
                 }
             }
+
+//#if false
+            // Is it possible that all the complicated logic above (for discharge support), could be replaced with this simple hack?
+            // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
+            // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
+            // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
+            // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
+            if (not _isDischarging && _chargerData.OutputCurrent == 0)
+            {
+                _chargerData.OutputCurrent = 1;
+            }
+//#endif
         }
     }
     else if (_state == ChargerState::Stopping_Start)
@@ -750,22 +813,13 @@ bool ChademoCharger::PreChargeCompleted()
     _preChargeDoneButStalled = true;
     _global.ccsPreChargeDoneButStalledTrigger = true;
 
-    if (_precharge_Longer_So_We_Can_Measure_Battery_Voltage)
+    if (_global.CHADEMO_SINGLE_X)
     {
-        bool carRequestCurrent = _state == ChargerState::ChargingLoop;
-        if (carRequestCurrent)
-        {
-            SetChargerDataFromCcsParams(); // update _chargerData.OutputVoltage
-            println("[cha] Estimated battery voltage deviation:%d", _chargerData.OutputVoltage - _carData.EstimatedBatteryVoltage);
-        }
-        else
-        {
-            println("[cha] PreCharge stalled until car asking for amps");
-        }
-            
-        return carRequestCurrent;
+        if (not _adapterContactorClosed)
+            println("[cha] PreCharge stalled until adapter contactor closed");
+        return _adapterContactorClosed;
     }
-    else
+    else // std
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
         if (not _carData.CarContactorsClosed)
@@ -787,26 +841,6 @@ bool ChademoCharger::CarContactorsOpened()
 bool chademoInterface_carContactorsOpened()
 {
     return chademoCharger->CarContactorsOpened();
-}
-
-bool ChademoCharger::PreChargeCanStart()
-{
-#ifdef CHADEMO_SINGLE_SESSION
-    // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
-    //bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
-    //return carReadyToCharge;
-
-    // To avoid waiting too long before sending first PreChargeReq, do it after switch(k), to save a second. ccs may not like waiting too long between CableCheck and first PreChargeReq.
-    // SOC won't change much between switch(k) and ReadyToCharge anyways, max 2%.
-    return _carData.EstimatedBatteryVoltageReady;
-#else
-    return true;
-#endif
-}
-
-bool chademoInterface_preChargeCanStart()
-{
-    return chademoCharger->PreChargeCanStart();
 }
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
@@ -866,7 +900,16 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_discovery)
+    if (_global.CHADEMO_SINGLE_X && not _global.ccsReachedCurrentDemand)
+    {
+        SetChargerData(ADAPTER_MAX_VOLTS,
+            ADAPTER_MAX_AMPS,
+            ADAPTER_MAX_AMPS, // dyn
+            _carData.EstimatedBatteryVoltage,
+            0 // _carData.RequestCurrent
+        );
+    }
+    else if (_discovery)
     {
         // fake for discovery
         SetChargerData(ADAPTER_MAX_VOLTS, 
@@ -876,17 +919,6 @@ void ChademoCharger::SetChargerDataFromCcsParams()
             0
         );
     }
-#ifdef CHADEMO_STANDALONE_TESTING
-    else if (true)
-    {
-        SetChargerData(ADAPTER_MAX_VOLTS,
-            ADAPTER_MAX_AMPS,
-            ADAPTER_MAX_AMPS, // dyn
-            _carData.EstimatedBatteryVoltage,
-            0 //_carData.RequestCurrent
-        );
-    }
-#endif
     else
     {
         // mirror these values
@@ -925,7 +957,7 @@ void ChademoCharger::Log()
             _carData.MaxVoltage,
             _carData.SocPercent,
             _carData.EstimatedBatteryVoltage,
-            &_carData.BatteryCapacityKwh  // bypass float to double promotion by passing as reference
+            &_carData.BatteryCapacityKwh // bypass float to double promotion by passing as reference
         );
 
         _logCycleCounter = 0;

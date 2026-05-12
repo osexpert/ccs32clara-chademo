@@ -16,7 +16,7 @@ enum SpecialMode
 {
 	None = 0,
 	Discharge = 1,
-	LongerPrecharge = 2,
+	//LongerPrecharge = 2,
 	Unwelding = 3,
 	MoreLogging = 4,
 };
