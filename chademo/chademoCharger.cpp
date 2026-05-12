@@ -661,7 +661,6 @@ void ChademoCharger::RunStateMachine()
                     // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
                     // So fake a RequestCurrent to max allowed, and see if it makes a difference.
                     // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
-                    // TODO: ramp up RequestCurrent?
                     int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
                     {
                         if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
@@ -700,7 +699,6 @@ void ChademoCharger::RunStateMachine()
                 }
             }
 
-//#if false
             // Is it possible that all the complicated logic above (for discharge support), could be replaced with this simple hack?
             // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
             // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
@@ -710,7 +708,6 @@ void ChademoCharger::RunStateMachine()
             {
                 _chargerData.OutputCurrent = 1;
             }
-//#endif
         }
     }
     else if (_state == ChargerState::Stopping_Start)

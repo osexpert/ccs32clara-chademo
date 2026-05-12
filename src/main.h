@@ -28,7 +28,6 @@
 
 #define MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION 40 /* 40V is considered to be sufficiently low to not harm. The Ioniq already finishes at 65V. */
 
-//#define CHADEMO_STANDALONE_TESTING
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
 #define IRQ_PRI(x) ((x) << 4)
