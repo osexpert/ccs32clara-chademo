@@ -715,7 +715,8 @@ static void stateFunctionWaitForPreChargeStart(void)
 
     // there is no need to wait here if _global.CHADEMO_SX. clara and pyplc does not wait at all.
     // But in case ccs finish insanely fast and chademo slow (unlikely), we can wait here for a while (max 10sec) until we time out.
-    if (_global.CHADEMO_SX ? _global.chademoReachedChargingLoop : pev_cyclesInState > 66) /* 66*30ms=2s */
+    int pos = chademoInterface_chargingLoopPos();
+    if (_global.CHADEMO_SX ? pos == 0 : pev_cyclesInState > 66) /* 66*30ms=2s */
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
@@ -732,6 +733,11 @@ static void stateFunctionWaitForPreChargeStart(void)
         //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
                 //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
         pev_enterState(PEV_STATE_WaitForPreChargeResponse);
+    }
+    else if (_global.CHADEMO_SX && pos > 0)
+    {
+        addToTrace(MOD_PEV, "Error: Can not start precharge -> chademo is past ChargingLoop");
+        pev_enterState(PEV_STATE_SafeShutDown);
     }
 }
 
@@ -756,6 +762,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
             _ccs_params.EvseVoltage = evsePresentVoltage;
 
             addToTrace(MOD_PEV, "PreCharge response:%dV", evsePresentVoltage);
+            setCheckpoint(571);
 
             uint16_t inletVtg = hardwareInterface_getInletVoltage();
             uint16_t batVtg = hardwareInterface_getBatteryVoltage();
@@ -765,6 +772,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
                 if (ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE)
                 {
                     addToTrace(MOD_PEV, "PreCharge difference is small (inlet:%dV batt:%dV)", inletVtg, batVtg);
+                    setCheckpoint(572);
                     PrechargeDifferenceIsSmall = true;
                 }
             }
@@ -772,6 +780,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
             if (PrechargeDifferenceIsSmall && chademoInterface_preChargeCompleted())
             {
                 addToTrace(MOD_PEV, "PreCharge completed.");
+                setCheckpoint(573);
                 // Turn the power relay on.
                 hardwareInterface_setPowerRelayOn();
                 pev_DelayCycles = 15; /* 15*30ms, explanation see below */
@@ -852,7 +861,6 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
         if (dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed)
         {
             _global.auto_power_off_timer_count_up_ms = 0;
-            _global.ccsReachedCurrentDemand = true;
 
             /* as long as the battery is not full and no stop-demand from the user, we continue charging */
             _stopreasons currentDemandStopReason = STOP_REASON_NONE;
@@ -1186,7 +1194,7 @@ void pevStateMachine_Mainfunction(void)
     pev_runFsm();
 }
 
-bool chademoInterface_ccsInEndState() {
+bool chademoInterface_ccsInStateEnd() {
     return pev_state == PEV_STATE_End;
 }
 
@@ -1198,7 +1206,7 @@ bool chademoInterface_ccsChargingCurrentMirrorsTarget() {
     return ChargingCurrentDifferentFromTarget_isSet && not ChargingCurrentDifferentFromTarget;
 }
 
-bool chademoInterface_ccsCableCheckDone() {
+bool chademoInterface_ccsInStateWaitForPreChargeStart() {
     //This would return true even if SafeShutdown and restart...
     //return pev_state > PEV_STATE_WaitForCableCheckResponse;
 
@@ -1206,7 +1214,12 @@ bool chademoInterface_ccsCableCheckDone() {
     return pev_state == PEV_STATE_WaitForPreChargeStart;
 }
 
-bool chademoInterface_ccsCurrentDemand()
+int chademoInterface_ccsCurrentDemandPos()
 {
-    return pev_state == PEV_STATE_WaitForCurrentDemandResponse;
+    if (pev_state < PEV_STATE_WaitForCurrentDemandResponse)
+        return -1;
+    else if (pev_state == PEV_STATE_WaitForCurrentDemandResponse)
+        return 0;
+    else
+        return 1;
 }

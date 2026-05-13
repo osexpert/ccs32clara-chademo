@@ -624,6 +624,7 @@ public:
     bool IsPowerOffOk();
     bool PreChargeCompleted();
     bool CarContactorsOpened();
+    int GetChargingLoopPos();
     void UpdateChargerMessages();
     void HandlePendingCarMessages();
     void SetChargerDataFromCcsParams();

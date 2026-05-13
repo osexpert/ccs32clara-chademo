@@ -118,7 +118,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForPreChargeStart)
     {
-        if (_ccs_params.checkpoint >= 570)
+        if (_ccs_params.checkpoint >= 570) // start precharge
         {
             ledBlinker->setPattern(blink_3);
             _ledState = LedState::WaitForPreChargeDoneButStalled;
@@ -126,7 +126,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForPreChargeDoneButStalled)
     {
-        if (_global.ccsPreChargeDoneButStalledTrigger)
+        if (_ccs_params.checkpoint >= 572) // difference is small
         {
             ledBlinker->setPattern(blink_4);
             _ledState = LedState::WaitForCurrentDemandLoop;
@@ -492,7 +492,7 @@ static void Ms30Task()
     tcp_Mainfunction();
     pevStateMachine_Mainfunction();
 
-    _global.ccsEnded = chademoInterface_ccsInEndState();
+    _global.ccsEnded = chademoInterface_ccsInStateEnd();
     if (_global.ccsEnded)
         tcp_disconnect(); // kill the last connection, if any
 }

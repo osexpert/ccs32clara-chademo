@@ -377,7 +377,7 @@ void ChademoCharger::RunStateMachine()
         }
         else // std
         {
-            if (chademoInterface_ccsCableCheckDone())
+            if (chademoInterface_ccsInStateWaitForPreChargeStart())
             {
                 println("[cha] ccs CableCheck done -> start Chademo");
                 SetState(ChargerState::Start);
@@ -510,7 +510,6 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
-        _global.chademoReachedChargingLoop = true;
         _global.auto_power_off_timer_count_up_ms = 0;
 
         if (_chargerData.OutputCurrent > 0)
@@ -587,7 +586,7 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (sxState == SX_WAIT_FOR_ccsCurrentDemand)
                 {
-                    if (chademoInterface_ccsCurrentDemand())
+                    if (chademoInterface_ccsCurrentDemandPos() == 0)
                     {
                         rampedRequestCurrent = _carData.RequestCurrent;
                         sxState = SX_RAMP_UP_carDataRequestCurrent;
@@ -808,7 +807,6 @@ void ChademoCharger::RunStateMachine()
 bool ChademoCharger::PreChargeCompleted()
 {
     _preChargeDoneButStalled = true;
-    _global.ccsPreChargeDoneButStalledTrigger = true;
 
     if (_global.CHADEMO_SX)
     {
@@ -838,6 +836,21 @@ bool ChademoCharger::CarContactorsOpened()
 bool chademoInterface_carContactorsOpened()
 {
     return chademoCharger->CarContactorsOpened();
+}
+
+int ChademoCharger::GetChargingLoopPos()
+{
+    if (chademoCharger->_state < ChargerState::ChargingLoop)
+        return -1;
+    else if (chademoCharger->_state == ChargerState::ChargingLoop)
+        return 0;
+    else
+        return 1;
+}
+
+int chademoInterface_chargingLoopPos()
+{
+    return chademoCharger->GetChargingLoopPos();
 }
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
@@ -897,23 +910,13 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_global.CHADEMO_SX && not _global.ccsReachedCurrentDemand)
+    if (_discovery || (_global.CHADEMO_SX && chademoInterface_ccsCurrentDemandPos() < 0))
     {
         SetChargerData(ADAPTER_MAX_VOLTS,
             ADAPTER_MAX_AMPS,
             ADAPTER_MAX_AMPS, // dyn
             _carData.EstimatedBatteryVoltage,
             0 // _carData.RequestCurrent
-        );
-    }
-    else if (_discovery)
-    {
-        // fake for discovery
-        SetChargerData(ADAPTER_MAX_VOLTS, 
-            ADAPTER_MAX_AMPS,
-            ADAPTER_MAX_AMPS, // dyn
-            0,
-            0
         );
     }
     else

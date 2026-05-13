@@ -48,11 +48,6 @@ struct global_data
 
     bool CHADEMO_SX = GITHUB_SX;
     
-    bool chademoReachedChargingLoop = false;
-    bool ccsReachedCurrentDemand = false;
-
-    bool ccsPreChargeDoneButStalledTrigger = false;
-
     uint32_t auto_power_off_timer_count_up_ms = 0;
     bool ccsLifesign = false;
     bool canLifesign = false;
