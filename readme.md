@@ -55,8 +55,6 @@ How I describe it is also how the original firmware works, AFAICT, allthou it se
 
 ## Stop button/power off
 Shortly pressing stop button will initiate power off pending.
-Between ccs has started and SLAC is done, stop button must be pressed for 5 seconds to initiate power off pending. This to allow "fiddle" with the plug or late plug insertion.
-As soon as SLAC is done, the logic reverts to "shortly pressing".
 When power off is pending, adapter should power off as soon as both ccs and chademo logic says that the plug is unlocked (adapter does not have physical locks on the plugs, but logically).
 Power off pending is set after charging is done and adapter should normally auto power off shortly after charging is stopped.
 Power off pending is set after 3 minutes of inactivity (not being inside ccs PreCharge or CurrentDemand loop).
@@ -82,7 +80,7 @@ Right before powering off adapter, it will blink 1, 2 or 3 times to show battery
 Hold stop button down while power on to activate special mode. Led will be constantly on. Release stop button after activation.
 If nothing is done within 10 seconds, it will continue with normal startup.
 Now press stop button as many times as the mode you want to select:
-- 1: Discharge support
+- 1: V2X mode
 - 2: (UNASSIGNED)
 - 3: Contactor unwelding attempt
 - 4: More logging
@@ -91,8 +89,8 @@ When 2 seconds has elapsed since last button press, you will see as many flashes
 If you select a mode that does not exist, it will continue with normal startup.
 After you have selected a mode, it is possible to combine it with another mode, by holding stop button down for ca. 1 second, until led turns on. Now select additional mode.
 
-### Special mode 1: Discharge support
-Enable discharge support. It will try to detect discharge units and support discharge. It will also simulate discharge, to extend timeout in chademo current loop beyond 4 sec.
+### Special mode 1: V2X mode
+It will try to detect V2X and support it. Portable dischargers should work without this mode, but eg. Sigenstor will need it to not timeout and to be able to discharge more amps.
 
 ### Special mode 2: (UNASSIGNED)
 
@@ -235,7 +233,7 @@ The following are known to work, but may not work on all cars (Leaf ZE1 typicall
 - SigenStor EVDC domestic 12.5kW charger https://github.com/osexpert/ccs32clara-chademo/discussions/49
 - EVniculus 7kW discharger https://github.com/osexpert/ccs32clara-chademo/discussions/53
 
-If using on a regular basis, its easiest to use a V2X build, else you must enable V2X every time you power on the adapter.
+If using on a regular basis, its easiest to use a V2X build, else you must enable V2X mode every time you power on the adapter.
 
 ## Download
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
@@ -244,7 +242,7 @@ Releases are made less often and the difference is, a release has been tested in
 ### Alternative function builds
 There are builds with modifiers after the version number. These are alternative function builds. Currently, these modifiers exist:
 - **AV1:** For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf's with 20-30kwh battery.
-- **V2X**: Discharge support permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
+- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
 - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
 
 ## Building
