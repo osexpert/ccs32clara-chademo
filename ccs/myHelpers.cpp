@@ -53,5 +53,21 @@ void* memcpy(void* __restrict target, const void* __restrict source, size_t leng
     }
 
     return target;
-};
+}
 
+int memcmp(const void* buf1, const void* buf2, size_t size)
+{
+    const unsigned char* p1 = (const unsigned char*)buf1;
+    const unsigned char* p2 = (const unsigned char*)buf2;
+
+    while (size--) {
+        if (*p1 != *p2) {
+            return (int)(*p1 - *p2);
+        }
+
+        p1++;
+        p2++;
+    }
+
+    return 0;
+}
