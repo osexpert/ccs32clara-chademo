@@ -40,7 +40,7 @@ struct global_data
 {
     int stopButtonCounter = 0;
 
-    bool ccsKickoff = false;
+    bool ccsKickoff = GITHUB_SX ? true : false;
     bool powerOffPending = false;
     bool ccsEnded = false;
     bool moreLogging = false;

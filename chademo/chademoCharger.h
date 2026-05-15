@@ -205,7 +205,7 @@ enum class StopReason
 
 
 #define CHARGER_STATE_LIST \
-    CHARGER_STATE(PreStart_DiscoveryCompleted_WaitForCableCheckDone) \
+    CHARGER_STATE(WaitForChademoKickoff) \
     CHARGER_STATE(Start) \
     CHARGER_STATE(WaitForCarReadyToCharge) \
     CHARGER_STATE(WaitForPreChargeDone) \
@@ -631,7 +631,6 @@ public:
     void SendChargerMessages();
     void RunStateMachine(void);
     void Run();
-    bool IsDiscoveryCompleted();
 	void HandleCanMessageIsr(uint32_t id, uint32_t data[2]);
     void SetState(ChargerState newState, StopReason stopReason = StopReason::NONE);
     void OpenAdapterContactor();
@@ -710,8 +709,8 @@ public:
         StopReason _stopReason = StopReason::NONE;
 
         ChargerState _state = _global.CHADEMO_SX ?
-            ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone :
-            ChargerState::Start;
+            ChargerState::WaitForChademoKickoff :
+            ChargerState::Start; // discovery
 
         CarData _carData = {};
         ChargerData _chargerData = {};

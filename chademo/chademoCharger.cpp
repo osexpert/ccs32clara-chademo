@@ -241,12 +241,6 @@ void ChademoCharger::HandlePendingCarMessages()
     }
 }
 
-bool ChademoCharger::IsDiscoveryCompleted()
-{
-    // if discovery, we go here when done
-    return _state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
-}
-
 void ChademoCharger::Run()
 {
     // HandlePendingMessages uses _switch_k
@@ -365,7 +359,7 @@ void ChademoCharger::RunStateMachine()
         _chargerData.RemainingChargeTimeCycles = _carData.MaxChargingTimeSec * CHA_CYCLES_PER_SEC;
     }
 
-    if (_state == ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone)
+    if (_state == ChargerState::WaitForChademoKickoff)
     {
         if (_global.CHADEMO_SX)
         {
@@ -412,11 +406,13 @@ void ChademoCharger::RunStateMachine()
             if (_discovery)
             {
                 SetSwitchD1(false);
+
                 _send_can = false;  // PS: even if we stop sending, car may continue to send 102 for a short time
                 _discovery = false;
-                println("[cha] Discovery completed");
+                println("[cha] Discovery completed => ccs kickoff");
+                _global.ccsKickoff = true;
 
-                SetState(ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone);
+                SetState(ChargerState::WaitForChademoKickoff);
             }
             else if (_carData.TargetVoltage > _chargerData.AvailableOutputVoltage)
             {

@@ -65,15 +65,15 @@ Since the adapter does not have physical locks, to be safe, never unplug the ccs
 
 ## Led
 <pre>
-Initially, slow blinking [**********__________]
-When SLAC is done, one blink [**_________]
-When tcp connected, two blinks [**___**_________]
-When PreCharge started, three blinks [**___**___**_________]
-When PreCharge is done, but stalled waiting for chademo, four blinks [**___**___**___**_________]
-When delivering amps, medium blinking [*****_____]
-When stop/power off pending, fast blinking [*_]
+Idle, always on [█]
+When ccs lifesign [██_________]
+When tcp connected [██__██_________]
+When ccs CableCheck started [██__██__██_________]
+When ccs PreCharge started, eager blinking [██__]
+When charging car [██████████__________]
+When stop/power off pending [█_]
 
-Charging the adapter itself, always on: [*]
+Charging the adapter itself [██████████__________]
 
 Right before powering off adapter, it will blink 1, 2 or 3 times to show battery level: 1:low, 2:ok, 3:good.
 </pre>

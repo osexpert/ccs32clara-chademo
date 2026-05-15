@@ -2,13 +2,12 @@
 
 #include <stdint.h>
 
-static const  uint8_t blink_start[] = { 19, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t solid_start[] = { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_1[] = { 2, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-static const  uint8_t blink_2[] = { 2, 3, 2, 9, 0, 0, 0, 0, 0, 0, 0 };
-static const  uint8_t blink_3[] = { 2, 3, 2, 3, 2, 9, 0, 0, 0, 0, 0 };
-static const  uint8_t blink_4[] = { 2, 3, 2, 3, 2, 3, 2, 9, 0, 0, 0 };
-static const  uint8_t blink_5[] = { 2, 3, 2, 3, 2, 3, 2, 3, 2, 9, 0 };
-static const  uint8_t blink_working[] = { 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_2[] = { 2, 2, 2, 9, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_3[] = { 2, 2, 2, 3, 2, 9, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_eager[] = { 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+static const  uint8_t blink_working[] = { 10, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static const  uint8_t blink_stop[] = { 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 class LedBlinker

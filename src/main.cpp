@@ -67,13 +67,13 @@ volatile uint32_t system_millis;
 enum LedState
 {
     Init,
-    WaitForCcsStarted,
+    WaitForCcsLifesign2, // 2? collision...
     WaitForSlacDone,
     WaitForTcpConnected,
+    WaitForCableCheckStart,
     WaitForPreChargeStart,
     WaitForPreChargeDoneButStalled,
     WaitForCurrentDemandLoop,
-    WaitForDeliveringAmps,
     Charging,
     Stop
 };
@@ -90,13 +90,14 @@ void RunLedStateMachine()
 
     if (_ledState == LedState::Init)
     {
-        ledBlinker->setPattern(blink_start);
-        _ledState = LedState::WaitForCcsStarted;
+        ledBlinker->setPattern(solid_start);
+        _ledState = LedState::WaitForCcsLifesign2;
     }
-    else if (_ledState == LedState::WaitForCcsStarted)
+    else if (_ledState == LedState::WaitForCcsLifesign2)
     {
-        if (_global.ccsKickoff)
+        if (_global.ccsLifesign)
         {
+            ledBlinker->setPattern(blink_1);
             _ledState = LedState::WaitForSlacDone;
         }
     }
@@ -104,7 +105,6 @@ void RunLedStateMachine()
     {
         if (_ccs_params.checkpoint >= 200) // SDP (service discovery, slac is done)
         {
-            ledBlinker->setPattern(blink_1);
             _ledState = LedState::WaitForTcpConnected;
         }
     }
@@ -113,6 +113,14 @@ void RunLedStateMachine()
         if (_ccs_params.checkpoint >= 303) // tcp connected
         {
             ledBlinker->setPattern(blink_2);
+            _ledState = LedState::WaitForCableCheckStart;
+        }
+    }
+    else if (_ledState == LedState::WaitForCableCheckStart)
+    {
+        if (_ccs_params.checkpoint >= 560) // send cable check req
+        {
+            ledBlinker->setPattern(blink_3);
             _ledState = LedState::WaitForPreChargeStart;
         }
     }
@@ -120,7 +128,7 @@ void RunLedStateMachine()
     {
         if (_ccs_params.checkpoint >= 570) // start precharge
         {
-            ledBlinker->setPattern(blink_3);
+            ledBlinker->setPattern(blink_eager);
             _ledState = LedState::WaitForPreChargeDoneButStalled;
         }
     }
@@ -128,22 +136,12 @@ void RunLedStateMachine()
     {
         if (_ccs_params.checkpoint >= 572) // difference is small
         {
-            ledBlinker->setPattern(blink_4);
             _ledState = LedState::WaitForCurrentDemandLoop;
         }
     }
     else if (_ledState == LedState::WaitForCurrentDemandLoop)
     {
         if (_ccs_params.checkpoint >= 700)
-        {
-            // barely noticable, removed blink
-            _ledState = LedState::WaitForDeliveringAmps;
-        }
-    }
-    else if (_ledState == LedState::WaitForDeliveringAmps)
-    {
-        // TODO: or check if we are in ccs CurrentDemand state?
-        if (_ccs_params.EvseCurrent > 0)
         {
             ledBlinker->setPattern(blink_working);
             _ledState = LedState::Charging;
@@ -470,12 +468,8 @@ static void Ms30Task()
 {
     if (!_global.ccsKickoff)
     {
-        // chademo will set these and then ccs can start
-        _global.ccsKickoff = chademoCharger->IsDiscoveryCompleted();
-        if (!_global.ccsKickoff)
-            return;
-
-        println("[cha] discovery completed => ccs kickoff");
+        // chademo will set this and then ccs can start
+        return;
     }
 
     // run eth even after ccsEnded, so we look "alive" to the charger
@@ -555,15 +549,25 @@ int adapter_charging()
     rcc_periph_clock_disable(RCC_CAN1);
     rcc_periph_clock_disable(RCC_RNG);
 
-    systick_setup(rcc_ahb_frequency - 1); // 1 sec
+    systick_setup(0xFFFFFF); //max 99.88 ms
+
+    bool ledState = true;
+    uint32_t last_system_millis = 0;
 
     while (1)
     {
         __WFI();
 
-        if (system_millis)
+        if ((system_millis - last_system_millis) >= 20)
         {
-            system_millis = 0;
+            last_system_millis += 20;
+
+            if (ledState)
+                led_on();
+            else
+                led_off();
+
+            ledState = !ledState;
 
             iwdg_reset();
 
