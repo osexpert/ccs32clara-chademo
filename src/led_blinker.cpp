@@ -1,4 +1,7 @@
 #include "led_blinker.h"
+//#include <cstdlib> // for abs()
+
+static inline int8_t absi8(int8_t v) { return v < 0 ? -v : v; }
 
 LedBlinker::LedBlinker()
 {
@@ -13,27 +16,29 @@ LedBlinker::LedBlinker()
     hasPendingPattern = false;
 }
 
-void LedBlinker::setPattern(const uint8_t newPattern[MaxPatternLength])
+void LedBlinker::setPattern(const int8_t* newPattern)
 {
-    // Always overwrite the pending pattern
-    for (int i = 0; i < MaxPatternLength; ++i)
+    for (int i = 0; i < MaxPatternLength; ++i) {
         pendingPattern[i] = newPattern[i];
+        if (newPattern[i] == 0) break;
+    }
 
     hasPendingPattern = true;
 }
 
-void LedBlinker::loadPattern(const uint8_t source[MaxPatternLength])
+void LedBlinker::loadPattern(const int8_t* source)
 {
-    for (int i = 0; i < MaxPatternLength; ++i)
+    for (int i = 0; i < MaxPatternLength; ++i) {
         pattern[i] = source[i];
+        if (source[i] == 0) break;
+    }
 
     currentIndex = 0;
-    remainingTicks = pattern[currentIndex];
-    ledOn = (currentIndex % 2 == 0);
+    remainingTicks = absi8(pattern[currentIndex]);
+    ledOn = (pattern[currentIndex] > 0);
     applyLed(ledOn);
 }
 
-// Call this every 100ms
 void LedBlinker::tick()
 {
     if (remainingTicks > 1) {
@@ -52,8 +57,8 @@ void LedBlinker::tick()
             currentIndex = 0;
         }
 
-        remainingTicks = pattern[currentIndex];
-        ledOn = (currentIndex % 2 == 0);
+        remainingTicks = absi8(pattern[currentIndex]);  // tick count is magnitude
+        ledOn = (pattern[currentIndex] > 0);          // sign controls LED state
         applyLed(ledOn);
     }
 }
