@@ -227,6 +227,7 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "200.MaxRemainingCapacityForCharging %d -> %d");
 
         _carData.MaxDischargeCurrent = 0xff - _msg200.m.MaxDischargeCurrentInverted;
+        _carData.MaxDischargeCurrentSet = true;
     }
     if (_msg201_pending)
     {
@@ -639,7 +640,6 @@ void ChademoCharger::RunStateMachine()
                     zeroOutputAmpsCycles = 0;
                 }
 
-                //COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
                 COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
 
                 static int fakeOutputCurrentCycles = 0;
@@ -901,7 +901,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
         _chargerData.ChaAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 
-    _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS, _chargerData.ChaAvailableOutputCurrent);
+    _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS_FALLBACK, _chargerData.ChaAvailableOutputCurrent);
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()

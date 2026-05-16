@@ -378,22 +378,23 @@ struct msg200
 {
     union {
         struct {
+            /// <summary>
+            /// japan: DischargeCurrentUpperLimit
+            /// </summary>
             uint8_t MaxDischargeCurrentInverted; // FF
             uint8_t Unused1; // 00
             uint8_t Unused2; // 00
             uint8_t Unused3; // 00
             /// <summary>
-            /// trace: 250v make no sense...310v is absolute minimum, so what does this really mean?
-            /// I think it is inverted and means 5 amps, but 5 amps what?
+            /// japan: DischargeLowerLimitVoltage
             /// </summary>
             uint16_t MinDischargeVoltage; // FA 00
             /// <summary>
-            /// trace: SOC%? But 69% seems very high? Can it be 100-69=31%?
-            /// Or kwh? 31kwh?
+            /// japan: LowerDischargeLimitOfBatteryResidualCapacity (0.1kWh)
             /// </summary>
             uint8_t MinBatteryDischargeLevel; // 1A
             /// <summary>
-            /// kwh?
+            /// japan: ChargingLimitBatteryRemainingCapacity (0.1kWh)
             /// </summary>
             uint8_t MaxRemainingCapacityForCharging; // FF
         } m;
@@ -443,11 +444,23 @@ struct msg208
                 So....I guess can just use 1 amp here for fun? Like a signal?
             */
 
+            /// <summary>
+            /// japan: PresentDischargeCurrent
+            /// </summary>
             uint8_t PresentDischargeCurrentInverted; // FF
+            /// <summary>
+            /// japan: PossibleInputVoltage
+            /// </summary>
             uint16_t MaxDischargeVoltage; // AA 00
+            /// <summary>
+            /// japan: InputableCurrent
+            /// </summary>
             uint8_t MaxDischargeCurrentInverted; // FF
             uint8_t Unused4; // 00
             uint8_t Unused5; // 00
+            /// <summary>
+            /// japan: LowerLimitOfAbnormalVoltageDetection
+            /// </summary>
             uint16_t MinDischargeVoltage; // AA 00
         } m;
         uint8_t bytes[8];
@@ -540,7 +553,8 @@ struct CarData
 
     ExtendedFunction1Flags ExtendedFunction1;
 
-    uint8_t MaxDischargeCurrent;
+    uint8_t MaxDischargeCurrent = 0;
+    bool MaxDischargeCurrentSet = false;
 
     int NomVoltOverride = 0;
     int MaxVoltOverride = 0;
@@ -682,7 +696,6 @@ public:
 
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
-        //bool _isDischargeUnit = false;
         bool _isDischarging = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage

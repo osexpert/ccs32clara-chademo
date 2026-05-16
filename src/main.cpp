@@ -247,22 +247,14 @@ void power_off_check()
     if (!_global.powerOffPending)
     {
         bool buttonPressedBriefly = _global.stopButtonCounter > 0;
-        bool buttonPressed5Seconds = _global.stopButtonCounter > 10 * 5; // 5 seconds
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
         if (buttonPressedBriefly
-//            && _ledState != LedState::WaitForSlacDone
             && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
-            //println("Stop button pressed briefly and slac not pending. Power off pending...");
             println("Stop button pressed briefly. Power off pending...");
-        }
-        if (buttonPressed5Seconds)
-        {
-            _global.powerOffPending = true;
-            println("Stop button pressed for 5 seconds. Power off pending...");
         }
         if (inactivity)
         {
