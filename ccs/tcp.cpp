@@ -47,14 +47,13 @@ static uint32_t tcp_debug_totalRetryCounter;
 static bool finPending;
 static bool peerFinPending;
 
-static uint16_t tcp_connecting_timeout;
-
 /*** local function prototypes ****************************************************/
 
 static void tcp_packRequestIntoEthernet(void);
 static void tcp_packRequestIntoIp(void);
 static void tcp_prepareTcpHeader(uint8_t tcpFlag);
 static void tcp_sendAck(void);
+static void tcp_setRetry(void);
 
 /*** functions *********************************************************************/
 uint32_t tcp_getTotalNumberOfRetries(void) {
@@ -124,11 +123,11 @@ void evaluateTcpPacket(void)
          TcpAckNr = remoteSeqNr + 1; /* The ACK number of our next transmit packet is one more than the received seq number. */
          setCheckpoint(303);
          tcpState = TCP_STATE_ESTABLISHED;
+         lastTransmitAckPending = false;
          tcp_sendAck();
 
          addToTrace(MOD_TCP, "[TCP] connected.");
          finPending = peerFinPending = true;
-         tcp_connecting_timeout = 0; // disable the timer
          connMgr_setLevel(CONNLEVEL_80_TCP_CONNECTED);
       }
       // Ignore everything else
@@ -186,6 +185,7 @@ void tcp_connect(void)
    tcp_packRequestIntoIp();
    tcpState = TCP_STATE_SYN_SENT;
    finPending = peerFinPending = false;
+   tcp_setRetry();
 }
 
 static void tcp_sendAck(void)
@@ -366,19 +366,22 @@ bool tcp_isConnected(void)
 
 void tcp_checkRetry(void)
 {
-    if (lastTransmitAckPending && tcpState == TCP_STATE_ESTABLISHED)
+    if (lastTransmitAckPending && (tcpState == TCP_STATE_ESTABLISHED || tcpState == TCP_STATE_SYN_SENT))
     {
         uint32_t now = rtc_get_ms();
         if (now >= nextRetryTime)
         {
+            bool syn = (tcpState == TCP_STATE_SYN_SENT);
             if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
             {
-                addToTrace(MOD_TCP, "[TCP] Giving up the retry");
+                addToTrace(MOD_TCP, syn ? "[TCP] Giving up SYN retry -> connMgr_restart" : "[TCP] Giving up the retry");
                 tcp_disconnect();
+                if (syn) connMgr_restart();
                 return;
             }
 
-            addToTrace(MOD_TCP, "[TCP] Last packet wasn't ACKed, retransmitting"); // Resend the last packet
+            addToTrace(MOD_TCP, syn ? "[TCP] SYN wasn't ACKed, retransmitting" : "[TCP] Last packet wasn't ACKed, retransmitting");
+
             tcp_packRequestIntoEthernet(); // retransmit the same content
 
             tcp_debug_totalRetryCounter++;
@@ -414,20 +417,9 @@ void tcp_Mainfunction(void)
             evccPort++;
 
         tcp_connect();
-        tcp_connecting_timeout = (5 * 33) + 1; // 5s
     }
 
     tcp_checkRetry();
-
-    if (tcp_connecting_timeout > 0)
-    {
-        tcp_connecting_timeout--;
-        if (tcp_connecting_timeout == 0)
-        {
-            addToTrace(MOD_TCP, "[TCP] Connect timeout -> restart");
-            connMgr_restart();
-        }
-    }
 }
 
 uint16_t setStartPort(uint32_t rand_num)
