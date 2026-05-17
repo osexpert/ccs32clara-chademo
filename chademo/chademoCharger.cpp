@@ -608,30 +608,14 @@ void ChademoCharger::RunStateMachine()
                 static int zeroOutputAmpsCycles = 0;
                 static int rampedRequestCurrent = 0;
 
-                //bool isDischargeUnit = false;
                 bool isDischarging = false;
-
-                //if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
-                //{
-                //    // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
-                //    // one discharger is observed to mirror asked amps as delivered amps.
-                //    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
-                //    _chargerData.OutputCurrent = 0;
-                //    isDischargeUnit = true;
-                //    isDischarging = true;
-                //}
-                //else 
                 if (_chargerData.OutputCurrent == 0)
                 {
-                    // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
-                    // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
-
+                    // zero amps for more than 3seconds -> assume discharging (the waiting may be pointless)
                     if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
                         zeroOutputAmpsCycles++;
                     }
-                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) 
-                    {
-                        rampedRequestCurrent = _carData.RequestCurrent;
+                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
                         isDischarging = true;
                     }
                 }
@@ -640,6 +624,9 @@ void ChademoCharger::RunStateMachine()
                     zeroOutputAmpsCycles = 0;
                 }
 
+                if (isDischarging && not _isDischarging){
+                    rampedRequestCurrent = _carData.RequestCurrent; // we are discharging now, but was not before -> init rampedRequestCurrent 
+                }
                 COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
 
                 static int fakeOutputCurrentCycles = 0;
@@ -656,18 +643,19 @@ void ChademoCharger::RunStateMachine()
                     // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
                     // So fake a RequestCurrent to max allowed, and see if it makes a difference.
                     // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
-                    int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
+                    int maxDischargeAmps = _carData.MaxDischargeCurrentSet ?
+                        _carData.MaxDischargeCurrent :
+                        MAX_DISCHARGE_AMPS_FALLBACK; // no discharge message from car, use fallback
+
+                    if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
                     {
-                        if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
-                        {
-                            rampedRequestCurrent = maxDischargeAmps;
-                        }
-                        else
-                        {
-                            rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
-                        }
-                        _carData.RequestCurrent = rampedRequestCurrent;
+                        rampedRequestCurrent = maxDischargeAmps;
                     }
+                    else
+                    {
+                        rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
+                    }
+                    _carData.RequestCurrent = rampedRequestCurrent;
 
                     // HACK: my car seems to time out after 6 minutes, if no current flows?
                     // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
@@ -901,7 +889,8 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
         _chargerData.ChaAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 
-    _chargerData.MaxDischargeCurrent = min((uint8_t)MAX_DISCHARGE_AMPS_FALLBACK, _chargerData.ChaAvailableOutputCurrent);
+    // Assume charger max supply is same as chargers max demand
+    _chargerData.MaxDischargeCurrent = _chargerData.MaxAvailableOutputCurrent;
 };
 
 void ChademoCharger::SetChargerDataFromCcsParams()
