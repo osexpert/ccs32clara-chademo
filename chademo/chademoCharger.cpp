@@ -611,139 +611,51 @@ void ChademoCharger::RunStateMachine()
                     }
                 }
             }
-            else if (_dischargeEnabled)
+            else
             {
-                static int zeroOutputAmpsCycles = 0;
                 static int rampedRequestCurrent = 0;
+                static bool outputCurrentPositive = false;
 
-                //bool isDischargeUnit = false;
-                bool isDischarging = false;
+                if (chademoInterface_ccsChargingCurrentMirrorsTarget())
+                {
+                    _chargerData.OutputCurrent = 0; // TEMP HACK? for dischargers that mirror asked amps?
+                    // Or maybe its a good hack, as it will now behave more like normal V2X so we can test V2X code paths with it.
+                }
 
-                //if (chademoInterface_ccsChargingVoltageMirrorsTarget() && chademoInterface_ccsChargingCurrentMirrorsTarget())
-                //{
-                //    // one discharger is observed to mirror target voltage -> output voltage. may not apply to all dischargers...
-                //    // one discharger is observed to mirror asked amps as delivered amps.
-                //    // Chademo does not like this and will give deviation amps error. Set to 0, to match reality (the discharger is not delivering any amps:-)
-                //    _chargerData.OutputCurrent = 0;
-                //    isDischargeUnit = true;
-                //    isDischarging = true;
-                //}
-                //else 
                 if (_chargerData.OutputCurrent == 0)
                 {
-                    // zero amps for more than 3seconds -> assume discharging. TODO: 3second make sense when starting the ChargingLoop, but not sure if same 3sec logic apply when switching between charging <-> discharging.
-                    // Note that we could be trickle charging for hours, eg. 1A, so we can not use this to detect if we want to countdown charging time or not.
-
-                    if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
-                        zeroOutputAmpsCycles++;
-                    }
-                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) 
-                    {
-                        rampedRequestCurrent = _carData.RequestCurrent;
-                        isDischarging = true;
-                    }
-                }
-                else
-                {
-                    zeroOutputAmpsCycles = 0;
-                }
-
-                //COMPARE_SET(_isDischargeUnit, isDischargeUnit, "[cha] IsDischargeUnit %d -> %d");
-                COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
-
-                static int fakeOutputCurrentCycles = 0;
-                static bool fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
-
-                if (isDischarging)
-                {
-                    _chargerData.RemainingDischargeTime = 5; // seconds?
+                    _chargerData.RemainingDischargeTime = 5; // seconds? // keep RemainingDischargeTime at 5, discharge indefinitely
 
                     // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
                     _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
 
-                    // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
-                    // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
-                    // So fake a RequestCurrent to max allowed, and see if it makes a difference.
-                    // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
-                    // TODO: ramp up RequestCurrent?
-                    int maxDischargeAmps = min(_carData.MaxDischargeCurrent, _chargerData.MaxDischargeCurrent);
-                    {
-                        if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
-                        {
-                            rampedRequestCurrent = maxDischargeAmps;
-                        }
-                        else
-                        {
-                            rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
-                        }
-                        _carData.RequestCurrent = rampedRequestCurrent;
-                    }
-
-                    // HACK: my car seems to time out after 6 minutes, if no current flows?
-                    // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
-                    // maybe the car does not like it (in this case the hack is not needed, but its impossible for us to know!).
-                    // I am starting to wonder, if the Chademo discharge messages has any purpose at all...because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless.
-                    // Dynamic control seems to be what keeps it alive more than 3 seconds in ChargingLoop,
-                    // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
-                    // So is it possible...that V2X can be implemented, completely without using the V2X messages?
-                    fakeOutputCurrentCycles++;
-                    if (not(fakeOutputCurrentOnce) || fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
-                    {
-                        _chargerData.DischargeCurrent = 0;
-                        _chargerData.OutputCurrent = 1;
-
-                        fakeOutputCurrentCycles = 0;
-                        fakeOutputCurrentOnce = true;
-                    }
-                }
-                else
-                {
-                    // keep RemainingDischargeTime at 5, discharge indefinitely
-                    _chargerData.DischargeCurrent = 0;
-                    fakeOutputCurrentCycles = 0;
-                }
-            }
-
-//#if false
-            // Is it possible that all the complicated logic above (for discharge support), could be replaced with this simple hack?
-            // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
-            // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
-            // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
-            // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-            if (not _isDischarging)
-            {
-                static int rampedRequestCurrent = 0;
-                static bool ramping = false;
-
-                // Reset ramping if output is live or car stops requesting
-                if (_chargerData.OutputCurrent > 0 || _carData.RequestCurrent == 0)
-                    ramping = false;
-
-                if (_chargerData.OutputCurrent == 0)
-                {
                     // Keep the car alive, believing it is getting some amps
+                    // It is weird that we both have DischargeCurrent and OutputCurrent...I wonder what they car says about this...but my car seems to completely ignore DischargeCurrent...
                     _chargerData.OutputCurrent = 1;
 
                     // Fake a higher ccs request, in case V2X use request current as how much it can discharge.
-                    if (_carData.RequestCurrent > 0)
+                    // Detect transition: init ramp from current request
+                    if (outputCurrentPositive)
                     {
-                        // Detect transition: init ramp from current request
-                        if (!ramping)
-                        {
-                            rampedRequestCurrent = _carData.RequestCurrent;
-                            ramping = true;
-                        }
-
-                        // car request some, but not getting any.
-                        // Fake it and request from ccs, as much as we can discharge
-                        int maxDischargeCurrent = _carData.MaxDischargeCurrentSet ?
-                            _carData.MaxDischargeCurrent :
-                            MAX_DISCHARGE_AMPS; // no discharge messages from car, Use some hardcoded max
-
-                        // Ramp up 5A per cycle toward target
-                        rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeCurrent);
-                        _carData.RequestCurrent = rampedRequestCurrent;
+                        rampedRequestCurrent = _carData.RequestCurrent; // init
+                        outputCurrentPositive = false;
                     }
+
+                    // car request some, but not getting any.
+                    // Fake it and request from ccs, as much as we can discharge
+                    int maxDischargeCurrent = _carData.MaxDischargeCurrentSet ?
+                        _carData.MaxDischargeCurrent :
+                        MAX_DISCHARGE_AMPS; // no discharge messages from car, Use some hardcoded max
+
+                    // Ramp up 5A per cycle toward target
+                    // This also seem to support immediate DOWN, if maxDischargeCurrent suddenly drop
+                    rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeCurrent);
+                    _carData.RequestCurrent = rampedRequestCurrent;
+                }
+                else
+                {
+                    outputCurrentPositive = true;
+                    _chargerData.DischargeCurrent = 0;
                 }
             }
 

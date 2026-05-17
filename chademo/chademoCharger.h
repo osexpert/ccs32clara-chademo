@@ -699,7 +699,7 @@ public:
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
         //bool _isDischargeUnit = false;
-        bool _isDischarging = false;
+        //bool _isDischarging = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
