@@ -647,14 +647,8 @@ void ChademoCharger::RunStateMachine()
                         _carData.MaxDischargeCurrent :
                         MAX_DISCHARGE_AMPS_FALLBACK; // no discharge message from car, use fallback
 
-                    if (maxDischargeAmps < _carData.RequestCurrent) // only ramp-UP
-                    {
-                        rampedRequestCurrent = maxDischargeAmps;
-                    }
-                    else
-                    {
-                        rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
-                    }
+                    rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
+
                     _carData.RequestCurrent = rampedRequestCurrent;
 
                     // HACK: my car seems to time out after 6 minutes, if no current flows?
