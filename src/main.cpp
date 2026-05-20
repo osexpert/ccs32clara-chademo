@@ -232,6 +232,23 @@ void power_off_no_return()
     }
 }
 
+void soft_reset()
+{
+    bool moreLogging = _global.moreLogging; // backup
+    _global = {}; // reinit
+    _global.moreLogging = moreLogging; // restore
+
+    _ccs_params = {}; // reinit
+
+    pevStateMachine_reset();
+
+    ChademoAlwaysOnBackup bk = chademoCharger->AlwaysOnBackup();
+    chademoCharger = {}; // reinit
+    chademoCharger->AlwaysOnRestore(bk);
+
+    _ledState = LedState::Init;
+}
+
 bool ccs_isPowerOffOk()
 {
     return not hardwareInterface_isConnectorLocked();
@@ -299,12 +316,7 @@ void power_off_check()
             if (_global.ALWAYS_ON && not _global.powerOffPendingViaButton && adc_4_volt > 3.3f)
             {
                 println("ALWAYS_ON and vcc4:%dV > 3.3V. Soft reset now...", &adc_4_volt); // bypass float to double promotion by passing as reference
-
-                _global.init();
-                _ccs_params.init();
-                pevStateMachine_reset();
-                chademoCharger->Init();
-                _ledState = LedState::Init;
+                soft_reset();
             }
             else
             {

@@ -38,65 +38,34 @@ enum _stopreasons
 
 struct ccs_params
 {
-    ccs_params()
-    {
-        init();
-    }
-
     int logging = DEFAULT_LOGGINGMASK;
-    int opmode;
-    int checkpoint;
+    int opmode = 0;
+    int checkpoint = 0;
 
-    int MaxPower;
-    int MaxVoltage;
-    int MaxCurrent;
+    int MaxPower = 100; // kW
+    int MaxVoltage = 410; // V
+    int MaxCurrent = ADAPTER_MAX_AMPS;// 125; // A
 
-    int TargetVoltage;
-    int TargetCurrent;
+    int TargetVoltage = 0;
+    int TargetCurrent = 0;
 
-    int soc;
-    int BatteryVoltage;
+    int soc = 0;
+    int BatteryVoltage = 0;
 
-    int EvseMaxCurrent;
-    int EvseMaxVoltage;
-    int EvseMinimumVoltage;
+    int EvseMaxCurrent = 0;
+    int EvseMaxVoltage = 0;
+    int EvseMinimumVoltage = 0;
 
-    int EvseVoltage;
-    int EvseCurrent;
-    int EvseMaxCurrentInCurrentDemandRes;
-    int CurrentDemandStopReason;
+    int EvseVoltage = 0;
+    int EvseCurrent = 0;
+    int EvseMaxCurrentInCurrentDemandRes = 0;
+    int CurrentDemandStopReason = STOP_REASON_NONE;
 
     int EvseDynCurrent() const
     {
         return EvseMaxCurrentInCurrentDemandRes == 0 ?
             EvseMaxCurrent :
             EvseMaxCurrentInCurrentDemandRes;
-    }
-
-    void init()
-    {
-        //logging = DEFAULT_LOGGINGMASK; keep
-        opmode = 0;
-        checkpoint = 0;
-
-        MaxPower = 100;           // kW
-        MaxVoltage = 410;         // V
-        MaxCurrent = ADAPTER_MAX_AMPS;
-
-        TargetVoltage = 0;
-        TargetCurrent = 0;
-
-        soc = 0;
-        BatteryVoltage = 0;
-
-        EvseMaxCurrent = 0;
-        EvseMaxVoltage = 0;
-        EvseMinimumVoltage = 0;
-
-        EvseVoltage = 0;
-        EvseCurrent = 0;
-        EvseMaxCurrentInCurrentDemandRes = 0;
-        CurrentDemandStopReason = STOP_REASON_NONE;
     }
 };
 

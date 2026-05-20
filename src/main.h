@@ -36,46 +36,24 @@
 #define IRQ_PRIORITY_CAN_RX     IRQ_PRI(14)
 #define IRQ_PRIORITY_SCHED      IRQ_PRI(15) // dont preemt anything but CAN?
 
-
 struct global_data
 {
-    global_data()
-    {
-        init();
-    }
+    int stopButtonCounter = 0;
 
-    int stopButtonCounter;
-
-    bool ccsKickoff;
-    bool powerOffPending;
-    bool powerOffPendingViaButton;
-    bool ccsEnded;
+    bool ccsKickoff = GITHUB_SX ? true : false;
+    bool powerOffPending = false;
+    bool powerOffPendingViaButton = false;
+    bool ccsEnded = false;
     bool moreLogging = false;
     int alternative_voltage = GITHUB_AV;
 
     bool CHADEMO_SX = GITHUB_SX;
-
-    bool ALWAYS_ON = GITHUB_V2X;
-    
     bool V2X = GITHUB_V2X;
+    bool ALWAYS_ON = GITHUB_V2X;
 
-    uint32_t auto_power_off_timer_count_up_ms;
-    bool ccsLifesign;
-    bool canLifesign;
-
-     void init()
-    {
-        stopButtonCounter = 0;
-
-        ccsKickoff = GITHUB_SX ? true : false;
-        powerOffPending = false;
-        powerOffPendingViaButton = false;
-        ccsEnded = false;
-
-        auto_power_off_timer_count_up_ms = 0;
-        ccsLifesign = false;
-        canLifesign = false;
-    }
+    uint32_t auto_power_off_timer_count_up_ms = 0;
+    bool ccsLifesign = false;
+    bool canLifesign = false;
 };
 
 extern global_data _global;

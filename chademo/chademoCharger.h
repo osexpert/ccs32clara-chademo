@@ -502,6 +502,16 @@ struct msg209
 
 #pragma pack(pop)
 
+struct ChademoAlwaysOnBackup
+{
+    bool EstimatedBatteryVoltageSet;
+    uint16_t EstimatedBatteryVoltage;
+    uint16_t TargetVoltage;
+    uint8_t SocPercent;
+
+    bool DischargeEnabled;
+};
+
 struct CarData
 {
     // valid after kswitch
@@ -519,7 +529,7 @@ struct CarData
 //#endif
 
     uint16_t EstimatedBatteryVoltage;
-//    bool EstimatedBatteryVoltageReady = false;
+    bool EstimatedBatteryVoltageSet = false;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
@@ -635,11 +645,6 @@ struct ChargerData
 class ChademoCharger
 {
 public:
-    ChademoCharger() 
-    {
-        Init();
-    }
-
     bool IsPowerOffOk();
     bool PreChargeCompleted();
     bool CarContactorsOpened();
@@ -665,6 +670,39 @@ public:
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
 
+    ChademoAlwaysOnBackup AlwaysOnBackup()
+    {
+        ChademoAlwaysOnBackup backup;
+
+        backup.EstimatedBatteryVoltage = _carData.EstimatedBatteryVoltage;
+        backup.EstimatedBatteryVoltageSet = _carData.EstimatedBatteryVoltageSet;
+        backup.SocPercent = _carData.SocPercent;
+        backup.TargetVoltage = _carData.TargetVoltage;
+
+        backup.DischargeEnabled = _dischargeEnabled;
+
+        return backup;
+    }
+    void AlwaysOnRestore(ChademoAlwaysOnBackup bk)
+    {
+        if (_global.CHADEMO_SX)
+        {
+            // nothing, clean slate
+        }
+        else if (bk.EstimatedBatteryVoltageSet) // DX + EstimatedBatteryVoltageSet
+        {
+            // discovery must already be done since EstimatedBatteryVoltageSet, so skip discovery
+            _carData.EstimatedBatteryVoltage = bk.EstimatedBatteryVoltage;
+            _carData.EstimatedBatteryVoltageSet = bk.EstimatedBatteryVoltageSet;
+            _carData.SocPercent = bk.SocPercent;
+            _carData.TargetVoltage = bk.TargetVoltage;
+
+            _discovery = false;
+            _state = ChargerState::WaitForChademoKickoff;
+        }
+
+        _dischargeEnabled = bk.DischargeEnabled;
+    }
     bool IsStoppingOrLater()
     {
         return _state >= ChargerState::Stopping_Start;
@@ -685,99 +723,53 @@ public:
         println("[cha] Unlock charging plug");
     }
 
-    void Init()
-    {
-        _delayCycles = 0;
-        _logCycleCounter = 0;
-        _cyclesInState = 0;
-
-        _chargingPlugLocked = false;
-        _msg102_recieved = false;
-        _send_can = false;
-        _d1 = false;
-        _d2 = false;
-        _adapterContactorClosed = false;
-
-        _discovery = _global.CHADEMO_SX ? false : true;
-
-        _preChargeDoneButStalled = false;
-        _dischargeEnabled = false;
-        _isDischarging = false;
-
-        // Pending flags
-        _msg100_pending = false;
-        _msg101_pending = false;
-        _msg102_pending = false;
-        _msg110_pending = false;
-        _msg200_pending = false;
-        _msg201_pending = false;
-
-        // Clear structs safely
-        _msg100_isr = {};
-        _msg101_isr = {};
-        _msg102_isr = {};
-        _msg110_isr = {};
-        _msg200_isr = {};
-        _msg201_isr = {};
-
-        _msg108 = {};
-        _msg109 = {};
-        _msg118 = {};
-        _msg208 = {};
-        _msg209 = {};
-
-        _stopReason = StopReason::NONE;
-
-        _state = _global.CHADEMO_SX ?
-            ChargerState::WaitForChademoKickoff :
-            ChargerState::Start;  // discovery
-
-        _carData = {};
-        _chargerData = {};
-    }
-
     private:
-        int _delayCycles;
-        int _logCycleCounter;
-        int _cyclesInState;
-        bool _chargingPlugLocked;
-        bool _msg102_recieved;
-        bool _send_can;
-        bool _d1;
-        bool _d2;
-        bool _adapterContactorClosed;
 
-        bool _discovery;
-        bool _preChargeDoneButStalled;
-        bool _dischargeEnabled;
-        bool _isDischarging;
+        int _delayCycles = 0;
+        int _logCycleCounter = 0;
+        int _cyclesInState = 0;
+        bool _chargingPlugLocked = false;
+        bool _msg102_recieved = false;
+        bool _send_can = false;
+        bool _d1 = false;
+        bool _d2 = false;
+        bool _adapterContactorClosed = false;
+
+        bool _discovery = _global.CHADEMO_SX ? false : true;
+
+        bool _preChargeDoneButStalled = false;
+        bool _dischargeEnabled = false;
+        bool _isDischarging = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
-        bool _msg100_pending;
-        msg100 _msg100_isr;
-        bool _msg101_pending;
-        msg101 _msg101_isr;
-        bool _msg102_pending;
-        msg102 _msg102_isr;
-        bool _msg110_pending;
-        msg110 _msg110_isr;
-        bool _msg200_pending;
-        msg200 _msg200_isr;
-        bool _msg201_pending;
-        msg201 _msg201_isr;
+        bool _msg100_pending = false;
+        msg100 _msg100_isr = {};
+        bool _msg101_pending = false;
+        msg101 _msg101_isr = {};
+        bool _msg102_pending = false;
+        msg102 _msg102_isr = {};
+        bool _msg110_pending = false;
+        msg110 _msg110_isr = {};
+        bool _msg200_pending = false;
+        msg200 _msg200_isr = {};
+        bool _msg201_pending = false;
+        msg201 _msg201_isr = {};
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages
-        msg108 _msg108;
-        msg109 _msg109;
-        msg118 _msg118;
-        msg208 _msg208;
-        msg209 _msg209;
+        msg108 _msg108 = {};
+        msg109 _msg109 = {};
+        msg118 _msg118 = {};
+        msg208 _msg208 = {};
+        msg209 _msg209 = {};
 
-        StopReason _stopReason;
-        ChargerState _state;
+        StopReason _stopReason = StopReason::NONE;
 
-        CarData _carData;
-        ChargerData _chargerData;
+        ChargerState _state = _global.CHADEMO_SX ?
+            ChargerState::WaitForChademoKickoff :
+            ChargerState::Start; // discovery
+
+        CarData _carData = {};
+        ChargerData _chargerData = {};
 
 };
 

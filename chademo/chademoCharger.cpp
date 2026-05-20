@@ -201,7 +201,7 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.AdjustBelowSoc, 
                 _carData.AdjustBelowFactor);
 
-//            _carData.EstimatedBatteryVoltageReady = true;
+            _carData.EstimatedBatteryVoltageSet = true;
         }
 
         _msg102_recieved = true;
