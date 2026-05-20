@@ -12,6 +12,8 @@ extern const char pevSttLabels[][MAX_LABEL_LEN];
 /* pev state machine */
 extern void pevStateMachine_Mainfunction(void);
 
+extern void pevStateMachine_reset();
+
 // naming: _ccsXxx if the method is impemented in ccs. Else in chademo.
 extern bool chademoInterface_preChargeCompleted();
 extern bool chademoInterface_carContactorsOpened();

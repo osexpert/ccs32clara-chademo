@@ -625,6 +625,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                 setCheckpoint(560);
                 pev_sendCableCheckReq();
                 pev_numberOfCableCheckReq = 1; // This is the first request.
+                CableCheckCompletedTrigger = false; // reset
                 pev_enterState(PEV_STATE_WaitForCableCheckResponse);
             }
             else
@@ -1184,6 +1185,10 @@ static void pev_runFsm(void)
 
 /************ public interfaces *****************************************/
 
+void pevStateMachine_reset()
+{
+    pev_enterState(PEV_STATE_Start);
+}
 
 /* The cyclic main function of the PEV charging state machine.
    Called each 30ms. */

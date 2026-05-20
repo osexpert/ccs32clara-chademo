@@ -60,6 +60,8 @@ ccs_params _ccs_params;
 
 volatile uint32_t system_millis;
 
+#define APP_ADDRESS  0x08020000
+
 #define AUTO_POWER_OFF_SEC (60 * 3) // 3 min
 #define CCS_TRACE_EVERY_MS 1000 // 1 sec
 #define SYSINFO_EVERY_MS 2000 // 2 sec
@@ -183,8 +185,8 @@ static void msleep(uint32_t delay)
 
 int battery_level_from_voltage(float voltage)
 {
-    if (voltage >= 4.0f) return 3;
-    if (voltage >= 3.7f) return 2;
+    if (voltage >= 3.9f) return 3;
+    if (voltage >= 3.6f) return 2;
     return 1;
 }
 
@@ -206,9 +208,9 @@ void showBatteryLevel()
     }
 }
 
-void power_off_no_return(const char* reason)
+void power_off_no_return()
 {
-    println("Power off: %s. Bye!", reason);
+    println("Power off. Bye!");
 
     // In case of emergency shutdown (stop button for 10 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
@@ -240,7 +242,8 @@ void power_off_check()
     bool buttonPressed10Seconds = _global.stopButtonCounter > 10 * 10; // 10 seconds
     if (buttonPressed10Seconds)
     {
-        power_off_no_return("Stop pressed for 10sec -> force off");
+        println("Stop pressed for 10sec -> force off");
+        power_off_no_return();
     }
 
     // Power off pending detector
@@ -250,12 +253,13 @@ void power_off_check()
         bool inactivity = _global.auto_power_off_timer_count_up_ms / 1000 > AUTO_POWER_OFF_SEC;
 
         // allow instant power off, unless Slac is pending (allow cable "fiddle" or late plugin before/during slac)
-        if (buttonPressedBriefly
-            && not special_modes_selection_pending())
+        if (buttonPressedBriefly && not special_modes_selection_pending())
         {
             _global.powerOffPending = true;
+            _global.powerOffPendingViaButton = true;
             println("Stop button pressed briefly. Power off pending...");
         }
+
         if (inactivity)
         {
             _global.powerOffPending = true;
@@ -290,7 +294,23 @@ void power_off_check()
         if (powerOffOkCcs && powerOffOkCha)
         {
             showBatteryLevel();
-            power_off_no_return("powerOffPending and both ccs and chademo says power off is ok");
+
+            // auto reboot when battery above 3.3V (prevent deep battery drain)
+            if (_global.ALWAYS_ON && not _global.powerOffPendingViaButton && adc_4_volt > 3.3f)
+            {
+                println("ALWAYS_ON and vcc4:%dV > 3.3V. Soft reset now...", &adc_4_volt); // bypass float to double promotion by passing as reference
+
+                _global.init();
+                _ccs_params.init();
+                pevStateMachine_reset();
+                chademoCharger->Init();
+                _ledState = LedState::Init;
+            }
+            else
+            {
+                println("powerOffPending and both ccs and chademo says power off is ok");
+                power_off_no_return();
+            }
         }
     }
 }
@@ -564,8 +584,10 @@ int adapter_charging()
             iwdg_reset();
 
             bool stopPressed = not DigIo::stop_button_in_inverted.Get();
-            if (stopPressed)
-                power_off_no_return("Stop pressed -> power off");
+            if (stopPressed) {
+                println("Stop pressed -> power off");
+                power_off_no_return();
+            }
         }
     }
 
@@ -576,7 +598,7 @@ extern "C" int main(void)
 {
     // set new vector table in a safe way (bootloader does not set it)
     __disable_irq();                   // Disable all interrupts
-    SCB->VTOR = 0x08020000;           // Set new vector table
+    SCB->VTOR = APP_ADDRESS;           // Set new vector table
     __DSB();                          // Ensure memory side effects complete
     __ISB();                          // Flush pipeline so VTOR takes effect
     __enable_irq();                   // Re-enable interrupts
@@ -647,10 +669,11 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
-#if GITHUB_V2X == 1
-    println("V2X build -> enable discharge");
-    chademoCharger->EnableDischarge();
-#endif
+    if (_global.V2X)
+    {
+        println("V2X build -> enable discharge");
+        chademoCharger->EnableDischarge();
+    }
 
     LedBlinker lb;
     ledBlinker = &lb;
@@ -714,7 +737,7 @@ extern "C" void print_crash_info(const char* type, uint32_t* stack)
     println("MMFAR: 0x%x", SCB_MMFAR);
     println("BFAR : 0x%x", SCB_BFAR);
 
-    power_off_no_return("fault");
+    power_off_no_return();
 }
 
 // Fault labels in flash

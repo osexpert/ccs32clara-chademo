@@ -370,7 +370,7 @@ void ChademoCharger::RunStateMachine()
                 SetState(ChargerState::Start);
             }
         }
-        else // std
+        else // DX
         {
             if (chademoInterface_ccsInStateWaitForPreChargeStart())
             {
@@ -792,7 +792,7 @@ bool ChademoCharger::PreChargeCompleted()
             println("[cha] PreCharge stalled until adapter contactor closed");
         return _adapterContactorClosed;
     }
-    else // std
+    else // DX
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
         if (not _carData.CarContactorsClosed)
