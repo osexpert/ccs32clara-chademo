@@ -712,6 +712,7 @@ public:
 
             _discovery = false;
             _state = ChargerState::WaitForChademoKickoff;
+            _global.ccsKickoff = true;
         }
 
         _dischargeEnabled = bk.DischargeEnabled;
