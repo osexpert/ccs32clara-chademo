@@ -58,75 +58,52 @@ jobs:
 
       # --- AV1 build ---
       - name: Build AV1 firmware
-        env:
-          SUFFIX: -AV1
         run: |
           export GITHUB_AV=1
-          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
+          export GITHUB_APPEND_VER=-AV1
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1
           path: My407ccs2chademo.bin
 
       # --- V2X build ---
       - name: Build V2X firmware
-        env:
-          SUFFIX: -V2X
         run: |
           export GITHUB_V2X=1
-          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
+          export GITHUB_APPEND_VER=-V2X
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X
           path: My407ccs2chademo.bin
 
 
       # --- V2X-AO build ---
       - name: Build V2X-AO firmware
-        env:
-          SUFFIX: -V2X-AO
         run: |
           export GITHUB_V2X=1
           export GITHUB_AO=1
-          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
+          export GITHUB_APPEND_VER=-V2X-AO
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
-          path: My407ccs2chademo.bin
-
-      # --- AV1-V2X build ---
-      - name: Build AV1-V2X firmware
-        env:
-          SUFFIX: -AV1-V2X
-        run: |
-          export GITHUB_AV=1
-          export GITHUB_V2X=1
-          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
-          make clean all
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X-AO
           path: My407ccs2chademo.bin
 
       # --- SX build ---
       - name: Build SX firmware
-        env:
-          SUFFIX: -SX
         run: |
           export GITHUB_SX=1
-          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
+          export GITHUB_APPEND_VER=-SX
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-SX
           path: My407ccs2chademo.bin
 
       - name: Add info to summary
