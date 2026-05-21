@@ -390,11 +390,14 @@ struct msg200
             /// </summary>
             uint16_t MinDischargeVoltage; // FA 00
             /// <summary>
-            /// japan: LowerDischargeLimitOfBatteryResidualCapacity (0.1kWh)
+            /// Possibly min soc allowed to discharge?
+            /// % 0-100?
             /// </summary>
             uint8_t MinBatteryDischargeLevel; // 1A
             /// <summary>
-            /// japan: ChargingLimitBatteryRemainingCapacity (0.1kWh)
+            /// OPTIONAL (0 if not used, but then why FF?)
+            /// Possibly max SOC allowed to charge to?
+            /// % 0-100?
             /// </summary>
             uint8_t MaxRemainingCapacityForCharging; // FF
         } m;
@@ -412,7 +415,15 @@ struct msg201
     union {
         struct {
             uint8_t ProtocolNumber; // 2
+            /// <summary>
+            /// Optional
+            /// Minutes. Set to 0 if not used.
+            /// </summary>
             uint16_t ApproxDischargeCompletionTime;
+            /// <summary>
+            /// Optional. Set to 0 if not used.
+            /// 0.1 kWh
+            /// </summary>
             uint16_t AvailableVehicleEnergy;
             uint8_t Unused5;
             uint8_t Unused6;
@@ -449,17 +460,17 @@ struct msg208
             /// </summary>
             uint8_t PresentDischargeCurrentInverted; // FF
             /// <summary>
-            /// japan: PossibleInputVoltage
+            /// AvailableInputVoltage
             /// </summary>
             uint16_t MaxDischargeVoltage; // AA 00
             /// <summary>
-            /// japan: InputableCurrent
+            /// AvailableInputCurrent
             /// </summary>
             uint8_t MaxDischargeCurrentInverted; // FF
             uint8_t Unused4; // 00
             uint8_t Unused5; // 00
             /// <summary>
-            /// japan: LowerLimitOfAbnormalVoltageDetection
+            /// LowerThresholdVoltage
             /// </summary>
             uint16_t MinDischargeVoltage; // AA 00
         } m;
@@ -482,6 +493,8 @@ struct msg209
         struct {
             uint8_t ProtocolNumber; // 1 or 2 (seen both)
             /// <summary>
+            /// OPTIONAL
+            /// Minutes
             /// Possibly setting this is > 0 make the car "alive" and never times out? No...seems to have no function.
             /// </summary>
             uint16_t RemainingDischargeTime;

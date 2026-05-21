@@ -49,7 +49,7 @@ struct global_data
 
     bool CHADEMO_SX = GITHUB_SX;
     bool V2X = GITHUB_V2X;
-    bool ALWAYS_ON = GITHUB_V2X;
+    bool ALWAYS_ON = GITHUB_AO;
 
     uint32_t auto_power_off_timer_count_up_ms = 0;
     bool ccsLifesign = false;

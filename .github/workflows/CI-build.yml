@@ -46,7 +46,7 @@ jobs:
         id: set_date
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
-      # --- Normal build ---
+      # --- Default build ---
       - name: Build default firmware
         run: |
           make clean all
@@ -58,57 +58,82 @@ jobs:
 
       # --- AV1 build ---
       - name: Build AV1 firmware
+        env:
+          SUFFIX: -AV1
         run: |
           export GITHUB_AV=1
-          export GITHUB_APPEND_VER=-AV1
+          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
           path: My407ccs2chademo.bin
 
       # --- V2X build ---
       - name: Build V2X firmware
+        env:
+          SUFFIX: -V2X
         run: |
           export GITHUB_V2X=1
-          export GITHUB_APPEND_VER=-V2X
+          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
+          path: My407ccs2chademo.bin
+
+
+      # --- V2X-AO build ---
+      - name: Build V2X-AO firmware
+        env:
+          SUFFIX: -V2X-AO
+        run: |
+          export GITHUB_V2X=1
+          export GITHUB_AO=1
+          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
+          make clean all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
           path: My407ccs2chademo.bin
 
       # --- AV1-V2X build ---
       - name: Build AV1-V2X firmware
+        env:
+          SUFFIX: -AV1-V2X
         run: |
           export GITHUB_AV=1
           export GITHUB_V2X=1
-          export GITHUB_APPEND_VER=-AV1-V2X
+          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1-V2X
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
           path: My407ccs2chademo.bin
 
       # --- SX build ---
       - name: Build SX firmware
+        env:
+          SUFFIX: -SX
         run: |
           export GITHUB_SX=1
-          export GITHUB_APPEND_VER=-SX
+          export GITHUB_APPEND_VER=${{ env.SUFFIX }}
           make clean all
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-SX
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}${{ env.SUFFIX }}
           path: My407ccs2chademo.bin
 
       - name: Add info to summary
         run: |
-          echo "### Alternative function builds" >> $GITHUB_STEP_SUMMARY
-          echo "- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
-          echo "- **V2X**: Discharge support permanently enabled. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
+          echo "### Build tags" >> $GITHUB_STEP_SUMMARY
           echo "- **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus." >> $GITHUB_STEP_SUMMARY
+          echo "- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
+          echo "- **V2X**: V2X support permanently enabled. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
+          echo "- **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
