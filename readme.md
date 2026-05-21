@@ -241,9 +241,10 @@ Releases are made less often and the difference is, a release has been tested in
 
 ### Alternative function builds
 There are builds with modifiers after the version number. These are alternative function builds. Currently, these modifiers exist:
-- **AV1:** For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf's with 20-30kwh battery.
-- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
 - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
+- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf with 20-30kwh battery.
+- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
+- **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual.
 
 ## Building
 If you want to compile the software from scratch, you can follow these instructions
