@@ -243,7 +243,7 @@ void soft_reset()
     pevStateMachine_reset();
 
     ChademoAlwaysOnBackup bk = chademoCharger->AlwaysOnBackup();
-    chademoCharger = {}; // reinit
+    *chademoCharger = {}; // reinit
     chademoCharger->AlwaysOnRestore(bk);
 
     _ledState = LedState::Init;
@@ -315,7 +315,7 @@ void power_off_check()
             // auto reboot when battery above 3.3V (prevent deep battery drain)
             if (_global.ALWAYS_ON && not _global.powerOffPendingViaButton && adc_4_volt > 3.3f)
             {
-                println("ALWAYS_ON and vcc4:%dV > 3.3V. Soft reset now...", &adc_4_volt); // bypass float to double promotion by passing as reference
+                println("ALWAYS_ON and vcc4:%fV > 3.3V. Soft reset now...", &adc_4_volt); // bypass float to double promotion by passing as reference
                 soft_reset();
             }
             else
