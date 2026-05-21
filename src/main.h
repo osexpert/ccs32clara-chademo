@@ -52,6 +52,7 @@ struct global_data
     bool ALWAYS_ON = GITHUB_AO;
 
     uint32_t auto_power_off_timer_count_up_ms = 0;
+
     bool ccsLifesign = false;
     bool canLifesign = false;
 };
