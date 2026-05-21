@@ -247,6 +247,8 @@ void soft_reset()
     chademoCharger->AlwaysOnRestore(bk);
 
     _ledState = LedState::Init;
+
+    connMgr_restart();
 }
 
 bool ccs_isPowerOffOk()
