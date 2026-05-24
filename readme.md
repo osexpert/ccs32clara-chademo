@@ -31,7 +31,8 @@ Some of the voltages are wired up to adc GPIOs. At least the 12v reading does no
 AFAICS, there are no temperature sensors in the adapter. Ideally there could be sensors at the inlets, or maybe attached to the aluminium conductor bars.
 
 ## Operation
-Plug adapter into car. Plug cable into adapter. Power on adapter.
+Plug adapter into car. Plug cable into adapter. Power on adapter. (plugging cable into adapter, after adapter is powered on, is not suppoeted and may not work, and may instead power off the adapter, so make sure everything is plugged in, before power on).
+
 Adapter will start chademo to fetch targetVoltage, soc and estimated battery voltage (calculated from targetVoltage and soc).
 Chademo will then shut down and ccs logic will start.
 When ccs reach start of PreCharge, chademo is restarted. Estimated battery voltage is used as PreCharge target voltage.
