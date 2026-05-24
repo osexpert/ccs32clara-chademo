@@ -31,7 +31,10 @@ Some of the voltages are wired up to adc GPIOs. At least the 12v reading does no
 AFAICS, there are no temperature sensors in the adapter. Ideally there could be sensors at the inlets, or maybe attached to the aluminium conductor bars.
 
 ## Operation
-Plug adapter into car. Plug cable into adapter. Power on adapter. (plugging cable into adapter, after adapter is powered on, is not suppoeted and may not work, and may instead power off the adapter, so make sure everything is plugged in, before power on).
+Plug adapter into car. Plug cable into adapter. Power on adapter.
+
+Plugging cable into adapter, after adapter is powered on, is not supported and may not work, and it may instead power off the adapter. So make sure everything is plugged in, _before_ power on the adapter.
+If the charger says to start charging before plugging in, this does not apply to the adapter. Starting the adapter after everything is plugged in, is analog to plugging the ccs plug into a ccs car.
 
 Adapter will start chademo to fetch targetVoltage, soc and estimated battery voltage (calculated from targetVoltage and soc).
 Chademo will then shut down and ccs logic will start.
