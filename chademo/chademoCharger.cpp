@@ -142,9 +142,9 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
 
-        // HACK: Peugeot iOn try to add 10V
+        // HACK: Peugeot iOn try to add 14V to push it into 400v + domain?
         if (_msg102.m.TargetVoltage == 336)
-            _msg102.m.TargetVoltage += 10;
+            _msg102.m.TargetVoltage = 350;
 
         COMPARE_SET(_msg102.m.RequestCurrent, _msg102_isr.m.RequestCurrent, "102.RequestCurrent %d -> %d");
         COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%02x -> 0x%02x");
