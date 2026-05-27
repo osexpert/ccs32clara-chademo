@@ -616,12 +616,6 @@ void ChademoCharger::RunStateMachine()
                 static int rampedRequestCurrent = 0;
                 static bool outputCurrentPositive = false;
 
-                if (chademoInterface_ccsChargingCurrentMirrorsTarget())
-                {
-                    _chargerData.OutputCurrent = 0; // TEMP HACK? for dischargers that mirror asked amps?
-                    // Or maybe its a good hack, as it will now behave more like normal V2X so we can test V2X code paths with it.
-                }
-
                 if (_chargerData.OutputCurrent == 0)
                 {
                     _chargerData.RemainingDischargeTime = 5; // seconds? // keep RemainingDischargeTime at 5, discharge indefinitely
@@ -851,6 +845,13 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
     _chargerData.OutputVoltage = outV;
 
     _chargerData.OutputCurrent = clampToUint8(outA);
+
+    // TEMP HACK!!!!!!
+    if (chademoInterface_ccsChargingCurrentMirrorsTarget())
+    {
+        _chargerData.OutputCurrent = 0; // TEMP HACK? for dischargers that mirror asked amps?
+        // Or maybe its a good hack, as it will now behave more like normal V2X so we can test V2X code paths with it.
+    }
 
     // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
     // we adjust ChaAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
