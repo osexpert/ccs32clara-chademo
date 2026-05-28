@@ -330,6 +330,17 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     _carData.OverridesJudged = true;
 }
 
+// car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-)
+static const int offsets[] = { 0, 20, 0, -20 };
+static int offset_index = 0;
+
+static int GetCyclicOffset()
+{
+    int result = offsets[offset_index];
+    offset_index = (offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
+    return result;
+}
+
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
@@ -548,6 +559,11 @@ void ChademoCharger::RunStateMachine()
             {
                 // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation volts error.
                 _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
+                _chargerData.OutputVoltageIsEstimated = true;
+            }
+
+            if (_chargerData.OutputVoltageIsEstimated && _estimatedOutputVoltageModulation) {
+                _chargerData.OutputVoltage += GetCyclicOffset();
             }
 
             const int SX_INITIAL = 0;
@@ -849,7 +865,7 @@ const char* ChademoCharger::GetStateName()
 
 #define MAX_UNDERSUPPLY_AMPS 10
 
-void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, uint16_t outA)
+void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_estimated, uint16_t outA)
 {
     _chargerData.AvailableOutputVoltage = maxV;
     if (_chargerData.AvailableOutputVoltage > ADAPTER_MAX_VOLTS)
@@ -864,6 +880,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
         _chargerData.DynAvailableOutputCurrent = ADAPTER_MAX_AMPS;
 
     _chargerData.OutputVoltage = outV;
+    _chargerData.OutputVoltageIsEstimated = outV_is_estimated;
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
@@ -895,6 +912,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
             ADAPTER_MAX_AMPS,
             ADAPTER_MAX_AMPS, // dyn
             _carData.EstimatedBatteryVoltage,
+            true, // voltage is estimated
             0 // _carData.RequestCurrent
         );
     }
@@ -906,6 +924,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
             _ccs_params.EvseMaxCurrent,
             _ccs_params.EvseDynCurrent(),
             _ccs_params.EvseVoltage,
+            false, // voltage not estimated
             _ccs_params.EvseCurrent
         );
     }

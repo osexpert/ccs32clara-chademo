@@ -637,6 +637,7 @@ struct ChargerData
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
+    bool OutputVoltageIsEstimated;
 
     uint8_t DischargeCurrent;
 
@@ -674,7 +675,7 @@ public:
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
-    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, uint16_t outA);
+    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_estimated, uint16_t outA);
     bool GetSwitchK();
     void SetBatteryVoltOverridesOnce();
     void CloseAdapterContactor();
@@ -754,6 +755,7 @@ public:
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
         bool _isDischarging = false;
+        bool _estimatedOutputVoltageModulation = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         bool _msg100_pending = false;
