@@ -605,15 +605,17 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             // (B) The charger finished to tell the charge parameters.
             if (dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.EVSEProcessing == dinEVSEProcessingType_Finished)
             {
-                addToTrace(MOD_PEV, "Checkpoint550: ChargeParams are discovered.. Will change to state C.");
 #define dcparm dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.DC_EVSEChargeParameter
                 int evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
                 int evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
                 int evseMinimumVoltage = combineValueAndMultiplier(dcparm.EVSEMinimumVoltageLimit);
 #undef dcparm
+                _ccs_params.EvseMinimumVoltage = evseMinimumVoltage;
                 _ccs_params.EvseMaxVoltage = evseMaxVoltage;
                 _ccs_params.EvseMaxCurrent = evseMaxCurrent;
-                _ccs_params.EvseMinimumVoltage = evseMinimumVoltage;
+
+                addToTrace(MOD_PEV, "Checkpoint550: ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
+                    evseMinimumVoltage, evseMaxVoltage, evseMaxCurrent);
 
                 setCheckpoint(550);
                 // pull the CP line to state C here:
@@ -879,7 +881,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             {
                 /* If the charger reports a malfunction, we stop the charging. */
                 /* Issue reference: https://github.com/uhi22/ccs32clara/issues/29 */
-                addToTrace(MOD_PEV, "Charger reported EVSE_Malfunction. A reason could be hitting the EVMaximumVoltageLimit or EVSEMaximumVoltageLimit.");
+                addToTrace(MOD_PEV, "Charger reported EVSE_Malfunction. A reason could be hitting the EVSEMinimumVoltageLimit or EVSEMaximumVoltageLimit.");
                 currentDemandStopReason = STOP_REASON_CHARGER_EVSE_MALFUNCTION;
             }
             else if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_EmergencyShutdown)
