@@ -1,0 +1,8 @@
+target 336, max 336
+
+36% -> 307v
+52% -> 312v
+56% -> 315v
+76% -> 321v
+
+Look like nominal is really 310v?

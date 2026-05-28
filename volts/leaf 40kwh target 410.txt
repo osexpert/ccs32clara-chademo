@@ -1,3 +1,5 @@
+target 410, max 435
+
 leaf 40kwh
 
 0, 324
