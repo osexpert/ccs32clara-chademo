@@ -210,8 +210,6 @@ void showBatteryLevel()
 
 void power_off_no_return()
 {
-    println("Power off. Bye!");
-
     // In case of emergency shutdown (stop button for 10 sec, fault, other very bad things) and contactor is still closed, power off adapter contactor here.
     // If we did not, both the car contactors and the adapter contactor would loose power at the same time, and it would be chance who takes the hit.
     // Its better to sacrefice the adapter instead of the car, so power off adapter contactor explicitly first, and wait a bit (20ms should suffice, but do 100 anyways).
@@ -222,6 +220,7 @@ void power_off_no_return()
         msleep(100);
     }
 
+    println("Power off %s. Bye!", GITHUB_VERSION);
     DigIo::power_on_out.Clear();
 
     led_off();
