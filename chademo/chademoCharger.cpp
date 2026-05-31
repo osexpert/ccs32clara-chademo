@@ -141,11 +141,6 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
-
-        // HACK: Peugeot iOn try to add 14V to push it into 400v + domain?
-        if (_msg102.m.TargetVoltage == 336)
-            _msg102.m.TargetVoltage = 350;
-
         COMPARE_SET(_msg102.m.RequestCurrent, _msg102_isr.m.RequestCurrent, "102.RequestCurrent %d -> %d");
         COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%02x -> 0x%02x");
         COMPARE_SET_X2(_msg102.m.Status, _msg102_isr.m.Status, "102.Status %08b (0x%02x) -> %08b (0x%02x)");
@@ -162,13 +157,16 @@ void ChademoCharger::HandlePendingCarMessages()
             println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
+
         // XPeng update TargetVoltage after closing its contactors, (it seems) from real target (battery max at 4.2v) to the same as MaxVolt.
         // Why? I guess...they think it will give them faster charging? In any case, ignore changes to TargetVoltage after d2 is set
-		// TargetVoltage should normally never change, so alternative could be to snapshot it as soon as switch(k) is set. But this seemed easier.
-        else if (not _d2)
-        {
+        // TargetVoltage should normally never change, so alternative could be to snapshot it as soon as switch(k) is set. But this seemed easier.
+        if (not _d2)
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
-        }
+
+        // HACK: Peugeot iOn try to add 14V to push it into 400v + domain?
+        if (_carData.TargetVoltage == 336)
+            _carData.TargetVoltage = 346;
 
         // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower that adapter max.
         //if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
