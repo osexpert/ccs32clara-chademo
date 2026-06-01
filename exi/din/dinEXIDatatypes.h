@@ -44,7 +44,7 @@ extern "C" {
 
 #define SUPPORT_YES 1
 #define SUPPORT_NO 2
-#define DEPLOY_DIN_CODEC SUPPORT_YES
+#define DEPLOY_DIN_CODEC SUPPORT_YES // originally NO
 #define DEPLOY_DIN_CODEC_FRAGMENT SUPPORT_NO
 
 #if DEPLOY_DIN_CODEC == SUPPORT_YES
@@ -1523,7 +1523,7 @@ struct dinMeteringReceiptResType {
 };
 
 /* Complex type name='urn:iso:15118:2:2010:MsgDataTypes,ServiceParameterListType',  base type name='anyType',  content type='ELEMENT',  isAbstract='false',  hasTypeId='false',  final='0',  block='0',  particle='("urn:iso:15118:2:2010:MsgDataTypes":ParameterSet{1-UNBOUNDED})',  derivedBy='RESTRICTION'.  */
-#define dinServiceParameterListType_ParameterSet_ARRAY_SIZE 1
+#define dinServiceParameterListType_ParameterSet_ARRAY_SIZE 1 // originally 5 but probably reduced to save stack
 struct dinServiceParameterListType {
 	/* element: "urn:iso:15118:2:2010:MsgDataTypes":ParameterSet, Complex type name='urn:iso:15118:2:2010:MsgDataTypes,ParameterSetType',  base type name='anyType',  content type='ELEMENT',  isAbstract='false',  hasTypeId='false',  final='0',  block='0',  particle='("urn:iso:15118:2:2010:MsgDataTypes":ParameterSetID,"urn:iso:15118:2:2010:MsgDataTypes":Parameter{1-UNBOUNDED})',  derivedBy='RESTRICTION'.  */
 	struct {

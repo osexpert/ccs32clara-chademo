@@ -15,13 +15,6 @@ int g_errn;
 uint8_t sessionId[SESSIONID_LEN];
 uint8_t sessionIdLen;
 
-#define UNUSED(x) x=x; /* to avoid compiler warning for unused parameters */
-
-void debugAddStringAndInt(char *s, int i) {
-    UNUSED(s)
-    UNUSED(i)
-}
-
 void projectExiConnector_decode_appHandExiDocument(void) {
    /* precondition: The global_streamDec.size and global_streamDec.data have been set to the byte array with EXI data. */
 

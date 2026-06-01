@@ -41,9 +41,6 @@
 #ifndef EXI_din_DATATYPES_DECODER_C
 #define EXI_din_DATATYPES_DECODER_C
 
-extern void debugAddStringAndInt(char *s, int i);
-
-
 #if DEPLOY_DIN_CODEC == SUPPORT_YES
 
 /** event-code */
@@ -354,220 +351,183 @@ static int decode_dinBodyType(bitstream_t* stream, struct dinBodyType* dinBodyTy
 					errn = decode_dinBodyBaseType(stream, &dinBodyType->BodyElement);
 					dinBodyType->BodyElement_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 1:
 					errn = decode_dinCableCheckReqType(stream, &dinBodyType->CableCheckReq);
 					dinBodyType->CableCheckReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 2:
 					errn = decode_dinCableCheckResType(stream, &dinBodyType->CableCheckRes);
 					dinBodyType->CableCheckRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 3:
 					errn = decode_dinCertificateInstallationReqType(stream, &dinBodyType->CertificateInstallationReq);
 					dinBodyType->CertificateInstallationReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 4:
 					errn = decode_dinCertificateInstallationResType(stream, &dinBodyType->CertificateInstallationRes);
 					dinBodyType->CertificateInstallationRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 5:
 					errn = decode_dinCertificateUpdateReqType(stream, &dinBodyType->CertificateUpdateReq);
 					dinBodyType->CertificateUpdateReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 6:
 					errn = decode_dinCertificateUpdateResType(stream, &dinBodyType->CertificateUpdateRes);
 					dinBodyType->CertificateUpdateRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 7:
 					errn = decode_dinChargeParameterDiscoveryReqType(stream, &dinBodyType->ChargeParameterDiscoveryReq);
 					dinBodyType->ChargeParameterDiscoveryReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 8:
 					errn = decode_dinChargeParameterDiscoveryResType(stream, &dinBodyType->ChargeParameterDiscoveryRes);
 					dinBodyType->ChargeParameterDiscoveryRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 9:
 					errn = decode_dinChargingStatusReqType(stream, &dinBodyType->ChargingStatusReq);
 					dinBodyType->ChargingStatusReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 10:
 					errn = decode_dinChargingStatusResType(stream, &dinBodyType->ChargingStatusRes);
 					dinBodyType->ChargingStatusRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 11:
 					errn = decode_dinContractAuthenticationReqType(stream, &dinBodyType->ContractAuthenticationReq);
 					dinBodyType->ContractAuthenticationReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 12:
 					errn = decode_dinContractAuthenticationResType(stream, &dinBodyType->ContractAuthenticationRes);
 					dinBodyType->ContractAuthenticationRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 13:
 					errn = decode_dinCurrentDemandReqType(stream, &dinBodyType->CurrentDemandReq);
 					dinBodyType->CurrentDemandReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 14:
 					errn = decode_dinCurrentDemandResType(stream, &dinBodyType->CurrentDemandRes);
 					dinBodyType->CurrentDemandRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 15:
 					errn = decode_dinMeteringReceiptReqType(stream, &dinBodyType->MeteringReceiptReq);
 					dinBodyType->MeteringReceiptReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 16:
 					errn = decode_dinMeteringReceiptResType(stream, &dinBodyType->MeteringReceiptRes);
 					dinBodyType->MeteringReceiptRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 17:
 					errn = decode_dinPaymentDetailsReqType(stream, &dinBodyType->PaymentDetailsReq);
 					dinBodyType->PaymentDetailsReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 18:
 					errn = decode_dinPaymentDetailsResType(stream, &dinBodyType->PaymentDetailsRes);
 					dinBodyType->PaymentDetailsRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 19:
 					errn = decode_dinPowerDeliveryReqType(stream, &dinBodyType->PowerDeliveryReq);
 					dinBodyType->PowerDeliveryReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 20:
 					errn = decode_dinPowerDeliveryResType(stream, &dinBodyType->PowerDeliveryRes);
 					dinBodyType->PowerDeliveryRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 21:
 					errn = decode_dinPreChargeReqType(stream, &dinBodyType->PreChargeReq);
 					dinBodyType->PreChargeReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 22:
 					errn = decode_dinPreChargeResType(stream, &dinBodyType->PreChargeRes);
 					dinBodyType->PreChargeRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 23:
 					errn = decode_dinServiceDetailReqType(stream, &dinBodyType->ServiceDetailReq);
 					dinBodyType->ServiceDetailReq_isUsed = 1u;
-					debugAddStringAndInt("Line", __LINE__);
 					grammarID = 4;
 					break;
 				case 24:
 					errn = decode_dinServiceDetailResType(stream, &dinBodyType->ServiceDetailRes);
 					dinBodyType->ServiceDetailRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 25:
 					errn = decode_dinServiceDiscoveryReqType(stream, &dinBodyType->ServiceDiscoveryReq);
 					dinBodyType->ServiceDiscoveryReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 26:
 					errn = decode_dinServiceDiscoveryResType(stream, &dinBodyType->ServiceDiscoveryRes);
 					dinBodyType->ServiceDiscoveryRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 27:
 					errn = decode_dinServicePaymentSelectionReqType(stream, &dinBodyType->ServicePaymentSelectionReq);
 					dinBodyType->ServicePaymentSelectionReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 28:
 					errn = decode_dinServicePaymentSelectionResType(stream, &dinBodyType->ServicePaymentSelectionRes);
 					dinBodyType->ServicePaymentSelectionRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 29:
 					errn = decode_dinSessionSetupReqType(stream, &dinBodyType->SessionSetupReq);
 					dinBodyType->SessionSetupReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 30:
 					errn = decode_dinSessionSetupResType(stream, &dinBodyType->SessionSetupRes);
 					dinBodyType->SessionSetupRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 31:
 					errn = decode_dinSessionStopType(stream, &dinBodyType->SessionStopReq);
 					dinBodyType->SessionStopReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 32:
 					errn = decode_dinSessionStopResType(stream, &dinBodyType->SessionStopRes);
 					dinBodyType->SessionStopRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 33:
 					errn = decode_dinWeldingDetectionReqType(stream, &dinBodyType->WeldingDetectionReq);
 					dinBodyType->WeldingDetectionReq_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 34:
 					errn = decode_dinWeldingDetectionResType(stream, &dinBodyType->WeldingDetectionRes);
 					dinBodyType->WeldingDetectionRes_isUsed = 1u;
 					grammarID = 4;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				case 35:
 					done = 1;
 					grammarID = 5;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				default:
 					errn = EXI_ERROR_UNKOWN_EVENT_CODE;
-					debugAddStringAndInt("Line", __LINE__);
 					break;
 				}
 			}
