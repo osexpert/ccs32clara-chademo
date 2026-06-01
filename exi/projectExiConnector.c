@@ -9,18 +9,11 @@ struct dinEXIDocument dinDocDec;
 struct appHandEXIDocument aphsDoc;
 bitstream_t global_streamEnc;
 bitstream_t global_streamDec;
-uint32_t global_streamEncPos;
-uint32_t global_streamDecPos;
+size_t global_streamEncPos;
+size_t global_streamDecPos;
 int g_errn;
 uint8_t sessionId[SESSIONID_LEN];
 uint8_t sessionIdLen;
-
-#define UNUSED(x) x=x; /* to avoid compiler warning for unused parameters */
-
-void debugAddStringAndInt(char *s, int i) {
-    UNUSED(s)
-    UNUSED(i)
-}
 
 void projectExiConnector_decode_appHandExiDocument(void) {
    /* precondition: The global_streamDec.size and global_streamDec.data have been set to the byte array with EXI data. */

@@ -29,10 +29,10 @@ OBJDUMP		= $(PREFIX)-objdump
 MKDIR_P     = mkdir -p
 FPU_FLAGS = -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CPU_FLAGS = -DSTM32F4 -mcpu=cortex-m4 -mthumb
-CFLAGS		= -Os -Isrc/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+CFLAGS		= -Os -Isrc/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iexi/appHandshake -Iexi/codec -Iexi/din -Iccs -Ichademo \
 				 -fno-common -fno-builtin \
 				 $(CPU_FLAGS) $(FPU_FLAGS) -std=gnu99 -ffunction-sections -fdata-sections
-CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iccs -Ichademo \
+CPPFLAGS    = -Og -ggdb -Wall -Wextra -Isrc/ -Ilibopeninv/src -Ilibopencm3/include -Iexi -Iexi/appHandshake -Iexi/codec -Iexi/din -Iccs -Ichademo \
 				-fno-common -std=c++11 -pedantic -DUSART_BAUDRATE=921600 \
 				-ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables $(CPU_FLAGS) $(FPU_FLAGS)
 # Check if the variable GITHUB_RUN_NUMBER exists. When running on the github actions running, this
@@ -67,8 +67,8 @@ OBJSL		  = main.o hwinit.o \
 
 OBJS     = $(patsubst %.o,obj/%.o, $(OBJSL))
 DEPENDS := $(patsubst %.o,obj/%.d, $(OBJSL))
-vpath %.c src/ libopeninv/src exi/ ccs/ chademo/
-vpath %.cpp src/ libopeninv/src exi/ ccs/ chademo/
+vpath %.c src/ libopeninv/src exi/ exi/appHandshake/ exi/codec/ exi/din/ ccs/ chademo/
+vpath %.cpp src/ libopeninv/src exi/ exi/appHandshake/ exi/codec/ exi/din/ ccs/ chademo/
 
 OPENOCD_BASE	= /usr
 OPENOCD		= $(OPENOCD_BASE)/bin/openocd
