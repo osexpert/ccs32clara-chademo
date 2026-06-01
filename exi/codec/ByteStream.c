@@ -30,7 +30,7 @@
 
 
 /* Avoid VS warning, put before your included header files */
-/* warning C4996: ï¿½fopenï¿½: This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. */
+/* warning C4996: ‘fopen’: This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. */
 #define _CRT_SECURE_NO_DEPRECATE
 
 #include <stdio.h>
