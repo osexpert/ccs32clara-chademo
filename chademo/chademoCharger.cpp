@@ -164,9 +164,13 @@ void ChademoCharger::HandlePendingCarMessages()
         if (not _d2)
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
 
-        // HACK: Peugeot iOn try to add 14V to push it into 400v + domain?
+        // HACK: Peugeot iOn try to add 10V and lower the maxes
         if (_carData.TargetVoltage == 336)
-            _carData.TargetVoltage = 346;
+        {
+//            _carData.TargetVoltage += 10;
+            _ccs_params.MaxCurrent = 125;
+            _ccs_params.MaxPower = 50;
+        }
 
         // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower that adapter max.
         //if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
