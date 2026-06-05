@@ -91,7 +91,7 @@ static bool ChargingVoltageDifferentFromTarget_isSet;
 static bool ChargingCurrentDifferentFromTarget;
 static bool ChargingCurrentDifferentFromTarget_isSet;
 
-static bool CableCheckCompletedTrigger;
+static bool ChargeParameterDiscoveryCompletedTrigger;
 
 /***local function prototypes *****************************************/
 
@@ -562,6 +562,7 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
                 setCheckpoint(540);
                 pev_sendChargeParameterDiscoveryReq();
                 pev_numberOfChargeParameterDiscoveryReq = 1; // first message
+                ChargeParameterDiscoveryCompletedTrigger = false; // reset
                 pev_enterState(PEV_STATE_WaitForChargeParameterDiscoveryResponse);
             }
             else
@@ -605,6 +606,8 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             // (B) The charger finished to tell the charge parameters.
             if (dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.EVSEProcessing == dinEVSEProcessingType_Finished)
             {
+                ChargeParameterDiscoveryCompletedTrigger = true;
+
 #define dcparm dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes.DC_EVSEChargeParameter
                 int evseMaxVoltage = combineValueAndMultiplier(dcparm.EVSEMaximumVoltageLimit);
                 int evseMaxCurrent = combineValueAndMultiplier(dcparm.EVSEMaximumCurrentLimit);
@@ -627,7 +630,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
                 setCheckpoint(560);
                 pev_sendCableCheckReq();
                 pev_numberOfCableCheckReq = 1; // This is the first request.
-                CableCheckCompletedTrigger = false; // reset
                 pev_enterState(PEV_STATE_WaitForCableCheckResponse);
             }
             else
@@ -679,7 +681,6 @@ static void stateFunctionWaitForCableCheckResponse(void)
             if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Finished)
             {
                 addToTrace(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
-                CableCheckCompletedTrigger = true;
                 pev_enterState(PEV_STATE_WaitForPreChargeStart);
             }
             else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
@@ -710,11 +711,10 @@ static void stateFunctionWaitForCableCheckResponse(void)
 
 static void stateFunctionWaitForPreChargeStart(void)
 {
-    // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 5-7 seconds? This at least saves 2 :-)
+    // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 7 seconds? This at least saves 2 :-)
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
-    // Gemini: 2 seconds is borderline and would have used 1.5s / 50 cycles...look out for FAILED_SequenceError or FIN's...
-    // Chatgpt: 2s borderline, 5 sec absolute max.
+    // How long can we wait before sending the first PreChargeReq? It seems undefined in spec...but Gemini suggests 5 seconds max.
 
     // there is no need to wait here if _global.CHADEMO_SX. clara and pyplc does not wait at all.
     // But in case ccs finish insanely fast and chademo slow (unlikely), we can wait here for a while (max 10sec) until we time out.
@@ -1098,11 +1098,11 @@ static void stateFunctionStop(void)
 
     hardwareInterface_unlockConnector();
 
-    // I guess we would want to retry if something failed, but only if we did not complete Cablecheck,
-    // because this trigger Chademo start, and we can only start Chademo once.
-    if (not CableCheckCompletedTrigger && not hardwareInterface_stopChargeRequested())
+    // I guess we would want to retry if something failed, but only if we did not complete ChargeParameterDiscovery,
+    // because this trigger stateC and connector locking (energizing state). Something failing after this is probably hardware/high voltage related, and will not "heal".
+    if (not ChargeParameterDiscoveryCompletedTrigger && not hardwareInterface_stopChargeRequested())
     {
-        addToTrace(MOD_PEV, "Did not complete CableCheck -> restart");
+        addToTrace(MOD_PEV, "Did not complete ChargeParameterDiscovery -> restart");
         pev_enterState(PEV_STATE_Start);
         connMgr_restart();
     }
