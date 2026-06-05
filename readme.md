@@ -243,8 +243,7 @@ If using on a regular basis, its easiest to use a V2X build, else you must enabl
 Every commit is built automatically and can be downloaded here, as artifact of a workflow run: [https://github.com/osexpert/ccs32clara-chademo/actions](https://github.com/osexpert/ccs32clara-chademo/actions?query=branch%3Amain)
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
 
-### Alternative function builds
-There are builds with modifiers after the version number. These are alternative function builds. Currently, these modifiers exist:
+### Build tags
 - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
 - **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf with 20-30kwh battery.
 - **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
