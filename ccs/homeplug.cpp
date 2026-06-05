@@ -743,8 +743,9 @@ void runSdpRecoveryStateMachine(void)
             }
             else
             {
-                // We are still here after 0.5 seconds, so SDP attempt did not fly. Go to slac.
+                // We are still here after 0.5 seconds, so SDP recovery did not fly. Go to slac.
                 // Why would we not be here? evaluateUdpPayload would have taken us into connMgr_setLevel(CONNLEVEL_50_SDP_DONE_TCP_NEXT);
+                // TODO: reset sdpDoneTrigger = false so we only try recovery once? Does it matter?
                 connMgr_setLevel(CONNLEVEL_10_START_SLAC);
             }
         }
