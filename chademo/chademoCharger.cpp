@@ -165,7 +165,7 @@ void ChademoCharger::HandlePendingCarMessages()
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
 
         // HACK: Peugeot iOn try to add 10V and lower the maxes
-        if (_carData.TargetVoltage == 336)
+        if (_carData.ProtocolNumber == 1 && _carData.TargetVoltage == 336)
         {
 //            _carData.TargetVoltage += 10;
             _ccs_params.MaxCurrent = 125;
@@ -688,9 +688,16 @@ void ChademoCharger::RunStateMachine()
             // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
             // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
             // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-            if (not _isDischarging && _chargerData.OutputCurrent == 0)
+            if (not _isDischarging)
             {
-                _chargerData.OutputCurrent = 1;
+                // Possibly, a strange logic that if 5 amps or less, the charging should stop (within 4 seconds?).
+                // Some (one?) charger was terribly slow at delivering amps, and this may have trigged the car to stop?
+                // At least the spec mention that chademo chargers before 0.9 would end charging by lowering current to 5A or lower. And even if we declare chademo 1.0,
+                // the car may have some strange logic related to this. So it  this works, we could possibly use it for all chademo < 1.0 cars?
+                if (_carData.ProtocolNumber == 1 && _carData.TargetVoltage == 336 && _chargerData.OutputCurrent < 6 && _carData.RequestCurrent >= 6)
+                    _chargerData.OutputCurrent = 6;
+                else if (_chargerData.OutputCurrent == 0)
+                   _chargerData.OutputCurrent = 1;
             }
         }
     }

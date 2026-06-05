@@ -42,9 +42,11 @@ struct ccs_params
     int opmode = 0;
     int checkpoint = 0;
 
-    int MaxPower = 100; // kW
     int MaxVoltage = 410; // V
+    // I guess if car is chademo 1.0 we could limit these to 125A and 50kW, because this was the max in chademo 1.0.
+    // BUT if it does not make a difference for the charger, what maxes we send (I assume), then we can just use 200A and 100kW.
     int MaxCurrent = ADAPTER_MAX_AMPS;// 125; // A
+    int MaxPower = 100; // kW
 
     int TargetVoltage = 0;
     int TargetCurrent = 0;
