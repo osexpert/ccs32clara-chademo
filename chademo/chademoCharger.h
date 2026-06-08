@@ -758,17 +758,17 @@ public:
         bool _estimatedOutputVoltageModulation = false;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
-        bool _msg100_pending = false;
+        volatile bool _msg100_pending = false;
         msg100 _msg100_isr = {};
-        bool _msg101_pending = false;
+        volatile bool _msg101_pending = false;
         msg101 _msg101_isr = {};
-        bool _msg102_pending = false;
+        volatile bool _msg102_pending = false;
         msg102 _msg102_isr = {};
-        bool _msg110_pending = false;
+        volatile bool _msg110_pending = false;
         msg110 _msg110_isr = {};
-        bool _msg200_pending = false;
+        volatile bool _msg200_pending = false;
         msg200 _msg200_isr = {};
-        bool _msg201_pending = false;
+        volatile bool _msg201_pending = false;
         msg201 _msg201_isr = {};
 
         // only allowed to use in: SendCanMessages, UpdateChargerMessages

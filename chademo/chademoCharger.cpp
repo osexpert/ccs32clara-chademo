@@ -966,39 +966,39 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
 {
     if (id == 0x100)
     {
-        _msg100_pending = true;
         _msg100_isr.pair[0] = data[0];
         _msg100_isr.pair[1] = data[1];
+        _msg100_pending = true;
     }
     else if (id == 0x101)
     {
-        _msg101_pending = true;
         _msg101_isr.pair[0] = data[0];
         _msg101_isr.pair[1] = data[1];
+        _msg101_pending = true;
     }
     else if (id == 0x102)
     {
-        _msg102_pending = true;
         _msg102_isr.pair[0] = data[0];
         _msg102_isr.pair[1] = data[1];
+        _msg102_pending = true;
     }
     else if (id == 0x110)
     {
-        _msg110_pending = true;
         _msg110_isr.pair[0] = data[0];
         _msg110_isr.pair[1] = data[1];
+        _msg110_pending = true;
     }
     else if (id == 0x200)
     {
-        _msg200_pending = true;
         _msg200_isr.pair[0] = data[0];
         _msg200_isr.pair[1] = data[1];
+        _msg200_pending = true;
     }
     else if (id == 0x201)
     {
-        _msg201_pending = true;
         _msg201_isr.pair[0] = data[0];
         _msg201_isr.pair[1] = data[1];
+        _msg201_pending = true;
     }
     _global.canLifesign = true;
 }
