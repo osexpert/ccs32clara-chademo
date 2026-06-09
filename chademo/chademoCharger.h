@@ -609,6 +609,12 @@ enum ProtocolNumber
     Chademo_2_0 = 3,
 };
 
+const int SX_INITIAL = 0;
+const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
+const int SX_WAIT_FOR_ccsCurrentDemand = 2;
+const int SX_RAMP_UP_carDataRequestCurrent = 3;
+const int SX_DONE = 4;
+
 struct ChargerData
 {
     uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
@@ -659,6 +665,7 @@ struct ChargerData
 class ChademoCharger
 {
 public:
+    int GetCyclicOffset();
     bool IsPowerOffOk();
     bool PreChargeCompleted();
     bool CarContactorsOpened();
@@ -787,5 +794,11 @@ public:
         CarData _carData = {};
         ChargerData _chargerData = {};
 
+        int _sxState = SX_INITIAL;
+        int _rampedRequestCurrent = 0;
+        bool _fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
+        int _fakeOutputCurrentCycles = 0;
+        int _zeroOutputAmpsCycles = 0;
+        int _offset_index = 0;
 };
 

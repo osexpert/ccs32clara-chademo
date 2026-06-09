@@ -332,12 +332,11 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
 
 // car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-)
 static const int offsets[] = { 0, 20, 0, -20 };
-static int offset_index = 0;
 
-static int GetCyclicOffset()
+int ChademoCharger::GetCyclicOffset()
 {
-    int result = offsets[offset_index];
-    offset_index = (offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
+    int result = offsets[_offset_index];
+    _offset_index = (_offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
     return result;
 }
 
@@ -566,87 +565,73 @@ void ChademoCharger::RunStateMachine()
                 _chargerData.OutputVoltage += GetCyclicOffset();
             }
 
-            const int SX_INITIAL = 0;
-            const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
-            const int SX_WAIT_FOR_ccsCurrentDemand = 2;
-            const int SX_RAMP_UP_carDataRequestCurrent = 3;
-            const int SX_DONE = 4;
-            static int sxState = SX_INITIAL;
-
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
-            if (_global.CHADEMO_SX && sxState != SX_DONE)
+            if (_global.CHADEMO_SX && _sxState != SX_DONE)
             {
-                static int rampedRequestCurrent = 0;
-
                 _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10
                 int carRequested = _carData.RequestCurrent;
                 _carData.RequestCurrent = 1; // fake 1A request for ccs
 
-                if (sxState == SX_INITIAL)
+                if (_sxState == SX_INITIAL)
                 {
-                    sxState = SX_WAIT_FOR_preChargeDoneButStalled;
-                    println("[cha] set sxState:%d", sxState);
+                    _sxState = SX_WAIT_FOR_preChargeDoneButStalled;
+                    println("[cha] set sxState:%d", _sxState);
                 }
 
-                if (sxState == SX_WAIT_FOR_preChargeDoneButStalled)
+                if (_sxState == SX_WAIT_FOR_preChargeDoneButStalled)
                 {
                     if (_preChargeDoneButStalled)
                     {
                         CloseAdapterContactor(); // will trigger complete of ccs precharge
-                        sxState = SX_WAIT_FOR_ccsCurrentDemand;
-                        println("[cha] set sxState:%d", sxState);
+                        _sxState = SX_WAIT_FOR_ccsCurrentDemand;
+                        println("[cha] set sxState:%d", _sxState);
                     }
                 }
-                else if (sxState == SX_WAIT_FOR_ccsCurrentDemand)
+                else if (_sxState == SX_WAIT_FOR_ccsCurrentDemand)
                 {
                     if (chademoInterface_ccsCurrentDemandPos() == 0)
                     {
-                        rampedRequestCurrent = _carData.RequestCurrent;
-                        sxState = SX_RAMP_UP_carDataRequestCurrent;
-                        println("[cha] set sxState:%d", sxState);
+                        _rampedRequestCurrent = _carData.RequestCurrent;
+                        _sxState = SX_RAMP_UP_carDataRequestCurrent;
+                        println("[cha] set sxState:%d", _sxState);
                     }
                 }
-                else if (sxState == SX_RAMP_UP_carDataRequestCurrent)
+                else if (_sxState == SX_RAMP_UP_carDataRequestCurrent)
                 {
                     // Ramp up 5A per cycle toward target
-                    rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
-                    _carData.RequestCurrent = rampedRequestCurrent;
+                    _rampedRequestCurrent = min(_rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
+                    _carData.RequestCurrent = _rampedRequestCurrent;
 
-                    if (rampedRequestCurrent >= carRequested)
+                    if (_rampedRequestCurrent >= carRequested)
                     {
-                        sxState = SX_DONE;
-                        println("[cha] set sxState:%d", sxState);
+                        _rampedRequestCurrent = 0; // done with it -> tidy
+                        _sxState = SX_DONE;
+                        println("[cha] set sxState:%d", _sxState);
                     }
                 }
             }
             else if (_dischargeEnabled)
             {
-                static int zeroOutputAmpsCycles = 0;
-                static int rampedRequestCurrent = 0;
-
                 bool isDischarging = false;
                 if (_chargerData.OutputCurrent == 0)
                 {
                     // zero amps for more than 3seconds -> assume discharging (the waiting may be pointless)
-                    if (zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
-                        zeroOutputAmpsCycles++;
+                    if (_zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
+                        _zeroOutputAmpsCycles++;
                     }
-                    if (zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
+                    if (_zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
                         isDischarging = true;
                     }
                 }
                 else
                 {
-                    zeroOutputAmpsCycles = 0;
+                    _zeroOutputAmpsCycles = 0;
                 }
 
                 if (isDischarging && not _isDischarging){
-                    rampedRequestCurrent = _carData.RequestCurrent; // we are discharging now, but was not before -> init rampedRequestCurrent 
+                    _rampedRequestCurrent = _carData.RequestCurrent; // we are discharging now, but was not before -> init rampedRequestCurrent 
                 }
                 COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
-
-                static int fakeOutputCurrentCycles = 0;
-                static bool fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
 
                 if (isDischarging)
                 {
@@ -663,9 +648,9 @@ void ChademoCharger::RunStateMachine()
                         _carData.MaxDischargeCurrent :
                         MAX_DISCHARGE_AMPS_FALLBACK; // no discharge message from car, use fallback
 
-                    rampedRequestCurrent = min(rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
+                    _rampedRequestCurrent = min(_rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
 
-                    _carData.RequestCurrent = rampedRequestCurrent;
+                    _carData.RequestCurrent = _rampedRequestCurrent;
 
                     // HACK: my car seems to time out after 6 minutes, if no current flows?
                     // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
@@ -674,21 +659,21 @@ void ChademoCharger::RunStateMachine()
                     // Dynamic control seems to be what keeps it alive more than 3 seconds in ChargingLoop,
                     // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
                     // So is it possible...that V2X can be implemented, completely without using the V2X messages?
-                    fakeOutputCurrentCycles++;
-                    if (not(fakeOutputCurrentOnce) || fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
+                    _fakeOutputCurrentCycles++;
+                    if (not(_fakeOutputCurrentOnce) || _fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
                     {
                         _chargerData.DischargeCurrent = 0;
                         _chargerData.OutputCurrent = 1;
 
-                        fakeOutputCurrentCycles = 0;
-                        fakeOutputCurrentOnce = true;
+                        _fakeOutputCurrentCycles = 0;
+                        _fakeOutputCurrentOnce = true;
                     }
                 }
                 else
                 {
                     // keep RemainingDischargeTime at 5, discharge indefinitely
                     _chargerData.DischargeCurrent = 0;
-                    fakeOutputCurrentCycles = 0;
+                    _fakeOutputCurrentCycles = 0;
                 }
             }
 
