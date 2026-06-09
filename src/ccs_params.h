@@ -67,6 +67,9 @@ struct ccs_params
             EvseMaxCurrent :
             EvseMaxCurrentInCurrentDemandRes;
     }
+
+    bool PowerRelayOn = false;
+    bool ConnectorLocked = false;
 };
 
 extern ccs_params _ccs_params;

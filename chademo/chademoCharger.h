@@ -214,10 +214,11 @@ enum class StopReason
     CHARGER_STATE(ChargingLoop) \
     CHARGER_STATE(Stopping_Start) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
+    CHARGER_STATE(Stopping_WaitToOpenAdapterContactor) \
+    CHARGER_STATE(Stopping_OpenAdapterContactor) \
     CHARGER_STATE(Stopping_WaitForSwitchKOff) \
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
     CHARGER_STATE(Stopping_SetSwitchD1Off) \
-    CHARGER_STATE(Stopping_WaitForLowVolts) \
     CHARGER_STATE(Stopping_UnlockChargingPlug) \
     CHARGER_STATE(End)
 
@@ -668,7 +669,7 @@ public:
     int GetCyclicOffset();
     bool IsPowerOffOk();
     bool PreChargeCompleted();
-    bool CarContactorsOpened();
+    bool AdapterContactorOpened();
     int GetChargingLoopPos();
     void UpdateChargerMessages();
     void HandlePendingCarMessages();
@@ -753,6 +754,7 @@ public:
         bool _chargingPlugLocked = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
+        bool _reportOutputVoltage = false;
         bool _d1 = false;
         bool _d2 = false;
         bool _adapterContactorClosed = false;
