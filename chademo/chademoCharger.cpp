@@ -713,10 +713,10 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
-            SetState(ChargerState::Stopping_WaitToOpenAdapterContactor);
+            SetState(ChargerState::Stopping_WaitForCcsPowerRelayOff);
         }
     }
-    else if (_state == ChargerState::Stopping_WaitToOpenAdapterContactor)
+    else if (_state == ChargerState::Stopping_WaitForCcsPowerRelayOff)
     {
         // Wait for hardwareInterface_setPowerRelayOff() being called, we mirror its state, but we can't wait for too long...
         if (not _ccs_params.PowerRelayOn || IsTimeoutSec(4))
