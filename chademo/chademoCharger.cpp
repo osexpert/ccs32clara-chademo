@@ -157,24 +157,17 @@ void ChademoCharger::HandlePendingCarMessages()
             println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetVoltage, _chargerData.AvailableOutputVoltage);
             set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
         }
+
         // XPeng update TargetVoltage after closing its contactors, (it seems) from real target (battery max at 4.2v) to the same as MaxVolt.
         // Why? I guess...they think it will give them faster charging? In any case, ignore changes to TargetVoltage after d2 is set
 		// TargetVoltage should normally never change, so alternative could be to snapshot it as soon as switch(k) is set. But this seemed easier.
-        else if (not _d2)
+        if (not _d2)
         {
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
         }
 
-        // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower that adapter max.
-        //if (_state == ChargerState::ChargingLoop && _msg102.m.RequestCurrent > _chargerData.MaxAvailableOutputCurrent)
-        //{
-        //    println("[cha] Car asking (%d) for more than max (%d) amps. Stopping.", _msg102.m.RequestCurrent, _chargerData.MaxAvailableOutputCurrent);
-        //    set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
-        //}
-        //else
-        {
-            _carData.RequestCurrent = _msg102.m.RequestCurrent;
-        }
+        // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower than adapter max.
+        _carData.RequestCurrent = _msg102.m.RequestCurrent;
 
         // soc and the constant both unstable before switch(k)
         if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
@@ -315,6 +308,11 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
             _carData.NomVoltOverride = 355; 
             override = true;
         }
+    }
+    else if (_carData.TargetVoltage == 336) // Peugeot iOn
+    {
+        _carData.NomVoltOverride = 310;
+        _carData.MaxVoltOverride = 336;
     }
 
     if (override)
