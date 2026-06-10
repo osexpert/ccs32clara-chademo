@@ -987,7 +987,6 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg201_isr.pair[1] = data[1];
         _msg201_pending = true;
     }
-    _global.canLifesign = true;
 }
 
 

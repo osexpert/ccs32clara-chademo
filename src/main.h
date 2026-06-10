@@ -54,7 +54,6 @@ struct global_data
     uint32_t auto_power_off_timer_count_up_ms = 0;
 
     bool ccsLifesign = false;
-    bool canLifesign = false;
 };
 
 extern global_data _global;
