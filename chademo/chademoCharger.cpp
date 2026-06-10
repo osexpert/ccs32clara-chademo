@@ -1095,8 +1095,7 @@ void ChademoCharger::UpdateChargerMessages()
     // ZE0 seems to hangs the second time, if discharge is enabled during discovery
     COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && not _discovery, "109.DischargeCompatible %d -> %d");
 
-    // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
-    uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
+    uint16_t outputVolt = _reportOutputVoltage ? _chargerData.OutputVoltage : 0;
     COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "109.OutputVoltage %d -> %d");
 
     uint8_t remainingChargingTime10s = 0;
