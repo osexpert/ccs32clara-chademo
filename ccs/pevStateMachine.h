@@ -16,7 +16,7 @@ extern void pevStateMachine_reset();
 
 // naming: _ccsXxx if the method is impemented in ccs. Else in chademo.
 extern bool chademoInterface_preChargeCompleted();
-extern bool chademoInterface_carContactorsOpened();
+extern bool chademoInterface_adapterContactorOpened();
 extern bool chademoInterface_ccsInStateEnd();
 extern bool chademoInterface_ccsChargingVoltageMirrorsTarget();
 extern bool chademoInterface_ccsChargingCurrentMirrorsTarget();

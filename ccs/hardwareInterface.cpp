@@ -38,11 +38,13 @@ bool hardwareInterface_getIsBatteryFull(void)
 void hardwareInterface_setPowerRelayOn(void)
 {
     println("hardwareInterface_setPowerRelayOn");
+    _ccs_params.PowerRelayOn = true;
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
     println("hardwareInterface_setPowerRelayOff");
+    _ccs_params.PowerRelayOn = false;
 }
 
 void hardwareInterface_setStateB(void)
@@ -57,23 +59,21 @@ void hardwareInterface_setStateC(void)
     DigIo::state_c_out_inverted.Clear();
 }
 
-static bool _connectorLocked = false;
-
 void hardwareInterface_lockConnector(void)
 {
     println("[ccs] Lock charging plug");
-    _connectorLocked = true;
+    _ccs_params.ConnectorLocked = true;
 }
 
 void hardwareInterface_unlockConnector(void)
 {
     println("[ccs] Unlock charging plug");
-    _connectorLocked = false;
+    _ccs_params.ConnectorLocked = false;
 }
 
 bool hardwareInterface_isConnectorLocked(void)
 {
-    return _connectorLocked;
+    return _ccs_params.ConnectorLocked;
 }
 
 bool hardwareInterface_stopChargeRequested()

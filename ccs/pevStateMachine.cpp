@@ -22,6 +22,7 @@
    STATE_ENTRY(WaitForCurrentDemandResponse, CurrentDemand, 5) /* Test with 5s timeout. Just experimental. The specified performance time is 25ms (ISO), the specified timeout 250ms. */\
    STATE_ENTRY(WaitForPowerDeliveryOffResponse, PowerDeliveryOff, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
    STATE_ENTRY(WaitForCurrentDownAfterStateB, CurrentDown, 60) \
+   STATE_ENTRY(WaitForPowerRelayOff, RelayOff, 60) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
@@ -975,11 +976,20 @@ static void stateFunctionWaitForCurrentDownAfterStateB(void)
         pev_DelayCycles--;
         return;
     }
-    if (chademoInterface_carContactorsOpened()) {
-        /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
+
+    /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
+    hardwareInterface_setPowerRelayOff();
+    setCheckpoint(850);
+    pev_enterState(PEV_STATE_WaitForPowerRelayOff);
+}
+
+static void stateFunctionWaitForPowerRelayOff(void)
+{
+    // Wait for chademo to ACK _ccs_params.ContactorClosed we sat in hardwareInterface_setPowerRelayOff()
+    if (chademoInterface_adapterContactorOpened())
+    {
         addToTrace(MOD_PEV, "Starting WeldingDetection");
-        hardwareInterface_setPowerRelayOff();
-        setCheckpoint(850);
+
         /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
         will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
         some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */

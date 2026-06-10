@@ -480,6 +480,7 @@ void ChademoCharger::RunStateMachine()
 
             println("[cha] Car contactors closed");
             _carData.CarContactorsClosed = true;
+            _reportOutputVoltage = true; // let car "see"  the charger voltage
 
             if (_global.CHADEMO_SX)
             {
@@ -709,7 +710,19 @@ void ChademoCharger::RunStateMachine()
             _chargerData.DischargeCurrent = 0;
             _chargerData.RemainingDischargeTime = 0;
 
+            // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
+
+            SetState(ChargerState::Stopping_WaitForCcsPowerRelayOff);
+        }
+    }
+    else if (_state == ChargerState::Stopping_WaitForCcsPowerRelayOff)
+    {
+        // Wait for hardwareInterface_setPowerRelayOff() being called, we mirror its state, but we can't wait for too long...
+        if (not _ccs_params.PowerRelayOn || IsTimeoutSec(4))
+        {
+            OpenAdapterContactor();
+            _reportOutputVoltage = false; // show 0 volt on CAN as well, regardless of chargers real output voltage
 
             if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0)
                 SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
@@ -750,18 +763,6 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD1(false);
 
-            SetState(ChargerState::Stopping_WaitForLowVolts);
-        }
-    }
-    else if (_state == ChargerState::Stopping_WaitForLowVolts)
-    {
-        // C-time <= 2.0s / T-time 4.0s
-        // cha spec says <= 10V but we need to play by ccs rules here. Seen some chargers never drop below 28V. Clara uses 40V.
-        // This check may be completely pointless?
-        if (_chargerData.OutputVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION || IsTimeoutSec(4))
-        {
-            OpenAdapterContactor();
-
             // stop CAN in later state to make sure we send this message to car before we kill CAN
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
 
@@ -770,6 +771,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_UnlockChargingPlug)
     {
+        // Unlock charging plug in own state, to make sure the car get the CAN message before power off (plug unlocked = power off ok)
     	UnlockChargingPlug();
 
         SetState(ChargerState::End);
@@ -807,14 +809,14 @@ bool chademoInterface_preChargeCompleted()
     return chademoCharger->PreChargeCompleted();
 }
 
-bool ChademoCharger::CarContactorsOpened()
+bool ChademoCharger::AdapterContactorOpened()
 {
-    return not _carData.CarContactorsClosed;
+    return not _adapterContactorClosed;
 }
 
-bool chademoInterface_carContactorsOpened()
+bool chademoInterface_adapterContactorOpened()
 {
-    return chademoCharger->CarContactorsOpened();
+    return chademoCharger->AdapterContactorOpened();
 }
 
 int ChademoCharger::GetChargingLoopPos()
@@ -985,7 +987,6 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg201_isr.pair[1] = data[1];
         _msg201_pending = true;
     }
-    _global.canLifesign = true;
 }
 
 
@@ -1094,8 +1095,7 @@ void ChademoCharger::UpdateChargerMessages()
     // ZE0 seems to hangs the second time, if discharge is enabled during discovery
     COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && not _discovery, "109.DischargeCompatible %d -> %d");
 
-    // real outVolt after car contactors close. Before this, use the simulated volt (currently always 0).
-    uint16_t outputVolt = _state > ChargerState::WaitForCarContactorsClosed ? _chargerData.OutputVoltage : 0;
+    uint16_t outputVolt = _reportOutputVoltage ? _chargerData.OutputVoltage : 0;
     COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "109.OutputVoltage %d -> %d");
 
     uint8_t remainingChargingTime10s = 0;
