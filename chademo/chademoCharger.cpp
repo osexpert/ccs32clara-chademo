@@ -555,7 +555,7 @@ void ChademoCharger::RunStateMachine()
 
             if (chademoInterface_ccsChargingVoltageMirrorsTarget())
             {
-                // All(?) dischargers and one(?) charger mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviation volts error.
+                // All(?) portable dischargers mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviating volts error.
                 _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                 _chargerData.OutputVoltageIsEstimated = true;
             }
