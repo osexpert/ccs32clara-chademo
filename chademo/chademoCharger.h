@@ -215,7 +215,6 @@ enum class StopReason
     CHARGER_STATE(Stopping_Start) \
     CHARGER_STATE(Stopping_WaitForSwitchKOff) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
-
     CHARGER_STATE(Stopping_WaitForCcsPowerRelayOff) \
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
     CHARGER_STATE(Stopping_SetSwitchD1Off) \
