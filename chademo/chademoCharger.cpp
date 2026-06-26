@@ -691,12 +691,23 @@ void ChademoCharger::RunStateMachine()
     {
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
-        SetState(ChargerState::Stopping_WaitForLowAmps);
+        SetState(ChargerState::Stopping_WaitForSwitchKOff);
+    }
+    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
+    {
+        // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
+        // Chademo 2.0 -> no need to wait for switch(k) to be off, before checking OutputCurrent <= 5 and clearing ChargerStatus::CHARGING.
+        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use switch(k) as synchronization point for the 4 second wait, until clearing D2.
+        if (not(_carData.Switch_k) || IsTimeoutSec(4))
+        {
+            SetState(ChargerState::Stopping_WaitForLowAmps);
+        }
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
     {
-        // Spec: C-time: 0.5 seconds timeout from Switch_k cleared to OutputCurrent <= 5. Car timeout after switch(k): 2.5 seconds.
-        // For the charger, no timeout is specified (failure to drop amps is not an option), but lets use 10 sec.
+        // For charger: C-time: 0.5 seconds from Switch_k cleared to OutputCurrent <= 5. But what is the timeout time?
+        // For car: timeout after switch(k) is cleared and waiting for ChargerStatus::CHARGING cleared: 2.5 seconds.
+        // For charger, I guess failure to drop amps is not an option, so maybe thats why I can't see any, but lets use 10 sec...
         if (_chargerData.OutputCurrent <= 5 || IsTimeoutSec(10))
         {
             _chargerData.RemainingChargeTimeCycles = 0;
@@ -719,28 +730,17 @@ void ChademoCharger::RunStateMachine()
         // Wait for hardwareInterface_setPowerRelayOff() being called, we mirror its state, but we can't wait for too long...
         if (not _ccs_params.PowerRelayOn || IsTimeoutSec(4))
         {
+            // Charger should drop volts during the car's welding detection.
             OpenAdapterContactor();
             _reportOutputVoltage = false; // show 0 volt on CAN as well, regardless of chargers real output voltage
 
-            if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0)
-                SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
-            else
-                SetState(ChargerState::Stopping_WaitForSwitchKOff);
-        }
-    }
-    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
-    {
-        // Spec: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
-        // Chademo 2.0 -> no need to wait for switch(k) to be off, before checking OutputCurrent <= 5 and clearing ChargerStatus::CHARGING.
-        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use switch(k) as synchronization point for the 4 second wait, until clearing D2.
-        if (not(_carData.Switch_k) || IsTimeoutSec(4))
-        {
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        // C-time <= 4.0s / T-time 10.0s (after Switch(k) cleared)
+        // C-time <= 4.0s / T-time 10.0s, after Switch(k) cleared.
+        // For simplicity, I ignore the "after Switck(k)" part.
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
             || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4))
             || IsTimeoutSec(10))
