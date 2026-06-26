@@ -691,17 +691,7 @@ void ChademoCharger::RunStateMachine()
     {
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
-        SetState(ChargerState::Stopping_WaitForSwitchKOff);
-    }
-    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
-    {
-        // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
-        // Chademo 2.0 -> no need to wait for switch(k) to be off, before checking OutputCurrent <= 5 and clearing ChargerStatus::CHARGING.
-        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use switch(k) as synchronization point for the 4 second wait, until clearing D2.
-        if (not(_carData.Switch_k) || IsTimeoutSec(4))
-        {
-            SetState(ChargerState::Stopping_WaitForLowAmps);
-        }
+        SetState(ChargerState::Stopping_WaitForLowAmps);
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
     {
@@ -722,6 +712,16 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
+            SetState(ChargerState::Stopping_WaitForSwitchKOff);
+        }
+    }
+    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
+    {
+        // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
+        // Chademo 2.0 -> no need to wait for switch(k) to be off, before checking OutputCurrent <= 5 and clearing ChargerStatus::CHARGING.
+        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use switch(k) as synchronization point for the 4 second wait, until clearing D2.
+        if (not(_carData.Switch_k) || IsTimeoutSec(4))
+        {
             SetState(ChargerState::Stopping_WaitForCcsPowerRelayOff);
         }
     }
