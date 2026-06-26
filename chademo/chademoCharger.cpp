@@ -709,7 +709,7 @@ void ChademoCharger::RunStateMachine()
             _chargerData.DischargeCurrent = 0;
             _chargerData.RemainingDischargeTime = 0;
 
-            // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection
+            // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k))
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
             SetState(ChargerState::Stopping_WaitForSwitchKOff);
@@ -718,7 +718,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
     {
         // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
-        // Chademo 2.0 -> no need to wait for switch(k) to be off, before checking OutputCurrent <= 5 and clearing ChargerStatus::CHARGING.
+        // Chademo 2.0: clearing ChargerStatus::CHARGING is allowed to perform before Switch_k is cleared. I think 1.0 is the same, and that this is just a clarification.
         // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use switch(k) as synchronization point for the 4 second wait, until clearing D2.
         if (not(_carData.Switch_k) || IsTimeoutSec(4))
         {
