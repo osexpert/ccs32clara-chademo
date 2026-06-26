@@ -185,9 +185,9 @@ static void msleep(uint32_t delay)
 
 int battery_level_from_voltage(float voltage)
 {
-    if (voltage >= 3.9f) return 3;
-    if (voltage >= 3.6f) return 2;
-    return 1;
+    if (voltage >= 3.9f) return 3; // ~75–100%
+    if (voltage >= 3.6f) return 2; // ~25–75%
+    return 1; // ~0–25%
 }
 
 static float adc_3_3_volt = 0.0f;
