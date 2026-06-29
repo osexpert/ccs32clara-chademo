@@ -291,6 +291,23 @@ struct msg102
     };
 };
 
+// Battery Voltage
+struct msg103
+{
+    union {
+        struct {
+            uint16_t BatteryVoltage;
+            uint8_t Unused2;
+            uint8_t Unused3;
+            uint8_t Unused4;
+            uint8_t Unused5;
+            uint8_t Unused6;
+            uint8_t Unused7;
+        } m;
+        uint8_t bytes[8];
+        uint32_t pair[2];
+    };
+};
 
 // Car extension
 struct msg110
@@ -772,6 +789,8 @@ public:
         msg101 _msg101_isr = {};
         volatile bool _msg102_pending = false;
         msg102 _msg102_isr = {};
+        volatile bool _msg103_pending = false;
+        msg103 _msg103_isr = {};
         volatile bool _msg110_pending = false;
         msg110 _msg110_isr = {};
         volatile bool _msg200_pending = false;

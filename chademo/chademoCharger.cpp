@@ -88,6 +88,7 @@ void ChademoCharger::HandlePendingCarMessages()
     static msg100 _msg100 = {};
     static msg101 _msg101 = {};
     static msg102 _msg102 = {};
+    static msg103 _msg103 = {};
     static msg110 _msg110 = {};
     static msg200 _msg200 = {};
     static msg201 _msg201 = {};
@@ -198,6 +199,15 @@ void ChademoCharger::HandlePendingCarMessages()
         }
 
         _msg102_recieved = true;
+    }
+    if (_msg103_pending)
+    {
+        _msg103_pending = false;
+
+        COMPARE_SET(_msg103.m.BatteryVoltage, _msg103_isr.m.BatteryVoltage, "103.BatteryVoltage %d -> %d");
+
+        _carData.EstimatedBatteryVoltage = _msg103.m.BatteryVoltage;
+        _carData.EstimatedBatteryVoltageSet = true;
     }
     if (_msg110_pending)
     {
@@ -966,6 +976,12 @@ void ChademoCharger::HandleCanMessageIsr(uint32_t id, uint32_t data[2])
         _msg102_isr.pair[0] = data[0];
         _msg102_isr.pair[1] = data[1];
         _msg102_pending = true;
+    }
+    else if (id == 0x103)
+    {
+        _msg103_isr.pair[0] = data[0];
+        _msg103_isr.pair[1] = data[1];
+        _msg103_pending = true;
     }
     else if (id == 0x110)
     {
