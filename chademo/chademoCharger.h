@@ -560,6 +560,7 @@ struct CarData
 
     uint16_t EstimatedBatteryVoltage;
     bool EstimatedBatteryVoltageSet = false;
+    bool EstimatedBatteryVoltageOverride = false;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 

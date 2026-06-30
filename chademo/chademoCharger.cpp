@@ -188,14 +188,16 @@ void ChademoCharger::HandlePendingCarMessages()
             // now that TargetVoltage is stable, set overrides, if any
             SetBatteryVoltOverridesOnce();
 
-            _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
-                _carData.SocPercent, 
-                _carData.NomVoltOverride, 
-                _carData.MaxVoltOverride,
-                _carData.AdjustBelowSoc, 
-                _carData.AdjustBelowFactor);
+            if (not _carData.EstimatedBatteryVoltageOverride) {
+                _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
+                    _carData.SocPercent, 
+                    _carData.NomVoltOverride, 
+                    _carData.MaxVoltOverride,
+                    _carData.AdjustBelowSoc, 
+                    _carData.AdjustBelowFactor);
 
-            _carData.EstimatedBatteryVoltageSet = true;
+                _carData.EstimatedBatteryVoltageSet = true;
+            }
         }
 
         _msg102_recieved = true;
@@ -208,6 +210,7 @@ void ChademoCharger::HandlePendingCarMessages()
 
         _carData.EstimatedBatteryVoltage = _msg103.m.BatteryVoltage;
         _carData.EstimatedBatteryVoltageSet = true;
+        _carData.EstimatedBatteryVoltageOverride = true;
     }
     if (_msg110_pending)
     {
