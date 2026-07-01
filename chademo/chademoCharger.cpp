@@ -152,12 +152,6 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
-        if (_state == ChargerState::ChargingLoop && _msg102.m.TargetVoltage > _chargerData.AvailableOutputVoltage)
-        {
-            println("[cha] Car asking (%d) for more than max (%d) volts. Stopping.", _msg102.m.TargetVoltage, _chargerData.AvailableOutputVoltage);
-            set_flag(&_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR); // let error handler deal with it
-        }
-
         // XPeng update TargetVoltage after closing its contactors, (it seems) from real target (battery max at 4.2v) to the same as MaxVolt.
         // Why? I guess...they think it will give them faster charging? In any case, ignore changes to TargetVoltage after d2 is set
 		// TargetVoltage should normally never change, so alternative could be to snapshot it as soon as switch(k) is set. But this seemed easier.
@@ -348,17 +342,13 @@ void ChademoCharger::RunStateMachine()
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reason
-        // STOP_BEFORE_CHARGING seems unreliable. At least some E-NV200 24kWh 2015 set this flag for no apperant reason, and still seem to work...
-        //if (has_flag(_carData.Status, CarStatus::STOP_BEFORE_CHARGING)) set_flag(&stopReason, StopReason::CAR_STOP_BEFORE_CHARGING);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reason
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR)) set_flag(&stopReason, StopReason::CHARGING_SYSTEM_ERROR);
         if (has_flag(_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE)) set_flag(&stopReason, StopReason::BATTERY_INCOMPATIBLE);
 
         if (stopReason != StopReason::NONE)
         {
-            println("[cha] Stopping before starting");
+            println("[cha] Stopping before ChargingLoop");
             SetState(ChargerState::Stopping_Start, stopReason);
         }
 
@@ -541,8 +531,6 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reasons
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGING_SYSTEM_ERROR)) set_flag(&stopReason, StopReason::CHARGING_SYSTEM_ERROR);
-        if (has_flag(_chargerData.Status, ChargerStatus::CHARGER_ERROR)) set_flag(&stopReason, StopReason::CHARGER_ERROR);
         if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
         if (stopReason != StopReason::NONE)
@@ -709,7 +697,7 @@ void ChademoCharger::RunStateMachine()
             _chargerData.DischargeCurrent = 0;
             _chargerData.RemainingDischargeTime = 0;
 
-            // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k))
+            // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
             SetState(ChargerState::Stopping_WaitForSwitchKOff);
@@ -739,8 +727,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        // C-time <= 4.0s / T-time 10.0s, after Switch(k) cleared.
-        // For simplicity, I ignore the "after Switck(k)" part.
+        // C-time <= 4.0s / T-time 10.0s, after Switch(k) cleared?
         if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
             || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4))
             || IsTimeoutSec(10))
