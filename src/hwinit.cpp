@@ -162,8 +162,6 @@ void can_setup(void) {
         true                // Enable filter
     );
 
-#if true
-
     // Match 0x200 and 0x201
     can_filter_id_mask_32bit_init(
         1,              // Filter bank 1
@@ -173,7 +171,6 @@ void can_setup(void) {
         true
     );
 
-#endif
 
     // FIFO Message Pending Interrupt Enable (FIFO 0) (RX)
     can_enable_irq(CAN1, CAN_IER_FMPIE0);

@@ -457,9 +457,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE)) // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // chademo 0.9 (and earlier) did not have the flag, wait 2 seconds (spec: compliance time 2 seconds). TODO: AI suggest maybe to use 3 seconds, for slower cars.
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(2))
+        if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
+            not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
+            HasElapsedSec(2) // chademo 0.9 (and earlier) did not have the flag, wait 2 seconds (spec: compliance time 2 seconds). TODO: AI suggest maybe to use 3 seconds, for slower cars.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
@@ -728,9 +728,10 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
         // C-time <= 4.0s / T-time 10.0s, after Switch(k) cleared?
-        if ((_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 && has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE))
-            || (_carData.ProtocolNumber < ProtocolNumber::Chademo_1_0 && HasElapsedSec(4))
-            || IsTimeoutSec(10))
+        if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
+            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || IsTimeoutSec(10)) :
+            HasElapsedSec(4)
+            )
         {
             // welding detection done & car contactors open
             _carData.CarContactorsClosed = false;
