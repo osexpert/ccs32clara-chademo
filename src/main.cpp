@@ -429,8 +429,8 @@ static void print_ccs_trace()
             _ccs_params.EvseMaxVoltage,
             _ccs_params.EvseMaxCurrent,
             _ccs_params.EvseMaxCurrentInCurrentDemandRes,
-            chademoInterface_ccsChargingVoltageMirrorsTarget(),
-            chademoInterface_ccsChargingCurrentMirrorsTarget(),
+            chademoInterface_ccsPresentVoltageMirrorsTarget(),
+            chademoInterface_ccsPresentCurrentMirrorsTarget(),
             // car
             _ccs_params.TargetCurrent,
             _ccs_params.TargetVoltage,

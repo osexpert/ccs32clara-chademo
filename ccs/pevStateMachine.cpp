@@ -86,11 +86,11 @@ static int LastTargetCurrent;
 static bool PrechargeDifferenceIsSmall;
 static uint8_t numberOfWeldingDetectionRounds;
 
-static bool ChargingVoltageDifferentFromTarget;
-static bool ChargingVoltageDifferentFromTarget_isSet;
+static bool PresentVoltageDifferentFromTarget;
+static bool PresentVoltageDifferentFromTarget_isSet;
 
-static bool ChargingCurrentDifferentFromTarget;
-static bool ChargingCurrentDifferentFromTarget_isSet;
+static bool PresentCurrentDifferentFromTarget;
+static bool PresentCurrentDifferentFromTarget_isSet;
 
 static bool ChargeParameterDiscoveryCompletedTrigger;
 
@@ -287,8 +287,8 @@ static void pev_sendPowerDeliveryReq(bool isOn)
     if (isOn) {
         // reset if set from previous session
         LastCurrentDemandResPresentVoltage = 0;
-        ChargingVoltageDifferentFromTarget = ChargingVoltageDifferentFromTarget_isSet = false;
-        ChargingCurrentDifferentFromTarget = ChargingCurrentDifferentFromTarget_isSet = false;
+        PresentVoltageDifferentFromTarget = PresentVoltageDifferentFromTarget_isSet = false;
+        PresentCurrentDifferentFromTarget = PresentCurrentDifferentFromTarget_isSet = false;
     }
 
     projectExiConnector_prepare_DinExiDocument();
@@ -928,11 +928,11 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
                 _ccs_params.EvseCurrent = evsePresentCurrent;
                 LastCurrentDemandResPresentVoltage = evsePresentVoltage;
 
-                if (evsePresentVoltage != LastTargetVoltage) ChargingVoltageDifferentFromTarget = true;
-                ChargingVoltageDifferentFromTarget_isSet = true;
+                if (evsePresentVoltage != LastTargetVoltage) PresentVoltageDifferentFromTarget = true;
+                PresentVoltageDifferentFromTarget_isSet = true;
 
-                if (evsePresentCurrent != LastTargetCurrent) ChargingCurrentDifferentFromTarget = true;
-                ChargingCurrentDifferentFromTarget_isSet = true;
+                if (evsePresentCurrent != LastTargetCurrent) PresentCurrentDifferentFromTarget = true;
+                PresentCurrentDifferentFromTarget_isSet = true;
 
                 setCheckpoint(710);
                 pev_sendCurrentDemandReq();
@@ -1215,12 +1215,12 @@ bool chademoInterface_ccsInStateEnd() {
     return pev_state == PEV_STATE_End;
 }
 
-bool chademoInterface_ccsChargingVoltageMirrorsTarget() {
-    return ChargingVoltageDifferentFromTarget_isSet && not ChargingVoltageDifferentFromTarget;
+bool chademoInterface_ccsPresentVoltageMirrorsTarget() {
+    return PresentVoltageDifferentFromTarget_isSet && not PresentVoltageDifferentFromTarget;
 }
 
-bool chademoInterface_ccsChargingCurrentMirrorsTarget() {
-    return ChargingCurrentDifferentFromTarget_isSet && not ChargingCurrentDifferentFromTarget;
+bool chademoInterface_ccsPresentCurrentMirrorsTarget() {
+    return PresentCurrentDifferentFromTarget_isSet && not PresentCurrentDifferentFromTarget;
 }
 
 bool chademoInterface_ccsInStateWaitForPreChargeStart() {

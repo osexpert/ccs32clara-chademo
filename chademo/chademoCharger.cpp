@@ -541,9 +541,9 @@ void ChademoCharger::RunStateMachine()
         {
             const int RAMP_AMPS_PER_STEP = 5; // Increase by 5A every 100ms (50A per second)
 
-            if (chademoInterface_ccsChargingVoltageMirrorsTarget())
+            if (chademoInterface_ccsPresentVoltageMirrorsTarget())
             {
-                // All(?) portable dischargers mirror TargetVoltage->OutputVoltage. Chademo does not like this and will give deviating volts error.
+                // All(?) portable dischargers mirror TargetVoltage -> PresentVoltage. Chademo does not like this and will give deviating volts error.
                 _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
                 _chargerData.OutputVoltageIsEstimated = true;
             }
