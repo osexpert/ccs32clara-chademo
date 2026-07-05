@@ -31,8 +31,7 @@ uint8_t hardwareInterface_getSoc(void)
 
 bool hardwareInterface_getIsBatteryFull(void)
 {
-    // Chademo: it make more sense that charger or the car should decide when to stop, and not the adapter?
-    return _ccs_params.soc == 100;
+    return _ccs_params.soc >= SOC_STOP_CHARGING;
 }
 
 void hardwareInterface_setPowerRelayOn(void)
