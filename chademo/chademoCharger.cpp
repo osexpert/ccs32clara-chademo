@@ -423,7 +423,7 @@ void ChademoCharger::RunStateMachine()
             else
             {
                 LockChargingPlug();
-                set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
+                set_flag(&_chargerData.Status, ChargerStatus::ENERGIZING);
 
                 SetState(ChargerState::WaitForPreChargeDone);
             }
@@ -458,11 +458,11 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
-            not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            HasElapsedSec(2) // chademo 0.9 (and earlier) did not have the flag, wait 2 seconds (spec: compliance time 2 seconds). TODO: AI suggest maybe to use 3 seconds, for slower cars.
+            not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
+            HasElapsedSec(2) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when, but this adapter doesn't have a voltmeter.
             )
         {
-            // Car seems to demand 0 volt at the inlet when D2=true, else it wont close contactors.
+            // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
@@ -481,7 +481,7 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::WaitForCarRequestCurrent);
         }
-        // Spec: max 4 seconds from set D2 to CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE cleared
+        // Spec: max 4 seconds from set D2 to CONTACTOR_OPEN cleared
         else if (IsTimeoutSec(4))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
@@ -498,7 +498,7 @@ void ChademoCharger::RunStateMachine()
 
             SetState(ChargerState::ChargingLoop);
         }
-        // Spec: max 4 seconds from CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE cleared to RequestCurrent > 0
+        // Spec: max 4 seconds from CONTACTOR_OPEN cleared to RequestCurrent > 0
         else if (IsTimeoutSec(4))
         {
             SetState(ChargerState::Stopping_Start, StopReason::TIMEOUT);
@@ -707,7 +707,7 @@ void ChademoCharger::RunStateMachine()
     {
         // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
         // Chademo 2.0: clearing ChargerStatus::CHARGING is allowed to perform before Switch_k is cleared. I think 1.0 is the same, and that this is just a clarification.
-        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE, it can make sense to use switch(k) as synchronization point for the 4 second wait, until clearing D2.
+        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN, it can make sense to use switch(k) as synchronization point for start of the (4sec fixed duration) welding detection.
         if (not(_carData.Switch_k) || IsTimeoutSec(4))
         {
             SetState(ChargerState::Stopping_WaitForCcsPowerRelayOff);
@@ -729,7 +729,7 @@ void ChademoCharger::RunStateMachine()
     {
         // C-time <= 4.0s / T-time 10.0s, after Switch(k) cleared?
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
-            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE) || IsTimeoutSec(10)) :
+            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) :
             HasElapsedSec(4)
             )
         {
@@ -750,7 +750,7 @@ void ChademoCharger::RunStateMachine()
             SetSwitchD1(false);
 
             // stop CAN in later state to make sure we send this message to car before we kill CAN
-            clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING_OR_PLUG_LOCKED);
+            clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING);
 
             SetState(ChargerState::Stopping_UnlockChargingPlug);
         }

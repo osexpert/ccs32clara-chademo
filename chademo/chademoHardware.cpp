@@ -40,7 +40,7 @@ bool ChademoCharger::GetSwitchK()
 /// Having a voltage on the wire, the car complains, go into turtle mode, and require clearing of DTC!
 /// It may be possible it can work without ensuring 0 volt using a contactor, but not sure how.
 /// 
-/// Looking at can-logs it seem car often close contactor (CAR_STATUS_CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = false)
+/// Looking at can-logs it seem car often close contactor (CarStatus::CONTACTOR_OPEN = false)
 /// at high voltages, BUT chargers may use similar tricks...and actually presenting 0 volt on the wire when they set D2=true,
 /// even thou CAN says otherwise... We can not know since we do not have D2 in the can-log, nor the real voltage.
 /// </summary>

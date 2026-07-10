@@ -25,7 +25,7 @@
 // Default SOC% at which the adapter will stop charging
 #define SOC_STOP_CHARGING 100
 
-// just some value seen in can logs.. seen 10, 15. Some say car will allow 10A deviation from what you say? So if we always say we use 10A, we can use anything between 0-20A? 
+// Just some value seen in can logs.. seen 10, 15. Some say car will allow 10A deviation from what you say? So if we always say we use 10A, we can use anything between 0-20A? 
 // For any current above 20A then need real measured amps? Try 40.
 #define MAX_DISCHARGE_AMPS_FALLBACK 40
 

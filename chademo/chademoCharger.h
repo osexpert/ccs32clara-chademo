@@ -113,9 +113,9 @@ enum CarStatus
     /// Car initially send 0 here. If charger >= chademo 1.0, car changes to 1 (open) as soon as it discovers.
     /// If charger say it is < chademo 1.0, car keep this flag as 0 (AFAICS).
     /// 
-    /// Set to 0 when the vehicle relay is closed (start) and set to 1 after the termination of welding detection (end)
+    /// 0 when the vehicle relay is closed, 1 when relay is opened and welding detection (if any) is done.
     /// </summary>
-    CONTACTOR_OPEN_OR_WELDING_DETECTION_DONE = 0x8,
+    CONTACTOR_OPEN = 0x8,
    
     /// <summary>
     /// 102.5.4 Normal stop request before charging
@@ -146,7 +146,7 @@ enum ChargerStatus
 {
     /// <summary>
     /// 109.5.0
-    /// during rundown: This is tied 1:1 with OutputCurrent > 0. Meaning we can be stopped, but still charging since amps > 0.
+    /// During rundown: This is tied 1:1 with OutputCurrent > 0. Meaning we can be stopped, but still charging since amps > 0.
     /// During startup, CHARGER_STATUS_CHARGING is set and then amps are still 0.
     /// 0: standby 1: charging (power transfer from charger)
     /// </summary>
@@ -160,13 +160,14 @@ enum ChargerStatus
 
     /// <summary>
     /// 109.5.2
-    /// connector is currently locked. In later spec, it is only refered to as Energizing state (OutputVoltage > 10 volt)
+    /// Energizing state. The charger is outputing voltage (OutputVoltage > 10 volt).
+    /// Implies the charger has locked the plug.
     /// </summary>
-    ENERGIZING_OR_PLUG_LOCKED = 0x4,
+    ENERGIZING = 0x4,
 
     /// <summary>
     /// 109.5.3
-    /// parameters between vehicle and charger not compatible
+    /// Parameters between vehicle and charger not compatible
     /// </summary>
     BATTERY_INCOMPATIBLE = 0x8,
 
@@ -179,7 +180,7 @@ enum ChargerStatus
 
     /// <summary>
     /// 109.5.5
-    /// charger is stopped (charger shutdown or end of charging). this is also initially set to stop, before charging.
+    /// Charger is stopped (charger shutdown or end of charging). This is also initially set to stop, before charging.
     /// </summary>
     STOPPED = 0x20,
 };
