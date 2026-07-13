@@ -551,6 +551,8 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
+    uint8_t MaxRequestCurrentBeforeD2;
+
 //#ifdef CHADEMO_SINGLE_X
     // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
     uint8_t SocPercent = 20;
@@ -595,7 +597,7 @@ struct CarData
     /// It may be that all chademo cars support it, even thou the spec disagrees.
     /// But based on discovering this, we can possibly change this to always return true.
     /// </summary>
-    bool DynamicControl() const
+    bool HasDynamicControl() const
     {
         // Try to pretent all cars allows it (even thou some may not respect it, it should not matter)
         return true;// has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);

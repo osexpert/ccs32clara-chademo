@@ -158,6 +158,8 @@ void ChademoCharger::HandlePendingCarMessages()
         if (not _d2)
         {
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
+
+            _carData.MaxRequestCurrentBeforeD2 = max(_carData.MaxRequestCurrentBeforeD2, _msg102.m.RequestCurrent);
         }
 
         // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower than adapter max.
@@ -445,7 +447,7 @@ void ChademoCharger::RunStateMachine()
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
-            println("[cha] Car progressing to ChargingLoop in its own time");
+            println("[cha] Car progressing to ChargingLoop in its own time. MaxRequestCurrentBeforeD2:%d", _carData.MaxRequestCurrentBeforeD2);
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
@@ -459,7 +461,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            HasElapsedSec(2) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when, but this adapter doesn't have a voltmeter.
+            (_carData.RequestCurrent > _carData.MaxRequestCurrentBeforeD2 || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when, but this adapter doesn't have a voltmeter.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
@@ -861,7 +863,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
     // we adjust ChaAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
     // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
     // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.DynamicControl())
+    if (_carData.HasDynamicControl())
     {
         if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS)
             _chargerData.ChaAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
