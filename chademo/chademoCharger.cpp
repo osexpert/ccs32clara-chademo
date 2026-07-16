@@ -141,7 +141,14 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg102.m.ProtocolNumber, _msg102_isr.m.ProtocolNumber, "102.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg102.m.TargetVoltage, _msg102_isr.m.TargetVoltage, "102.TargetVoltage %d -> %d");
+
+        if (_msg102_isr.m.RequestCurrent > _msg102.m.RequestCurrent)
+            _carData.RequestCurrentIncreasing = true;
+        else if (_msg102_isr.m.RequestCurrent < _msg102.m.RequestCurrent)
+            _carData.RequestCurrentIncreasing = false;
+
         COMPARE_SET(_msg102.m.RequestCurrent, _msg102_isr.m.RequestCurrent, "102.RequestCurrent %d -> %d");
+
         COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%02x -> 0x%02x");
         COMPARE_SET_X2(_msg102.m.Status, _msg102_isr.m.Status, "102.Status %08b (0x%02x) -> %08b (0x%02x)");
         COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "102.SocPercent %d -> %d");
@@ -461,7 +468,8 @@ void ChademoCharger::RunStateMachine()
     {
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            (_carData.RequestCurrent > _carData.MaxRequestCurrentBeforeD2 || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when, but this adapter doesn't have a voltmeter.
+            // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
+            (_carData.RequestCurrent > _carData.MaxRequestCurrentBeforeD2 || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
@@ -554,12 +562,12 @@ void ChademoCharger::RunStateMachine()
                 _chargerData.OutputVoltage += GetCyclicOffset();
             }
 
+            uint8_t originalRequestCurrent = _carData.RequestCurrent;
+
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (_global.CHADEMO_SX && _sxState != SX_DONE)
             {
                 _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10
-                int carRequested = _carData.RequestCurrent;
-                _carData.RequestCurrent = 1; // fake 1A request for ccs
 
                 if (_sxState == SX_INITIAL)
                 {
@@ -578,6 +586,7 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (_sxState == SX_WAIT_FOR_ccsCurrentDemand)
                 {
+                    _carData.RequestCurrent = 1; // fake 1A towards ccs
                     if (chademoInterface_ccsCurrentDemandPos() == 0)
                     {
                         _rampedRequestCurrent = _carData.RequestCurrent;
@@ -587,11 +596,11 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (_sxState == SX_RAMP_UP_carDataRequestCurrent)
                 {
-                    // Ramp up 5A per cycle toward target
-                    _rampedRequestCurrent = min(_rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
+                    // Ramp up 5A per cycle, toward ccs
+                    _rampedRequestCurrent = min<int>(_rampedRequestCurrent + RAMP_AMPS_PER_STEP, _carData.RequestCurrent);
                     _carData.RequestCurrent = _rampedRequestCurrent;
 
-                    if (_rampedRequestCurrent >= carRequested)
+                    if (_rampedRequestCurrent >= _carData.RequestCurrent)
                     {
                         _rampedRequestCurrent = 0; // done with it -> tidy
                         _sxState = SX_DONE;
@@ -674,6 +683,13 @@ void ChademoCharger::RunStateMachine()
             if (not _isDischarging && _chargerData.OutputCurrent == 0)
             {
                 _chargerData.OutputCurrent = 1;
+            }
+
+            // jedemo stop 1s after starting to request current, if {some unknown condition} is not met. I am guessing, it only allows a small deviation between RequestCurrent and OutputCurrent?
+            // So try to fake OutputCurrent = RequestCurrent (until the charger is catching up)
+            if (not _isDischarging && _chargerData.OutputCurrent < 10 && _carData.RequestCurrentIncreasing)
+            {
+                _chargerData.OutputCurrent = min((uint8_t)10, originalRequestCurrent);
             }
         }
     }

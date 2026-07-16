@@ -592,6 +592,8 @@ struct CarData
 
     bool CarContactorsClosed = false;
 
+    bool RequestCurrentIncreasing = false;
+
     /// <summary>
     /// return true if car allows changing available current during charging (and not only allows, but also take it into account)
     /// It may be that all chademo cars support it, even thou the spec disagrees.
@@ -799,7 +801,7 @@ public:
         ChargerData _chargerData = {};
 
         int _sxState = SX_INITIAL;
-        int _rampedRequestCurrent = 0;
+        uint8_t _rampedRequestCurrent = 0;
         bool _fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
         int _fakeOutputCurrentCycles = 0;
         int _zeroOutputAmpsCycles = 0;
