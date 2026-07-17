@@ -516,6 +516,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
+        static const uint8_t CHADEMO_FAKE_IDLE_CURRENT = 1; // Fake output current towards the car. May need to use 5?
+
         _global.auto_power_off_timer_count_up_ms = 0;
 
         if (_chargerData.OutputCurrent > 0)
@@ -563,8 +565,8 @@ void ChademoCharger::RunStateMachine()
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (_global.CHADEMO_SX && _sxState != SX_DONE)
             {
-                _chargerData.ChaAvailableOutputCurrent = 1; // temporarely limit to 1 (make car ask for only 1A) but does the car like this??? May need to use 5,6 or 10.
-                _chargerData.OutputCurrent = 1; // fake 1A towards the car
+                _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // temporarely limit (make car ask for less)
+                _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // fake towards the car
 
                 if (_sxState == SX_INITIAL)
                 {
@@ -621,8 +623,7 @@ void ChademoCharger::RunStateMachine()
                         _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
 
                         // V2X unit use our request amps as a "sign" of how much we (the car) can discharge.
-                        // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so,
-                        // so fake a RequestCurrent to max allowed.
+                        // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so, so fake a RequestCurrent to max allowed.
                         // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
                         int maxDischargeAmps = _carData.MaxDischargeCurrentSet ?
                             _carData.MaxDischargeCurrent :
@@ -630,12 +631,12 @@ void ChademoCharger::RunStateMachine()
 
                         _carData.RequestCurrent = maxDischargeAmps;
 
-                        // HACK: my car time out after 6 minutes, if OutputCurrent = 0, so tickle OutputCurrent every minute to keep it alive.
+                        // My car time out after 6 minutes, if OutputCurrent = 0, so tickle OutputCurrent every minute to keep it alive.
 	                    // I wonder what purpose the Chademo discharge messages has, because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless, if OutputCurrent = 0 .
                         if (_fakeOutputCurrentCycles++ >= FAKE_OUTPUT_CURRENT_INTERVAL)
                         {
                             _chargerData.DischargeCurrent = 0;
-                            _chargerData.OutputCurrent = 1;
+                            _chargerData.OutputCurrent = 1; // tickle 1A
 
                             _fakeOutputCurrentCycles = 0;
                         }
@@ -654,9 +655,8 @@ void ChademoCharger::RunStateMachine()
                 // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
                 if (not _isDischarging && _chargerData.OutputCurrent == 0)
                 {
-                    _chargerData.ChaAvailableOutputCurrent = 1; // temporarely limit to 1 (make car ask for only 1A) but does the car like this??? May need to use 5,6 or 10.
-
-                    _chargerData.OutputCurrent = 1;
+                    _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // temporarely limit (make car ask for less)
+                    _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // fake towards the car
                 }
             }
         }
@@ -843,20 +843,20 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
-    // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
-    // we adjust ChaAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
-    // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
-    // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
     if (_carData.HasDynamicControl())
     {
-        if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS)
-            _chargerData.ChaAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
-        else
-            _chargerData.ChaAvailableOutputCurrent = _chargerData.DynAvailableOutputCurrent;
+        _chargerData.AvailableOutputCurrent = _chargerData.DynAvailableOutputCurrent;
+
+        // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
+        // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
+        // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
+        int requestLimit = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+        if (_carData.RequestCurrent > requestLimit && _chargerData.AvailableOutputCurrent > requestLimit)
+            _chargerData.AvailableOutputCurrent = requestLimit;
     }
     else
     {
-        _chargerData.ChaAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
+        _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 
     // Assume charger max supply is same as chargers max demand
@@ -1057,7 +1057,7 @@ void ChademoCharger::SendChargerMessages()
 void ChademoCharger::UpdateChargerMessages()
 {
     COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "108.WeldingDetection %d -> %d");
-    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.ChaAvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
+    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.AvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
     COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "108.AvailableOutputVoltage %d -> %d");
     COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "108.ThresholdVoltage %d -> %d");
 
