@@ -447,7 +447,7 @@ void ChademoCharger::RunStateMachine()
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
-            println("[cha] Car progressing to ChargingLoop in its own time. MaxRequestCurrentBeforeD2:%d", _carData.MaxRequestCurrentBeforeD2);
+            println("[cha] Car progressing to ChargingLoop in its own time");
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
@@ -462,7 +462,7 @@ void ChademoCharger::RunStateMachine()
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
             // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
-            (_carData.RequestCurrent > _carData.MaxRequestCurrentBeforeD2 || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
+            ((_carData.MaxRequestCurrentBeforeD2 == 0 &&_carData.RequestCurrent > _carData.MaxRequestCurrentBeforeD2) || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
