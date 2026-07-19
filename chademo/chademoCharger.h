@@ -592,8 +592,6 @@ struct CarData
 
     bool CarContactorsClosed = false;
 
-    bool RequestCurrentIncreasing = false;
-
     /// <summary>
     /// return true if car allows changing available current during charging (and not only allows, but also take it into account)
     /// It may be that all chademo cars support it, even thou the spec disagrees.
