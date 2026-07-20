@@ -249,8 +249,8 @@ void ChademoCharger::Run()
     // HandlePendingMessages uses _switch_k
     COMPARE_SET(_carData.Switch_k, GetSwitchK(), "[cha] switch(k) %d -> %d");
 
-    SetChargerDataFromCcsParams();
     HandlePendingCarMessages();
+    SetChargerDataFromCcsParams();
     RunStateMachine();
     SetCcsParamsFromCarData();
     SendChargerMessages();
