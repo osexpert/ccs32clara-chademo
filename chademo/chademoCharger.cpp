@@ -305,7 +305,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
 
     if (_carData.TargetVoltage == 410)
     {
-        if (_global.alternative_voltage == 1) // Leaf 20-30
+        if (CONFIG_ALTERNATIVE_VOLTAGE == 1) // Leaf 20-30
         {
             _carData.NomVoltOverride = 380;
             _carData.AdjustBelowSoc = 29;
@@ -326,7 +326,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
 
     if (override)
         println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
-            _global.alternative_voltage, 
+            CONFIG_ALTERNATIVE_VOLTAGE, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
             _carData.MaxVoltOverride,
@@ -375,7 +375,7 @@ void ChademoCharger::RunStateMachine()
 
     if (_state == ChargerState::WaitForChademoKickoff)
     {
-        if (_global.CHADEMO_SX)
+        if (CONFIG_SX)
         {
             if (_global.ccsLifesign)
             {
@@ -456,7 +456,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        if (_global.CHADEMO_SX || _preChargeDoneButStalled)
+        if (CONFIG_SX || _preChargeDoneButStalled)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
@@ -486,7 +486,7 @@ void ChademoCharger::RunStateMachine()
             _carData.CarContactorsClosed = true;
             _reportOutputVoltage = true; // let car "see"  the charger voltage
 
-            if (_global.CHADEMO_SX)
+            if (CONFIG_SX)
             {
                 // not yet
             }
@@ -522,8 +522,6 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
-        static const uint8_t CHADEMO_FAKE_IDLE_CURRENT = 1; // Fake output current towards the car. May need to use 5?
-
         _global.auto_power_off_timer_count_up_ms = 0;
 
         if (_chargerData.OutputCurrent > 0)
@@ -569,10 +567,10 @@ void ChademoCharger::RunStateMachine()
             }
 
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
-            if (_global.CHADEMO_SX && _sxState != SX_DONE)
+            if (CONFIG_SX && _sxState != SX_DONE)
             {
-                _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // temporarely limit (make car ask for less)
-                _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // fake towards the car
+                _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // temporarely limit (make car ask for less)
+                _chargerData.OutputCurrent = min(CHADEMO_FAKE_IDLE_AMPS, _carData.RequestCurrent); // fake towards the car
 
                 if (_sxState == SX_INITIAL)
                 {
@@ -661,8 +659,8 @@ void ChademoCharger::RunStateMachine()
                 // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
                 if (not _isDischarging && _chargerData.OutputCurrent == 0)
                 {
-                    _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // temporarely limit (make car ask for less)
-                    _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // fake towards the car
+                    _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // temporarely limit (make car ask for less)
+                    _chargerData.OutputCurrent = min(CHADEMO_FAKE_IDLE_AMPS, _carData.RequestCurrent); // fake towards the car
                 }
             }
         }
@@ -767,7 +765,7 @@ bool ChademoCharger::PreChargeCompleted()
 {
     _preChargeDoneButStalled = true;
 
-    if (_global.CHADEMO_SX)
+    if (CONFIG_SX)
     {
         if (not _adapterContactorClosed)
             println("[cha] PreCharge stalled until adapter contactor closed");
@@ -871,7 +869,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
 
 void ChademoCharger::SetChargerDataFromCcsParams()
 {
-    if (_discovery || (_global.CHADEMO_SX && chademoInterface_ccsCurrentDemandPos() < 0))
+    if (_discovery || (CONFIG_SX && chademoInterface_ccsCurrentDemandPos() < 0))
     {
         SetChargerData(ADAPTER_MAX_VOLTS,
             ADAPTER_MAX_AMPS,

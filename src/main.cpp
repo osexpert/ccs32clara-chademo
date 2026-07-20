@@ -314,7 +314,7 @@ void power_off_check()
             showBatteryLevel();
 
             // auto reboot when battery above 3.3V (prevent deep battery drain)
-            if (_global.ALWAYS_ON && not _global.powerOffPendingViaButton && adc_4_volt > 3.3f)
+            if (CONFIG_ALWAYS_ON && not _global.powerOffPendingViaButton && adc_4_volt > 3.3f)
             {
                 println("ALWAYS_ON and vcc4:%fV > 3.3V. Soft reset now...", &adc_4_volt); // bypass float to double promotion by passing as reference
                 soft_reset();
@@ -682,7 +682,7 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
-    if (_global.V2X)
+    if (CONFIG_V2X)
     {
         println("V2X build -> enable discharge");
         chademoCharger->EnableDischarge();

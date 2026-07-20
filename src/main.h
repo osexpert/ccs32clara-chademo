@@ -19,16 +19,22 @@
   */
 /* USER CODE END Header */
 
-#define ADAPTER_MAX_AMPS 200
-#define ADAPTER_MAX_VOLTS 500 //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
+constexpr uint8_t ADAPTER_MAX_AMPS = 200;
+constexpr uint16_t ADAPTER_MAX_VOLTS = 500; //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
 // Default SOC% at which the adapter will stop charging
-#define SOC_STOP_CHARGING 100
+constexpr uint8_t STOP_CHARGING_SOC = 100;
 
 // Just some value seen in can logs.. seen 10, 15. Some say car will allow 10A deviation from what you say? So if we always say we use 10A, we can use anything between 0-20A? 
 // For any current above 20A then need real measured amps? Try 40.
-#define MAX_DISCHARGE_AMPS_FALLBACK 40
+constexpr uint8_t MAX_DISCHARGE_AMPS_FALLBACK = 40;
 
+constexpr uint8_t CHADEMO_FAKE_IDLE_AMPS = 1; // Fake output current towards the car. May need to use 2 or 5?
+
+constexpr bool CONFIG_SX = GITHUB_SX;
+constexpr bool CONFIG_V2X = GITHUB_V2X;
+constexpr bool CONFIG_ALTERNATIVE_VOLTAGE = GITHUB_AV;
+constexpr bool CONFIG_ALWAYS_ON = GITHUB_AO;
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
 #define IRQ_PRI(x) ((x) << 4)
@@ -41,16 +47,11 @@ struct global_data
 {
     int stopButtonCounter = 0;
 
-    bool ccsKickoff = GITHUB_SX ? true : false;
+    bool ccsKickoff = CONFIG_SX ? true : false;
     bool powerOffPending = false;
     bool powerOffPendingViaButton = false;
     bool ccsEnded = false;
     bool moreLogging = false;
-    int alternative_voltage = GITHUB_AV;
-
-    bool CHADEMO_SX = GITHUB_SX;
-    bool V2X = GITHUB_V2X;
-    bool ALWAYS_ON = GITHUB_AO;
 
     uint32_t auto_power_off_timer_count_up_ms = 0;
 

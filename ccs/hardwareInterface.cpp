@@ -31,7 +31,7 @@ uint8_t hardwareInterface_getSoc(void)
 
 bool hardwareInterface_getIsBatteryFull(void)
 {
-    return _ccs_params.soc >= SOC_STOP_CHARGING;
+    return _ccs_params.soc >= STOP_CHARGING_SOC;
 }
 
 void hardwareInterface_setPowerRelayOn(void)

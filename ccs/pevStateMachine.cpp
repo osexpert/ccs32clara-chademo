@@ -718,10 +718,10 @@ static void stateFunctionWaitForPreChargeStart(void)
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
     // How long can we wait before sending the first PreChargeReq? It seems undefined in spec...but Gemini suggests 5 seconds max.
 
-    // there is no need to wait here if _global.CHADEMO_SX. clara and pyplc does not wait at all.
+    // there is no need to wait here if CONFIG_SX. clara and pyplc does not wait at all.
     // But in case ccs finish insanely fast and chademo slow (unlikely), we can wait here for a while (max 10sec) until we time out.
     int pos = chademoInterface_chargingLoopPos();
-    if (_global.CHADEMO_SX ? pos == 0 : pev_cyclesInState > 66) /* 66*30ms=2s */
+    if (CONFIG_SX ? pos == 0 : pev_cyclesInState > 66) /* 66*30ms=2s */
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
@@ -739,7 +739,7 @@ static void stateFunctionWaitForPreChargeStart(void)
                 //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
         pev_enterState(PEV_STATE_WaitForPreChargeResponse);
     }
-    else if (_global.CHADEMO_SX && pos > 0)
+    else if (CONFIG_SX && pos > 0)
     {
         addToTrace(MOD_PEV, "Error: Can not start precharge -> chademo is past ChargingLoop");
         pev_enterState(PEV_STATE_SafeShutDown);
