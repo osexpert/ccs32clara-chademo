@@ -569,6 +569,8 @@ struct CarData
     uint8_t MaxCurrent;
     uint8_t RequestCurrent;
 
+    uint8_t MaxRequestCurrentBeforeD2;
+
 //#ifdef CHADEMO_SINGLE_X
     // PS: unstable before switch (k), but until then fake something for CableCheck and ChargeParameterDiscovery
     uint8_t SocPercent = 20;
@@ -613,7 +615,7 @@ struct CarData
     /// It may be that all chademo cars support it, even thou the spec disagrees.
     /// But based on discovering this, we can possibly change this to always return true.
     /// </summary>
-    bool DynamicControl() const
+    bool HasDynamicControl() const
     {
         // Try to pretent all cars allows it (even thou some may not respect it, it should not matter)
         return true;// has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);
@@ -628,11 +630,12 @@ enum ProtocolNumber
     Chademo_2_0 = 3,
 };
 
+static constexpr int FAKE_OUTPUT_CURRENT_INTERVAL = CHA_CYCLES_PER_SEC * 60;
+
 const int SX_INITIAL = 0;
 const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
 const int SX_WAIT_FOR_ccsCurrentDemand = 2;
-const int SX_RAMP_UP_carDataRequestCurrent = 3;
-const int SX_DONE = 4;
+const int SX_DONE = 3;
 
 struct ChargerData
 {
@@ -658,7 +661,7 @@ struct ChargerData
 
     uint8_t MaxAvailableOutputCurrent;
     uint8_t DynAvailableOutputCurrent;
-    uint8_t ChaAvailableOutputCurrent;
+    uint8_t AvailableOutputCurrent;
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
@@ -817,9 +820,7 @@ public:
         ChargerData _chargerData = {};
 
         int _sxState = SX_INITIAL;
-        int _rampedRequestCurrent = 0;
-        bool _fakeOutputCurrentOnce = false; // first time, when we are not returning from real charging but starting up
-        int _fakeOutputCurrentCycles = 0;
+        int _fakeOutputCurrentCycles = FAKE_OUTPUT_CURRENT_INTERVAL; // fake once during start
         int _zeroOutputAmpsCycles = 0;
         int _offset_index = 0;
 };

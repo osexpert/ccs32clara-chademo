@@ -159,6 +159,8 @@ void ChademoCharger::HandlePendingCarMessages()
         if (not _d2)
         {
             _carData.TargetVoltage = _msg102.m.TargetVoltage;
+
+            _carData.MaxRequestCurrentBeforeD2 = max(_carData.MaxRequestCurrentBeforeD2, _msg102.m.RequestCurrent);
         }
 
         // We will limit this later anyways. But it can happen in SX mode, where the ccs data is suddenly available, and they are lower than adapter max.
@@ -472,7 +474,8 @@ void ChademoCharger::RunStateMachine()
     {
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            HasElapsedSec(2) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when, but this adapter doesn't have a voltmeter.
+            // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
+            ((_carData.MaxRequestCurrentBeforeD2 == 0 &&_carData.RequestCurrent > 0) || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
@@ -519,6 +522,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::ChargingLoop)
     {
+        static const uint8_t CHADEMO_FAKE_IDLE_CURRENT = 1; // Fake output current towards the car. May need to use 5?
+
         _global.auto_power_off_timer_count_up_ms = 0;
 
         if (_chargerData.OutputCurrent > 0)
@@ -552,8 +557,6 @@ void ChademoCharger::RunStateMachine()
         }
         else
         {
-            const int RAMP_AMPS_PER_STEP = 5; // Increase by 5A every 100ms (50A per second)
-
             if (chademoInterface_ccsPresentVoltageMirrorsTarget())
             {
                 // All(?) portable dischargers mirror TargetVoltage -> PresentVoltage. Chademo does not like this and will give deviating volts error.
@@ -568,9 +571,8 @@ void ChademoCharger::RunStateMachine()
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (_global.CHADEMO_SX && _sxState != SX_DONE)
             {
-                _chargerData.ChaAvailableOutputCurrent = 10; // temporarely limit to 10
-                int carRequested = _carData.RequestCurrent;
-                _carData.RequestCurrent = 1; // fake 1A request for ccs
+                _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // temporarely limit (make car ask for less)
+                _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // fake towards the car
 
                 if (_sxState == SX_INITIAL)
                 {
@@ -589,102 +591,79 @@ void ChademoCharger::RunStateMachine()
                 }
                 else if (_sxState == SX_WAIT_FOR_ccsCurrentDemand)
                 {
+                    _carData.RequestCurrent = 1; // fake 1A towards ccs (or maybe use 0A?)
                     if (chademoInterface_ccsCurrentDemandPos() == 0)
                     {
-                        _rampedRequestCurrent = _carData.RequestCurrent;
-                        _sxState = SX_RAMP_UP_carDataRequestCurrent;
-                        println("[cha] set sxState:%d", _sxState);
-                    }
-                }
-                else if (_sxState == SX_RAMP_UP_carDataRequestCurrent)
-                {
-                    // Ramp up 5A per cycle toward target
-                    _rampedRequestCurrent = min(_rampedRequestCurrent + RAMP_AMPS_PER_STEP, carRequested);
-                    _carData.RequestCurrent = _rampedRequestCurrent;
-
-                    if (_rampedRequestCurrent >= carRequested)
-                    {
-                        _rampedRequestCurrent = 0; // done with it -> tidy
                         _sxState = SX_DONE;
                         println("[cha] set sxState:%d", _sxState);
                     }
                 }
             }
-            else if (_dischargeEnabled)
+            else // not SX or SX_DONE
             {
-                bool isDischarging = false;
-                if (_chargerData.OutputCurrent == 0)
+                if (_dischargeEnabled)
                 {
-                    // zero amps for more than 3seconds -> assume discharging (the waiting may be pointless)
-                    if (_zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
-                        _zeroOutputAmpsCycles++;
-                    }
-                    if (_zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
-                        isDischarging = true;
-                    }
-                }
-                else
-                {
-                    _zeroOutputAmpsCycles = 0;
-                }
-
-                if (isDischarging && not _isDischarging){
-                    _rampedRequestCurrent = _carData.RequestCurrent; // we are discharging now, but was not before -> init rampedRequestCurrent 
-                }
-                COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
-
-                if (isDischarging)
-                {
-                    _chargerData.RemainingDischargeTime = 5; // seconds?
-
-                    // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
-                    _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
-
-                    // V2X unit may use our request amps as a "sign" of how much we (the car) can discharge?
-                    // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so.
-                    // So fake a RequestCurrent to max allowed, and see if it makes a difference.
-                    // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
-                    int maxDischargeAmps = _carData.MaxDischargeCurrentSet ?
-                        _carData.MaxDischargeCurrent :
-                        MAX_DISCHARGE_AMPS_FALLBACK; // no discharge message from car, use fallback
-
-                    _rampedRequestCurrent = min(_rampedRequestCurrent + RAMP_AMPS_PER_STEP, maxDischargeAmps);
-
-                    _carData.RequestCurrent = _rampedRequestCurrent;
-
-                    // HACK: my car seems to time out after 6 minutes, if no current flows?
-                    // Try to fake something every minute. Seems to work. Thou I wonder, if high discharge is currently in progress,
-                    // maybe the car does not like it (in this case the hack is not needed, but its impossible for us to know!).
-                    // I am starting to wonder, if the Chademo discharge messages has any purpose at all...because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless.
-                    // Dynamic control seems to be what keeps it alive more than 3 seconds in ChargingLoop,
-                    // and flow of current (measured by car) or declaring OutputCurrent > 0 seems to be what keeps it alive more than 6 minutes.
-                    // So is it possible...that V2X can be implemented, completely without using the V2X messages?
-                    _fakeOutputCurrentCycles++;
-                    if (not(_fakeOutputCurrentOnce) || _fakeOutputCurrentCycles >= (CHA_CYCLES_PER_SEC * 60))
+                    bool isDischarging = false;
+                    if (_chargerData.OutputCurrent == 0)
                     {
-                        _chargerData.DischargeCurrent = 0;
-                        _chargerData.OutputCurrent = 1;
+                        // zero amps for more than 3seconds -> assume discharging (the waiting may be pointless)
+                        if (_zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
+                            _zeroOutputAmpsCycles++;
+                        }
+                        if (_zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
+                            isDischarging = true;
+                        }
+                    }
+                    else
+                    {
+                        _zeroOutputAmpsCycles = 0;
+                    }
 
+                    COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
+
+                    if (isDischarging)
+                    {
+                        _chargerData.RemainingDischargeTime = 5; // seconds?
+
+                        // My car don't seem to care much about DischargeCurrent. I faked it to the max, but car did not care. So I wonder, what is it good for?
+                        _chargerData.DischargeCurrent = min((uint8_t)10, _carData.MaxDischargeCurrent);
+
+                        // V2X unit use our request amps as a "sign" of how much we (the car) can discharge.
+                        // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so, so fake a RequestCurrent to max allowed.
+                        // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
+                        int maxDischargeAmps = _carData.MaxDischargeCurrentSet ?
+                            _carData.MaxDischargeCurrent :
+                            MAX_DISCHARGE_AMPS_FALLBACK; // no discharge message from car, use fallback
+
+                        _carData.RequestCurrent = maxDischargeAmps;
+
+                        // My car time out after 6 minutes, if OutputCurrent = 0, so tickle OutputCurrent every minute to keep it alive.
+	                    // I wonder what purpose the Chademo discharge messages has, because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless, if OutputCurrent = 0 .
+                        if (_fakeOutputCurrentCycles++ >= FAKE_OUTPUT_CURRENT_INTERVAL)
+                        {
+                            _chargerData.DischargeCurrent = 0;
+                            _chargerData.OutputCurrent = 1; // tickle 1A
+
+                            _fakeOutputCurrentCycles = 0;
+                        }
+                    }
+                    else
+                    {
+                        // keep RemainingDischargeTime at 5, discharge indefinitely
+                        _chargerData.DischargeCurrent = 0;
                         _fakeOutputCurrentCycles = 0;
-                        _fakeOutputCurrentOnce = true;
                     }
                 }
-                else
-                {
-                    // keep RemainingDischargeTime at 5, discharge indefinitely
-                    _chargerData.DischargeCurrent = 0;
-                    _fakeOutputCurrentCycles = 0;
-                }
-            }
 
-            // Is it possible that all the complicated logic above (for discharge support), could be replaced with this simple hack?
-            // Because it seems the discharge messages really does not do much. DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
-            // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
-            // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
-            // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-            if (not _isDischarging && _chargerData.OutputCurrent == 0)
-            {
-                _chargerData.OutputCurrent = 1;
+                // DischargeCurrent do not seem to be validated by the car, RemainingDischargeTime do not keep the car alive etc.
+                // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
+                // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
+                // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
+                if (not _isDischarging && _chargerData.OutputCurrent == 0)
+                {
+                    _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // temporarely limit (make car ask for less)
+                    _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_CURRENT; // fake towards the car
+                }
             }
         }
     }
@@ -870,20 +849,20 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
-    // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
-    // we adjust ChaAvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
-    // Its kind of silly...why did they not provide a flag to turn off the car failing part instead? :-)
-    // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-    if (_carData.DynamicControl())
+    if (_carData.HasDynamicControl())
     {
-        if (_carData.RequestCurrent > _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS)
-            _chargerData.ChaAvailableOutputCurrent = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
-        else
-            _chargerData.ChaAvailableOutputCurrent = _chargerData.DynAvailableOutputCurrent;
+        _chargerData.AvailableOutputCurrent = _chargerData.DynAvailableOutputCurrent;
+
+        // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
+        // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
+        // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
+        int requestLimit = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+        if (_carData.RequestCurrent > requestLimit && _chargerData.AvailableOutputCurrent > requestLimit)
+            _chargerData.AvailableOutputCurrent = requestLimit;
     }
     else
     {
-        _chargerData.ChaAvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
+        _chargerData.AvailableOutputCurrent = _chargerData.MaxAvailableOutputCurrent;
     }
 
     // Assume charger max supply is same as chargers max demand
@@ -1090,7 +1069,7 @@ void ChademoCharger::SendChargerMessages()
 void ChademoCharger::UpdateChargerMessages()
 {
     COMPARE_SET(_msg108.m.WeldingDetection, _chargerData.SupportWeldingDetection, "108.WeldingDetection %d -> %d");
-    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.ChaAvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
+    COMPARE_SET(_msg108.m.AvailableOutputCurrent, _chargerData.AvailableOutputCurrent, "108.AvailableOutputCurrent %d -> %d");
     COMPARE_SET(_msg108.m.AvailableOutputVoltage, _chargerData.AvailableOutputVoltage, "108.AvailableOutputVoltage %d -> %d");
     COMPARE_SET(_msg108.m.ThresholdVoltage, _chargerData.ThresholdVoltage, "108.ThresholdVoltage %d -> %d");
 
