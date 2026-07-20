@@ -373,8 +373,6 @@ void ChademoCharger::RunStateMachine()
         }
 
         _chargerData.ThresholdVoltage = min(_chargerData.AvailableOutputVoltage, _carData.MaxVoltage);
-
-        _chargerData.RemainingChargeTimeSec = _carData.MaxChargingTimeSec;
         _chargerData.RemainingChargeTimeCycles = _carData.MaxChargingTimeSec * CHA_CYCLES_PER_SEC;
     }
 
@@ -538,8 +536,6 @@ void ChademoCharger::RunStateMachine()
             // This time can be seen inside the car? So count it down as long as it does not interfere with our plans (the plan is to stop countdown at 5 seconds).
             if (_dischargeEnabled && _chargerData.RemainingChargeTimeCycles < (CHA_CYCLES_PER_SEC * 5))
                 _chargerData.RemainingChargeTimeCycles = (CHA_CYCLES_PER_SEC * 5);
-
-            _chargerData.RemainingChargeTimeSec = _chargerData.RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
         }
 
         StopReason stopReason = StopReason::NONE;
@@ -552,7 +548,7 @@ void ChademoCharger::RunStateMachine()
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
         if (has_flag(_carData.Status, CarStatus::ERROR)) set_flag(&stopReason, StopReason::CAR_ERROR);
         // charger reasons
-        if (_chargerData.RemainingChargeTimeSec == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
+        if (_chargerData.RemainingChargeTimeCycles == 0) set_flag(&stopReason, StopReason::CHARGING_TIME);
 
         if (stopReason != StopReason::NONE)
         {
@@ -682,7 +678,6 @@ void ChademoCharger::RunStateMachine()
         if (_chargerData.OutputCurrent <= 5 || IsTimeoutSec(10))
         {
             _chargerData.RemainingChargeTimeCycles = 0;
-            _chargerData.RemainingChargeTimeSec = 0;
 
             // TODO: what about discharge and chargerData.OutputVoltage/chargerData.DischargeCurrent?
             // DischargeCurrent will be left at what we set them to last, while OutputVoltage will suddenly rise to Target voltage... Not sure if it matters thou, at this stage.
@@ -909,7 +904,7 @@ void ChademoCharger::Log()
             _chargerData.AvailableOutputVoltage,
             _chargerData.MaxAvailableOutputCurrent,
             _chargerData.DynAvailableOutputCurrent,
-            _chargerData.RemainingChargeTimeSec,
+            _chargerData.RemainingChargeTimeSec(),
             _chargerData.Status,
 
             _carData.RequestCurrent,
@@ -1085,15 +1080,15 @@ void ChademoCharger::UpdateChargerMessages()
 
     uint8_t remainingChargingTime10s = 0;
     uint8_t remainingChargingTimeMins = 0;
-    if (_chargerData.RemainingChargeTimeSec < 60)
+    if (_chargerData.RemainingChargeTimeSec() < 60)
     {
-        remainingChargingTime10s = _chargerData.RemainingChargeTimeSec / 10;
+        remainingChargingTime10s = _chargerData.RemainingChargeTimeSec() / 10;
         remainingChargingTimeMins = 0;
     }
     else
     {
         remainingChargingTime10s = 0xff;
-        remainingChargingTimeMins = _chargerData.RemainingChargeTimeSec / 60;
+        remainingChargingTimeMins = _chargerData.RemainingChargeTimeSec() / 60;
     }
 
     COMPARE_SET(_msg109.m.RemainingChargingTime10s, remainingChargingTime10s, "109.RemainingChargingTime10s %d -> %d");

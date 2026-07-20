@@ -675,8 +675,12 @@ struct ChargerData
 
     //bool DischargeEnabled = false;// safe to have this on for all?
 
+    uint16_t RemainingChargeTimeSec() const
+    {
+        return RemainingChargeTimeCycles / CHA_CYCLES_PER_SEC;
+    }
+
     // initial value from car, charger count it down
-    uint16_t RemainingChargeTimeSec;
     uint32_t RemainingChargeTimeCycles;
 
     uint16_t ThresholdVoltage;
