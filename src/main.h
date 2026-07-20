@@ -29,12 +29,19 @@ constexpr uint8_t STOP_CHARGING_SOC = 100;
 // For any current above 20A then need real measured amps? Try 40.
 constexpr uint8_t MAX_DISCHARGE_AMPS_FALLBACK = 40;
 
-constexpr uint8_t CHADEMO_FAKE_IDLE_AMPS = 1; // Fake output current towards the car. May need to use 2 or 5?
+//constexpr uint8_t CHADEMO_FAKE_IDLE_AMPS = 1; // Fake output current towards the car. May need to use 2 or 5?
 
 constexpr bool CONFIG_SX = GITHUB_SX;
 constexpr bool CONFIG_V2X = GITHUB_V2X;
-constexpr bool CONFIG_ALTERNATIVE_VOLTAGE = GITHUB_AV;
+constexpr uint8_t CONFIG_ALTERNATIVE_VOLTAGE = GITHUB_AV;
 constexpr bool CONFIG_ALWAYS_ON = GITHUB_AO;
+
+constexpr bool CHADEMO_VOLTAGE_MODULATION = false;
+
+constexpr uint16_t DX_CCS_WaitForPreChargeStart_MS = 2000;
+
+// Based on logs, worst case is 1600ms before asking for amps, but use 2000 for now.
+constexpr uint16_t CHADEMO_PRE1_WaitForCarContactorsClosed_MS = 2000;
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
 #define IRQ_PRI(x) ((x) << 4)

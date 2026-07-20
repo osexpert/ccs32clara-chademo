@@ -618,6 +618,7 @@ struct CarData
     bool HasDynamicControl() const
     {
         // Try to pretent all cars allows it (even thou some may not respect it, it should not matter)
+        // jdemo dont allow it?
         return true;// has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);
     }
 };
@@ -712,6 +713,7 @@ public:
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
+    bool HasElapsedMs(uint16_t ms);
 
     ChademoAlwaysOnBackup AlwaysOnBackup()
     {
@@ -785,7 +787,7 @@ public:
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
         bool _isDischarging = false;
-        bool _estimatedOutputVoltageModulation = false;
+        bool _estimatedOutputVoltageModulation = CHADEMO_VOLTAGE_MODULATION;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         volatile bool _msg100_pending = false;

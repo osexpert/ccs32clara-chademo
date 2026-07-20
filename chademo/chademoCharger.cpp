@@ -293,7 +293,12 @@ bool ChademoCharger::IsTimeoutSec(uint16_t sec)
 // same as IsTimeoutSec, but without the logging
 bool ChademoCharger::HasElapsedSec(uint16_t sec)
 {
-    return (_cyclesInState > (sec * CHA_CYCLES_PER_SEC));
+    return _cyclesInState > (sec * CHA_CYCLES_PER_SEC);
+}
+
+bool ChademoCharger::HasElapsedMs(uint16_t ms)
+{
+    return (_cyclesInState * CHA_CYCLE_MS) > ms;
 }
 
 void ChademoCharger::SetBatteryVoltOverridesOnce()
@@ -475,7 +480,7 @@ void ChademoCharger::RunStateMachine()
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
             // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
-            ((_carData.MaxRequestCurrentBeforeD2 == 0 &&_carData.RequestCurrent > 0) || HasElapsedSec(2)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
+            ((_carData.MaxRequestCurrentBeforeD2 == 0 && _carData.RequestCurrent > 0) || HasElapsedMs(CHADEMO_PRE1_WaitForCarContactorsClosed_MS)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
@@ -569,8 +574,7 @@ void ChademoCharger::RunStateMachine()
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (CONFIG_SX && _sxState != SX_DONE)
             {
-                _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // temporarely limit (make car ask for less)
-                _chargerData.OutputCurrent = min(CHADEMO_FAKE_IDLE_AMPS, _carData.RequestCurrent); // fake towards the car
+                _chargerData.OutputCurrent = 1; // fake towards the car
 
                 if (_sxState == SX_INITIAL)
                 {
@@ -659,8 +663,7 @@ void ChademoCharger::RunStateMachine()
                 // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
                 if (not _isDischarging && _chargerData.OutputCurrent == 0)
                 {
-                    _chargerData.AvailableOutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // temporarely limit (make car ask for less)
-                    _chargerData.OutputCurrent = min(CHADEMO_FAKE_IDLE_AMPS, _carData.RequestCurrent); // fake towards the car
+                    _chargerData.OutputCurrent = 1; // fake towards the car
                 }
             }
         }

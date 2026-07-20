@@ -721,7 +721,7 @@ static void stateFunctionWaitForPreChargeStart(void)
     // there is no need to wait here if CONFIG_SX. clara and pyplc does not wait at all.
     // But in case ccs finish insanely fast and chademo slow (unlikely), we can wait here for a while (max 10sec) until we time out.
     int pos = chademoInterface_chargingLoopPos();
-    if (CONFIG_SX ? pos == 0 : pev_cyclesInState > 66) /* 66*30ms=2s */
+    if (CONFIG_SX ? pos == 0 : pev_cyclesInState > (DX_CCS_WaitForPreChargeStart_MS / 30))
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
