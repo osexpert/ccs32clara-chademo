@@ -44,7 +44,7 @@ struct ccs_params
 
     int MaxPower = 100; // kW
     int MaxVoltage = 410; // V
-    int MaxCurrent = ADAPTER_MAX_AMPS;// A
+    int MaxCurrent = ADAPTER_MAX_AMPS; // A
 
     int TargetVoltage = 0;
     int TargetCurrent = 0;

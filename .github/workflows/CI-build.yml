@@ -106,11 +106,24 @@ jobs:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-SX
           path: My407ccs2chademo.bin
 
+      # --- JDEMO build ---
+      - name: Build JDEMO firmware
+        run: |
+          export GITHUB_JDEMO=1
+          export GITHUB_APPEND_VER=-JDEMO
+          make clean all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-JDEMO
+          path: My407ccs2chademo.bin
+
       - name: Add info to summary
         run: |
           echo "### Build tags" >> $GITHUB_STEP_SUMMARY
-          echo "- **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus." >> $GITHUB_STEP_SUMMARY
           echo "- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
           echo "- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
           echo "- **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual." >> $GITHUB_STEP_SUMMARY
+          echo "- **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus." >> $GITHUB_STEP_SUMMARY
+          echo "- **JDEMO**: Jdemo quirks: disable dynamic current and limit to 125A." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

@@ -19,7 +19,21 @@
   */
 /* USER CODE END Header */
 
-constexpr uint8_t ADAPTER_MAX_AMPS = 200;
+constexpr bool CONFIG_SX = GITHUB_SX;
+constexpr bool CONFIG_V2X = GITHUB_V2X;
+constexpr uint8_t CONFIG_ALTERNATIVE_VOLTAGE = GITHUB_AV;
+constexpr bool CONFIG_ALWAYS_ON = GITHUB_AO;
+
+// Jdemo: custom kit for Toyota RAV4, Tesla Rodster etc. Made by Quick Charge Power https://quickchargepower.com/ (QC Charge https://qccharge.com/).
+// Jdemo is quirky in some ways:
+// - after D2=true, charger must ACK (ChargerStatus::CHARGING=true / ChargerStatus::STOPPED=false) within 2 sec. It is more restrictive than the spec: 2.5sec.
+// - If AvailableOutputCurrent is changed/lowered so that RequestCurrent reack AvailableOutputCurrent, the charging just stops (at least for lower values as 10).
+// - It will/can increase RequestCurrent until it reaches AvailableOutputCurrent - 10 (so for a 200A charger, it will/can ask for 190A until it backs down). The kit is a 125A kit and should never have asked for more than 125A.
+// - It is possible that CHADEMO_MAX_UNDERSUPPLY_AMPS = 20 would work...since it has this weird 10A thing...but also never changing AvailableOutputCurrent seems to work.
+constexpr bool CONFIG_JDEMO = GITHUB_JDEMO;
+
+// Jdemo ask for more than 125A even thou it is a 125A kit, so limit here.
+constexpr uint8_t ADAPTER_MAX_AMPS = CONFIG_JDEMO ? 125 : 200;
 constexpr uint16_t ADAPTER_MAX_VOLTS = 500; //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
 // Default SOC% at which the adapter will stop charging
@@ -29,19 +43,14 @@ constexpr uint8_t STOP_CHARGING_SOC = 100;
 // For any current above 20A then need real measured amps? Try 40.
 constexpr uint8_t MAX_DISCHARGE_AMPS_FALLBACK = 40;
 
-//constexpr uint8_t CHADEMO_FAKE_IDLE_AMPS = 1; // Fake output current towards the car. May need to use 2 or 5?
-
-constexpr bool CONFIG_SX = GITHUB_SX;
-constexpr bool CONFIG_V2X = GITHUB_V2X;
-constexpr uint8_t CONFIG_ALTERNATIVE_VOLTAGE = GITHUB_AV;
-constexpr bool CONFIG_ALWAYS_ON = GITHUB_AO;
-
 constexpr bool CHADEMO_VOLTAGE_MODULATION = false;
 
 constexpr uint16_t DX_CCS_WaitForPreChargeStart_MS = 2000;
 
 // Based on logs, worst case is 1600ms before asking for amps, but use 2000 for now.
 constexpr uint16_t CHADEMO_PRE1_WaitForCarContactorsClosed_MS = 2000;
+
+constexpr uint8_t CHADEMO_MAX_UNDERSUPPLY_AMPS = 10;
 
 // Shifted priority macro for STM32 (only top 4 bits used in NVIC)
 #define IRQ_PRI(x) ((x) << 4)

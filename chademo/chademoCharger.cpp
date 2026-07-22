@@ -833,8 +833,6 @@ const char* ChademoCharger::GetStateName()
     return _stateNames[_state];
 };
 
-#define MAX_UNDERSUPPLY_AMPS 10
-
 void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_estimated, uint16_t outA)
 {
     _chargerData.AvailableOutputVoltage = maxV;
@@ -861,7 +859,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
         // If difference between RequestCurrent and OutputCurrent is too large, the car fails. If car support dynamic AvailableOutputCurrent,
         // we adjust AvailableOutputCurrent down, forcing the car to ask for less amps, reducing the difference.
         // I don't know exactly what difference is allowed (spec. says 10% or 20A). At least 10A difference seems to work fine. 40A certainly does not:-)
-        int requestLimit = _chargerData.OutputCurrent + MAX_UNDERSUPPLY_AMPS;
+        int requestLimit = _chargerData.OutputCurrent + CHADEMO_MAX_UNDERSUPPLY_AMPS;
         if (_carData.RequestCurrent > requestLimit && _chargerData.AvailableOutputCurrent > requestLimit)
             _chargerData.AvailableOutputCurrent = requestLimit;
     }
