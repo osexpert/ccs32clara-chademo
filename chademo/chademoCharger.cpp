@@ -265,19 +265,28 @@ void ChademoCharger::SetCcsParamsFromCarData()
     _ccs_params.MaxVoltage = _carData.TargetVoltage + 1;
     _ccs_params.soc = _carData.SocPercent;
     _ccs_params.BatteryVoltage = _carData.EstimatedBatteryVoltage;
+    _ccs_params.TargetVoltage = _carData.TargetVoltage;
 
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
-    _ccs_params.TargetCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
+    int requestCurrent = (_state == ChargerState::ChargingLoop ? _carData.RequestCurrent : 0);
 
-    if (_ccs_params.TargetCurrent > _ccs_params.EvseDynCurrent())
-    {
-        // If car does not support DynamicControl,
-        // car may ask for more (MaxAvailableOutputCurrent) than is currently available (DynAvailableOutputCurrent),
-        // and the charger may not like this. Asking for more than available is rude in any case, so cap it if is happens.
-        _ccs_params.TargetCurrent = _ccs_params.EvseDynCurrent();
-    }
+    // 1. Limit request to max allowed by charger
+    int maxCurrent = _ccs_params.EvseDynMaxCurrent();
+    if (requestCurrent > maxCurrent)
+        requestCurrent = maxCurrent;
 
-    _ccs_params.TargetVoltage = _carData.TargetVoltage;
+    // 2. Ramp
+    int diff = requestCurrent - _ccs_params.TargetCurrent;
+    if (diff > 4)
+        _ccs_params.TargetCurrent += 4; // 4A/100ms = 40A/sec ramp up
+    else if (diff < -10)
+        _ccs_params.TargetCurrent -= 10; // 10A/100ms = 100A/sec ramp down
+    else
+        _ccs_params.TargetCurrent = requestCurrent;
+
+    // 3. Limit target current to max allowed by charger
+    if (_ccs_params.TargetCurrent > maxCurrent)
+        _ccs_params.TargetCurrent = maxCurrent;
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t sec)
@@ -883,7 +892,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
         SetChargerData(
             _ccs_params.EvseMaxVoltage,
             _ccs_params.EvseMaxCurrent,
-            _ccs_params.EvseDynCurrent(),
+            _ccs_params.EvseDynMaxCurrent(),
             _ccs_params.EvseVoltage,
             false, // voltage not estimated
             _ccs_params.EvseCurrent

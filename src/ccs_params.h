@@ -44,7 +44,7 @@ struct ccs_params
 
     int MaxPower = 100; // kW
     int MaxVoltage = 410; // V
-    int MaxCurrent = ADAPTER_MAX_AMPS;// 125; // A
+    int MaxCurrent = ADAPTER_MAX_AMPS;// A
 
     int TargetVoltage = 0;
     int TargetCurrent = 0;
@@ -61,7 +61,7 @@ struct ccs_params
     int EvseMaxCurrentInCurrentDemandRes = 0;
     int CurrentDemandStopReason = STOP_REASON_NONE;
 
-    int EvseDynCurrent() const
+    int EvseDynMaxCurrent() const
     {
         return EvseMaxCurrentInCurrentDemandRes == 0 ?
             EvseMaxCurrent :
