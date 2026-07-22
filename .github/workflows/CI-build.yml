@@ -125,5 +125,5 @@ jobs:
           echo "- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
           echo "- **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual." >> $GITHUB_STEP_SUMMARY
           echo "- **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus." >> $GITHUB_STEP_SUMMARY
-          echo "- **JDEMO**: Jdemo quirks: disable dynamic current and limit to 125A." >> $GITHUB_STEP_SUMMARY
+          echo "- **JDEMO**: Jdemo quirk: disable dynamic current." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

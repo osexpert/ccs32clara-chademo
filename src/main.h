@@ -28,12 +28,11 @@ constexpr bool CONFIG_ALWAYS_ON = GITHUB_AO;
 // Jdemo is quirky in some ways:
 // - after D2=true, charger must ACK (ChargerStatus::CHARGING=true / ChargerStatus::STOPPED=false) within 2 sec. It is more restrictive than the spec: 2.5sec.
 // - If AvailableOutputCurrent is changed/lowered so that RequestCurrent reack AvailableOutputCurrent, the charging just stops (at least for lower values as 10).
-// - It will/can increase RequestCurrent until it reaches AvailableOutputCurrent - 10 (so for a 200A charger, it will/can ask for 190A until it backs down). The kit is a 125A kit and should never have asked for more than 125A.
+// - It will/can increase RequestCurrent until it reaches AvailableOutputCurrent - 10 (so for a 200A charger, it will/can ask for 190A until it backs down). The kits were sold as 125A kits, but some were delivered with 200A cables.
 // - It is possible that CHADEMO_MAX_UNDERSUPPLY_AMPS = 20 would work...since it has this weird 10A thing...but also never changing AvailableOutputCurrent seems to work.
 constexpr bool CONFIG_JDEMO = GITHUB_JDEMO;
 
-// Jdemo ask for more than 125A even thou it is a 125A kit, so limit here.
-constexpr uint8_t ADAPTER_MAX_AMPS = CONFIG_JDEMO ? 125 : 200;
+constexpr uint8_t ADAPTER_MAX_AMPS = 200;
 constexpr uint16_t ADAPTER_MAX_VOLTS = 500; //Porsche Taycan requires 750V, but setting this value to 750 might break compatibility with many chargers. As default value 500V is good!
 
 // Default SOC% at which the adapter will stop charging
