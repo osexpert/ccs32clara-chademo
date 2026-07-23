@@ -156,7 +156,7 @@
   </div>
 
   <div class="row" id="actions" style="display:none;">
-    <button class="secondary" id="resetToOriginal">Reset to loaded</button>
+    <button class="secondary" id="resetToLoaded">Reset to loaded</button>
     <button class="secondary" id="resetToDefault">Reset to default</button>
     <button id="download">Download patched file</button>
   </div>
@@ -175,7 +175,7 @@ const { parseConfigBlocks, readValue, writeValue, bounds, findVersionString, loa
 
 let fileBytes = null;     // Uint8Array, mutated in place on write — only copy of the file kept in RAM
 let fileName = "firmware.bin";
-let blocks = [];           // parsed block descriptors, incl. originalValue snapshot
+let blocks = [];           // parsed block descriptors, incl. loadedValue snapshot
 let configs = [];          // flat list of {name, description, values(resolved)}
 
 const dropEl = document.getElementById('drop');
@@ -200,7 +200,7 @@ dropEl.addEventListener('drop', e => {
 fileInput.addEventListener('change', e => {
   if (e.target.files[0]) loadFile(e.target.files[0]);
 });
-document.getElementById('resetToOriginal').addEventListener('click', resetToOriginal);
+document.getElementById('resetToLoaded').addEventListener('click', resetToLoaded);
 document.getElementById('resetToDefault').addEventListener('click', resetToDefault);
 document.getElementById('download').addEventListener('click', downloadPatched);
 document.getElementById('loadConfigs').addEventListener('click', () => configsFileInput.click());
@@ -214,14 +214,15 @@ configPanel.addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) loadConfigsFile(e.dataTransfer.files[0]);
 });
 configSelect.addEventListener('change', () => {
-  restoreDefaultValues(); // a config always applies on top of the default values, never stacks
   const c = configs.find(c => c.name === configSelect.value);
   if (!c){
+    restoreLoadedValues();
     configNote.style.opacity = '0';
     render();
     setStatus('Reverted to loaded values.', false, true);
     return;
   }
+  restoreDefaultValues(); // a config always applies on top of the default values, never stacks
   try {
     applyConfig(fileBytes, blocks, c); // throws if it references a field this firmware doesn't have
   } catch(e){
@@ -267,7 +268,7 @@ function parseAndRender(){
     return;
   }
   // snapshot original values once, before any edits, so "changed" styling stays correct across re-renders
-  blocks = found.map(b => ({ ...b, originalValue: readValue(fileBytes, b.valueOffset, b.valueLen, b.type), defaultValue: readValue(fileBytes, b.defValueOffset, b.valueLen, b.type) }));
+  blocks = found.map(b => ({ ...b, loadedValue: readValue(fileBytes, b.valueOffset, b.valueLen, b.type), defaultValue: readValue(fileBytes, b.defValueOffset, b.valueLen, b.type) }));
   setStatus(`Found ${blocks.length} config values.`, false);
   render();
   tablePanel.style.display = 'block';
@@ -333,17 +334,17 @@ function render(){
   });
 }
 
-function restoreOriginalValues(){
-  blocks.forEach(b => writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, b.originalValue));
+function restoreLoadedValues(){
+  blocks.forEach(b => writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, b.loadedValue));
 }
 
 function restoreDefaultValues(){
   blocks.forEach(b => writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, b.defaultValue));
 }
 
-function resetToOriginal(){
+function resetToLoaded(){
   if (!blocks.length) return;
-  restoreOriginalValues();
+  restoreLoadedValues();
   configSelect.value = '';
   configNote.style.opacity = '0';
   render();
