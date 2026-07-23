@@ -1,4 +1,3 @@
-
 // values that can be patched directly in the firmware
 
 CONFIG_ITEM(ADAPTER_MAX_AMPS, "max-amps", uint8_t, 200);

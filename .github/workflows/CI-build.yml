@@ -105,6 +105,6 @@ jobs:
           - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
           - **JDEMO**: Jdemo quirk: disable dynamic current.
 
-          ### Custom config tool
-          - If you need something special, eg. reduce max amps, you can use this [Tool](https://osexpert.github.io/ccs32clara-chademo/config.html) to customize the firmware further.
+          ### Config editor
+          - If you need something special, eg. reduce max amps, you can use this [Config editor](https://osexpert.github.io/ccs32clara-chademo/config.html) to customize the downloaded firmware.
           EOF
