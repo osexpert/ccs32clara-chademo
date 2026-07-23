@@ -22,6 +22,7 @@
     background:var(--bg); color:var(--text);
     font-family:var(--mono); font-size:14px;
     display:flex; justify-content:center;
+    zoom: 0.80;
   }
   .wrap{width:100%; max-width:760px;}
   h1{
@@ -70,14 +71,24 @@
   .toggle input{position:absolute; opacity:0; inset:0; cursor:pointer; margin:0;}
   .track{
     position:absolute; inset:0; background:#0a0f0d; border:1px solid var(--line);
-    border-radius:1rem; transition:background .15s, border-color .15s;
+    border-radius:1rem; transition:background .15s, border-color .15s, box-shadow .15s;
   }
   .knob{
     position:absolute; top:1px; left:1px; width:1.05rem; height:1.05rem;
     background:var(--dim); border-radius:50%; transition:transform .15s, background .15s;
   }
-  input:checked + .track{border-color:var(--accent-dim); background:rgba(94,230,160,.08);}
-  input:checked + .track .knob{transform:translateX(1.1rem); background:var(--accent);}
+  input:checked + .track {
+    border-color: var(--line); 
+    background: #0a0f0d; 
+  }
+  input:checked + .track .knob {
+    transform: translateX(1.1rem); 
+    background: var(--dim); 
+  }
+  input.changed + .track {
+    border-color: var(--warn) !important;
+    box-shadow: 0 0 0 1px var(--warn);
+  }
   .row{display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;}
   button{
     background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent-dim);
@@ -100,6 +111,7 @@
     font-size:.75rem; color:var(--dim); margin-top:.7rem; padding:.6rem .8rem;
     border-left:2px solid var(--accent-dim); background:rgba(94,230,160,.05); line-height:1.5;
     min-height:2.8rem; opacity:0; transition:opacity .15s;
+    white-space: pre-wrap; /* Keep newline */
   }
   .config-row{display:flex; gap:.8rem; align-items:flex-start;}
   .config-row select{flex:1;}
@@ -138,13 +150,14 @@
 
   <div class="panel" id="tablePanel" style="display:none;">
     <table>
-      <thead><tr><th>Name</th><th>Type</th><th style="text-align:right;">Original</th><th style="text-align:right;">Value</th></tr></thead>
+      <thead><tr><th>Name</th><th>Type</th><th style="text-align:right;">Default</th><th style="text-align:right;">Value</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
 
   <div class="row" id="actions" style="display:none;">
-    <button class="secondary" id="reset">Reset to original</button>
+    <button class="secondary" id="resetToOriginal">Reset to loaded</button>
+    <button class="secondary" id="resetToDefault">Reset to default</button>
     <button id="download">Download patched file</button>
   </div>
 </div>
@@ -187,7 +200,8 @@ dropEl.addEventListener('drop', e => {
 fileInput.addEventListener('change', e => {
   if (e.target.files[0]) loadFile(e.target.files[0]);
 });
-document.getElementById('reset').addEventListener('click', resetChanges);
+document.getElementById('resetToOriginal').addEventListener('click', resetToOriginal);
+document.getElementById('resetToDefault').addEventListener('click', resetToDefault);
 document.getElementById('download').addEventListener('click', downloadPatched);
 document.getElementById('loadConfigs').addEventListener('click', () => configsFileInput.click());
 configsFileInput.addEventListener('change', e => {
@@ -205,7 +219,7 @@ configSelect.addEventListener('change', () => {
   if (!c){
     configNote.style.opacity = '0';
     render();
-    setStatus('Reverted to original values.', false, true);
+    setStatus('Reverted to loaded values.', false, true);
     return;
   }
   try {
@@ -253,7 +267,7 @@ function parseAndRender(){
     return;
   }
   // snapshot original values once, before any edits, so "changed" styling stays correct across re-renders
-  blocks = found.map(b => ({ ...b, originalValue: readValue(fileBytes, b.valueOffset, b.valueLen, b.type) }));
+  blocks = found.map(b => ({ ...b, originalValue: readValue(fileBytes, b.valueOffset, b.valueLen, b.type), defaultValue: readValue(fileBytes, b.defValueOffset, b.valueLen, b.type) }));
   setStatus(`Found ${blocks.length} config values.`, false);
   render();
   tablePanel.style.display = 'block';
@@ -272,8 +286,8 @@ function render(){
     origTd.style.textAlign = 'right';
     origTd.style.color = 'var(--dim)';
     origTd.textContent = b.type === 'bool'
-      ? (readValue(fileBytes, b.orgValueOffset, b.valueLen, b.type) ? 'true' : 'false')
-      : readValue(fileBytes, b.orgValueOffset, b.valueLen, b.type);
+      ? (readValue(fileBytes, b.defValueOffset, b.valueLen, b.type) ? 'true' : 'false')
+      : readValue(fileBytes, b.defValueOffset, b.valueLen, b.type);
     const valTd = document.createElement('td');
     valTd.style.textAlign = 'right';
 
@@ -284,8 +298,12 @@ function render(){
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = !!val;
+      // Tag if switch is changed from original value
+      cb.classList.toggle('changed', Boolean(val) !== Boolean(b.defaultValue));
       cb.addEventListener('change', () => {
-        writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, cb.checked ? 1 : 0);
+        const newValue = cb.checked ? 1 : 0;
+        writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, newValue);
+        cb.classList.toggle('changed', Boolean(newValue) !== Boolean(b.defaultValue));
       });
       label.appendChild(cb);
       const track = document.createElement('span'); track.className = 'track';
@@ -299,14 +317,14 @@ function render(){
       input.type = 'number';
       input.min = min; input.max = max; input.step = 1;
       input.value = val;
-      if (val !== b.originalValue) input.classList.add('changed');
+      if (val !== b.defaultValue) input.classList.add('changed');
       input.addEventListener('input', () => {
         let n = parseInt(input.value, 10);
         if (isNaN(n)) return;
         const clamped = Math.max(min, Math.min(max, n));
         if (clamped !== n) input.value = clamped; // keep the field honest about what's actually stored
         writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, clamped);
-        input.classList.toggle('changed', clamped !== b.originalValue);
+        input.classList.toggle('changed', clamped !== b.defaultValue);
       });
       valTd.appendChild(input);
     }
@@ -319,13 +337,26 @@ function restoreOriginalValues(){
   blocks.forEach(b => writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, b.originalValue));
 }
 
-function resetChanges(){
+function restoreDefaultValues(){
+  blocks.forEach(b => writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, b.defaultValue));
+}
+
+function resetToOriginal(){
   if (!blocks.length) return;
   restoreOriginalValues();
   configSelect.value = '';
   configNote.style.opacity = '0';
   render();
-  setStatus('Reset to original.', false, true);
+  setStatus('Reset to loaded.', false, true);
+}
+
+function resetToDefault(){
+  if (!blocks.length) return;
+  restoreDefaultValues();
+  configSelect.value = '';
+  configNote.style.opacity = '0';
+  render();
+  setStatus('Reset to default.', false, true);
 }
 
 function downloadPatched(){

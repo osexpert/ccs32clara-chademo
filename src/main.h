@@ -32,14 +32,14 @@ struct ConfigBlock
     char name[NS];
     char type[TNS];
     uint8_t value_len;
-    volatile VT org_value;
+    volatile VT def_value;
     volatile VT config_value;
     char end_marker[10];
 };
 
 #pragma pack(pop)
 
-#define CONFIG_ITEM(var_name, cfg_name_unused, type, org_value_unused) extern volatile type& var_name;
+#define CONFIG_ITEM(var_name, cfg_name_unused, type, def_value_unused) extern volatile type& var_name;
 
 #include "config_list.h"
 

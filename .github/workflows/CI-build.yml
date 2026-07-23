@@ -61,35 +61,35 @@ jobs:
           node-version: 20
 
       - name: Patch AV1 variant
-        run: node config.js My407ccs2chademo.bin configs.json av1 av1/My407ccs2chademo.bin
+        run: node config.js My407ccs2chademo.bin configs.json AV1 av1/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1
           path: av1/My407ccs2chademo.bin
 
       - name: Patch V2X variant
-        run: node config.js My407ccs2chademo.bin configs.json v2x v2x/My407ccs2chademo.bin
+        run: node config.js My407ccs2chademo.bin configs.json V2X v2x/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X
           path: v2x/My407ccs2chademo.bin
 
       - name: Patch V2X-AO variant
-        run: node config.js My407ccs2chademo.bin configs.json v2x-ao v2x-ao/My407ccs2chademo.bin
+        run: node config.js My407ccs2chademo.bin configs.json V2X-AO v2x-ao/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X-AO
           path: v2x-ao/My407ccs2chademo.bin
 
       - name: Patch SX variant
-        run: node config.js My407ccs2chademo.bin configs.json sx sx/My407ccs2chademo.bin
+        run: node config.js My407ccs2chademo.bin configs.json SX sx/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-SX
           path: sx/My407ccs2chademo.bin
 
       - name: Patch JDEMO variant
-        run: node config.js My407ccs2chademo.bin configs.json jdemo jdemo/My407ccs2chademo.bin
+        run: node config.js My407ccs2chademo.bin configs.json JDEMO jdemo/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-JDEMO

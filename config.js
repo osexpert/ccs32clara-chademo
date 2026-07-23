@@ -1,6 +1,7 @@
 // Shared logic for the ccs32clara-chademo config editor.
 // Works three ways, unmodified:
-//   1. <script src="config.js"></script> in index.html — functions become globals.
+//   1. <script src="config.js"></script> in index.html ï¿½ exposes window.ConfigEditor only,
+//      nothing else leaks into global scope (avoids clashing with anything index.html declares).
 //   2. const cfg = require('./config.js') from another Node script/module.
 //   3. node config.js <firmware-in> <configs.json> <config-name> <firmware-out>  (CLI, see bottom)
 
@@ -11,11 +12,13 @@
 //   char name[NS];             e.g. "max-amps\0"
 //   char type[TNS];            e.g. "uint8_t\0"
 //   uint8_t value_len;         sizeof(VT)
-//   volatile VT org_value;     compile-time default, never modified by this tool
+//   volatile VT def_value;     compile-time default, never modified by this tool
 //   volatile VT config_value;  the value we read/patch
 //   char end_marker[10];       "</config>\0"
 // };
 // #pragma pack(pop)
+
+(function(){
 
 const LITTLE_ENDIAN = true; // STM32 is always LE
 
@@ -55,13 +58,13 @@ function parseConfigBlocks(bytes){
       const name = readCString(bytes, pos); pos += name.len;
       const type = readCString(bytes, pos); pos += type.len;
       const valueLen = bytes[pos]; pos += 1;
-      const orgValueOffset = pos;                 // org_value comes first now
-      const valueOffset = orgValueOffset + valueLen; // config_value — the writable field
+      const defValueOffset = pos;                 // def_value comes first now
+      const valueOffset = defValueOffset + valueLen; // config_value ï¿½ the writable field
       const afterConfigValue = valueOffset + valueLen;
       const endStr = new TextDecoder().decode(bytes.slice(afterConfigValue, afterConfigValue + END.length));
       if (endStr !== END){ i++; continue; }
       const blockEnd = afterConfigValue + END.length + 1; // + its null terminator
-      found.push({ name: name.str, type: type.str, valueLen, orgValueOffset, valueOffset });
+      found.push({ name: name.str, type: type.str, valueLen, defValueOffset, valueOffset });
       i = blockEnd;
     } catch(e){
       i++;
@@ -99,7 +102,28 @@ function bounds(type, len){
 
 // ---- config list (configs.json) ----
 // { "configs": [ { "name": "taycan", "extends": "default", "description": "...", "values": {"max-volts": 750} } ] }
-// "name" is the only identifier — also what "extends" references and what selects a config from the CLI.
+// "name" is the only identifier ï¿½ also what "extends" references and what selects a config from the CLI.
+
+function resolveDescription(raw, byName, seen){
+  if (seen.has(raw.name)) return raw.description || ''; // Guard against cyclic inheritance loops
+  seen.add(raw.name);
+  
+  const descriptions = [];
+  
+  // Resolve parent description first if this config extends another
+  if (raw.extends && byName[raw.extends]){
+    const parentDesc = resolveDescription(byName[raw.extends], byName, seen);
+    if (parentDesc) descriptions.push(parentDesc);
+  }
+  
+  // Append current config's description
+  if (raw.description && raw.description.trim() !== '') {
+    descriptions.push(raw.description.trim());
+  }
+  
+  // Join all descriptions separated by newlines
+  return descriptions.join('\n');
+}
 
 function resolveConfig(raw, byName, seen){
   if (seen.has(raw.name)) return raw.values || {}; // guard against cycles
@@ -116,13 +140,13 @@ function loadConfigList(json){
   const byName = Object.fromEntries(list.map(c => [c.name, c]));
   return list.map(c => ({
     name: c.name,
-    description: c.description || '',
+    description: resolveDescription(c, byName, new Set()),
     values: resolveConfig(c, byName, new Set())
   }));
 }
 
 // Applies a resolved config to bytes. Strict: if ANY field in config.values doesn't
-// exist in this firmware's blocks, nothing is written at all and an Error is thrown —
+// exist in this firmware's blocks, nothing is written at all and an Error is thrown ï¿½
 // a config JSON that's out of sync with the firmware must fail loudly, never silently
 // produce a partially-patched file.
 function applyConfig(bytes, blocks, config){
@@ -178,3 +202,5 @@ if (typeof require !== 'undefined' && typeof module !== 'undefined' && require.m
     process.exit(1);
   }
 }
+
+})();

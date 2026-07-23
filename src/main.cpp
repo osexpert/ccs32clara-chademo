@@ -50,17 +50,17 @@
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
 
-#define CONFIG_ITEM(var_name, cfg_name, type, org_value)                         \
-    __attribute__((used, section(".config")))                    \
-    ConfigBlock<sizeof(cfg_name), sizeof(#type), type> var_name##_block = {                  \
-        "<config>",                                               \
-        cfg_name,                                                    \
-        #type,                                            \
-        sizeof(type),                                            \
-        org_value,                                            \
-        org_value,                                            \
-        "</config>"                                              \
-    };                                                           \
+#define CONFIG_ITEM(var_name, cfg_name, type, def_value) \
+    __attribute__((used, section(".config")))            \
+    ConfigBlock<sizeof(cfg_name), sizeof(#type), type> var_name##_block = { \
+        "<config>",                                      \
+        cfg_name,                                        \
+        #type,                                           \
+        sizeof(type),                                    \
+        def_value,                                       \
+        def_value,                                       \
+        "</config>"                                      \
+    };                                                   \
     volatile type& var_name = var_name##_block.config_value;
 
 #include "config_list.h"
@@ -74,10 +74,10 @@ inline void PrintConfigValue(const char* name, T value){
     println("config %s:%d", name, value);
 }
 
-#define CONFIG_ITEM(var_name, cfg_name_unused, type_unused, org_value_unused)                         \
+#define CONFIG_ITEM(var_name, cfg_name_unused, type_unused, def_value_unused) \
     do {                                                                      \
-        if (var_name##_block.config_value != var_name##_block.org_value)               \
-            PrintConfigValue(var_name##_block.name, var_name##_block.config_value);                              \
+        if (var_name##_block.config_value != var_name##_block.def_value)      \
+            PrintConfigValue(var_name##_block.name, var_name##_block.config_value); \
     } while (0)
 
 void print_config_changes()
