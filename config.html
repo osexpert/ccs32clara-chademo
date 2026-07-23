@@ -214,7 +214,7 @@ configPanel.addEventListener('drop', e => {
   if (e.dataTransfer.files[0]) loadConfigsFile(e.dataTransfer.files[0]);
 });
 configSelect.addEventListener('change', () => {
-  restoreOriginalValues(); // a config always applies on top of the original file, never stacks
+  restoreDefaultValues(); // a config always applies on top of the default values, never stacks
   const c = configs.find(c => c.name === configSelect.value);
   if (!c){
     configNote.style.opacity = '0';
