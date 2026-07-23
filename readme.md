@@ -2,9 +2,7 @@
 
 [![Build status](../../actions/workflows/CI-build.yml/badge.svg)](../../actions/workflows/CI-build.yml)
 
-![image](doc/small_logo.png)
-
-![image](doc/ccs2-chademo_adapter.jpg)
+![image](doc/medium_logo.jpg) ![image](doc/ccs2-chademo_adapter.jpg)
 
 This is ccs32clara derived firmware for Dongguan Longood CCS2 to CHAdeMO adapter (My407ccs2chademo.bin)
 
