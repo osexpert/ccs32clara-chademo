@@ -1,0 +1,36 @@
+{
+  "configs": [
+    {
+      "name": "SX",
+      "description": "Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.",
+      "values": { "sx": true }
+    },
+    {
+      "name": "V2X",
+      "description": "V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).",
+      "values": { "v2x": true }
+    },
+    {
+      "name": "V2X-AO",
+      "extends": "V2X",
+      "description": "Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual.",
+      "values": { "always-on": true }
+    },
+    {
+      "name": "AV1",
+      "description": "For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery.",
+      "values": { "alt-estimated-voltage": 1 }
+    },
+    {
+      "name": "JDEMO",
+      "description": "Jdemo quirk: prevent dynamic control.",
+      "values": { "dynamic-control-fallback": false }
+    },
+    {
+      "name": "JDEMO125A",
+      "extends": "JDEMO",
+      "description": "Jdemo quirk: limit to 125A.",
+      "values": { "max-amps": 125 }
+    }
+  ]
+}
