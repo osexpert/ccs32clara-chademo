@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ccs32clara-chademo config editor</title>
+<style>
+  :root{
+    --bg: #0d1210;
+    --panel: #131a17;
+    --line: #24322c;
+    --text: #d7e4dd;
+    --dim: #7f9186;
+    --accent: #5ee6a0;
+    --accent-dim: #2e6b4c;
+    --warn: #e0a458;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:2.5rem 1.5rem 5rem;
+    background:var(--bg); color:var(--text);
+    font-family:var(--mono); font-size:14px;
+    display:flex; justify-content:center;
+  }
+  .wrap{width:100%; max-width:760px;}
+  h1{
+    font-size:1rem; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 .3rem;
+  }
+  .sub{color:var(--dim); margin:0 0 2rem; font-size:.8rem; line-height:1.5;}
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:1.2rem; margin-bottom:1rem; transition:border-color .15s;
+  }
+  .panel.drag{border-color:var(--accent);}
+  .panel h2{
+    font-size:.7rem; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--dim); margin:0 0 .8rem; font-weight:500;
+  }
+  .drop{
+    border:1px dashed var(--line); border-radius:6px; padding:2rem 1rem;
+    text-align:center; color:var(--dim); cursor:pointer; transition:border-color .15s;
+  }
+  .drop:hover, .drop.drag{border-color:var(--accent);}
+  .drop input{display:none;}
+  .filename{color:var(--accent); font-weight:600;}
+  table{width:100%; border-collapse:collapse;}
+  th{
+    text-align:left; font-size:.68rem; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--dim); font-weight:500; padding:.4rem .5rem; border-bottom:1px solid var(--line);
+  }
+  td{padding:.5rem; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .name{color:var(--text); font-weight:600;}
+  .type{color:var(--dim);}
+  input[type=number]{
+    width:8rem; background:#0a0f0d; border:1px solid var(--line); color:var(--text);
+    font-family:var(--mono); font-size:13px; padding:.3rem .5rem; border-radius:4px;
+  }
+  input[type=number]:focus{outline:none; border-color:var(--accent);}
+  input[type=number].changed{border-color:var(--warn); color:var(--warn);}
+  select{
+    background:#0a0f0d; border:1px solid var(--line); color:var(--text);
+    font-family:var(--mono); font-size:13px; padding:.4rem .6rem; border-radius:4px;
+    width:100%;
+  }
+  select:focus{outline:none; border-color:var(--accent);}
+  .toggle{position:relative; width:2.4rem; height:1.3rem; cursor:pointer; display:inline-block;}
+  .toggle input{position:absolute; opacity:0; inset:0; cursor:pointer; margin:0;}
+  .track{
+    position:absolute; inset:0; background:#0a0f0d; border:1px solid var(--line);
+    border-radius:1rem; transition:background .15s, border-color .15s;
+  }
+  .knob{
+    position:absolute; top:1px; left:1px; width:1.05rem; height:1.05rem;
+    background:var(--dim); border-radius:50%; transition:transform .15s, background .15s;
+  }
+  input:checked + .track{border-color:var(--accent-dim); background:rgba(94,230,160,.08);}
+  input:checked + .track .knob{transform:translateX(1.1rem); background:var(--accent);}
+  .row{display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;}
+  button{
+    background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent-dim);
+    font-family:var(--mono); font-size:.8rem; letter-spacing:.03em;
+    padding:.55rem 1rem; border-radius:4px; cursor:pointer; transition:filter .15s;
+  }
+  button:hover{filter:brightness(1.25);}
+  button:disabled{opacity:.35; cursor:not-allowed;}
+  button.secondary{background:transparent; color:var(--dim); border-color:var(--line);}
+  button.small{padding:.4rem .7rem; font-size:.72rem; white-space:nowrap;}
+  .status{font-size:.75rem; color:var(--dim); min-height:1.2em;}
+  .status.err{color:#e07070;}
+  .status.ok{color:var(--accent);}
+  .meta{font-size:.85rem; color:var(--dim); margin-top:.3rem;}
+  .badge{
+    font-size:.65rem; padding:.1rem .4rem; border-radius:3px; border:1px solid var(--line);
+    color:var(--dim); margin-left:.4rem;
+  }
+  .note{
+    font-size:.75rem; color:var(--dim); margin-top:.7rem; padding:.6rem .8rem;
+    border-left:2px solid var(--accent-dim); background:rgba(94,230,160,.05); line-height:1.5;
+    min-height:2.8rem; opacity:0; transition:opacity .15s;
+  }
+  .config-row{display:flex; gap:.8rem; align-items:flex-start;}
+  .config-row select{flex:1;}
+  .hint{font-size:.8rem; color:var(--dim); margin-top:.5rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ccs32clara-chademo config editor</h1>
+  <p class="sub">Loads a firmware binary, finds every <code>&lt;config&gt;...&lt;/config&gt;</code> block and lets you patch config values directly in the file.</p>
+
+  <div class="panel">
+    <h2>Firmware</h2>
+    <div class="drop" id="drop">
+      <input type="file" id="file"/>
+      <div id="dropLabel">Drop a firmware file here, or click to choose one</div>
+    </div>
+    <div class="meta" id="fwVersion"></div>
+    <div class="row" style="margin-top:.8rem;">
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="configPanel">
+    <h2>Configuration</h2>
+    <div class="config-row">
+      <select id="configSelect">
+        <option value="">— Custom / no config —</option>
+      </select>
+      <button class="secondary small" id="loadConfigs">Load configs (JSON)</button>
+      <input type="file" id="configsFile" accept="application/json" style="display:none;"/>
+    </div>
+    <div class="hint">Auto-loads <code>configs.json</code> from next to this page. Or drag a configs JSON file onto this panel.</div>
+    <div class="note" id="configNote"></div>
+  </div>
+
+  <div class="panel" id="tablePanel" style="display:none;">
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th style="text-align:right;">Original</th><th style="text-align:right;">Value</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="row" id="actions" style="display:none;">
+    <button class="secondary" id="reset">Reset to original</button>
+    <button id="download">Download patched file</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+if (typeof ConfigEditor === 'undefined'){
+  document.body.innerHTML = '<p style="color:#e07070;font-family:monospace;padding:2rem;max-width:600px;">' +
+    'Could not load <code>config.js</code>. Make sure <code>config.js</code> is saved in the ' +
+    'same folder as this <code>index.html</code> file — they were downloaded as two separate ' +
+    'files and both are required.</p>';
+  throw new Error('ConfigEditor not loaded — is config.js next to index.html?');
+}
+const { parseConfigBlocks, readValue, writeValue, bounds, findVersionString, loadConfigList, applyConfig } = ConfigEditor;
+
+let fileBytes = null;     // Uint8Array, mutated in place on write — only copy of the file kept in RAM
+let fileName = "firmware.bin";
+let blocks = [];           // parsed block descriptors, incl. originalValue snapshot
+let configs = [];          // flat list of {name, description, values(resolved)}
+
+const dropEl = document.getElementById('drop');
+const fwVersionEl = document.getElementById('fwVersion');
+const fileInput = document.getElementById('file');
+const statusEl = document.getElementById('status');
+const rowsEl = document.getElementById('rows');
+const tablePanel = document.getElementById('tablePanel');
+const actionsEl = document.getElementById('actions');
+const configPanel = document.getElementById('configPanel');
+const configSelect = document.getElementById('configSelect');
+const configNote = document.getElementById('configNote');
+const configsFileInput = document.getElementById('configsFile');
+
+dropEl.addEventListener('click', () => fileInput.click());
+dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('drag'); });
+dropEl.addEventListener('dragleave', () => dropEl.classList.remove('drag'));
+dropEl.addEventListener('drop', e => {
+  e.preventDefault(); dropEl.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+document.getElementById('reset').addEventListener('click', resetChanges);
+document.getElementById('download').addEventListener('click', downloadPatched);
+document.getElementById('loadConfigs').addEventListener('click', () => configsFileInput.click());
+configsFileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadConfigsFile(e.target.files[0]);
+});
+configPanel.addEventListener('dragover', e => { e.preventDefault(); configPanel.classList.add('drag'); });
+configPanel.addEventListener('dragleave', () => configPanel.classList.remove('drag'));
+configPanel.addEventListener('drop', e => {
+  e.preventDefault(); configPanel.classList.remove('drag');
+  if (e.dataTransfer.files[0]) loadConfigsFile(e.dataTransfer.files[0]);
+});
+configSelect.addEventListener('change', () => {
+  restoreOriginalValues(); // a config always applies on top of the original file, never stacks
+  const c = configs.find(c => c.name === configSelect.value);
+  if (!c){
+    configNote.style.opacity = '0';
+    render();
+    setStatus('Reverted to original values.', false, true);
+    return;
+  }
+  try {
+    applyConfig(fileBytes, blocks, c); // throws if it references a field this firmware doesn't have
+  } catch(e){
+    configSelect.value = '';
+    configNote.style.opacity = '0';
+    render();
+    setStatus(e.message, true);
+    return;
+  }
+  render();
+  configNote.textContent = c.description || '';
+  configNote.style.opacity = c.description ? '1' : '0';
+  setStatus(`Applied config "${c.name}".`, false, true);
+});
+
+// ---- firmware file handling ----
+
+function loadBytes(buffer, name){
+  fileName = name;
+  fileBytes = new Uint8Array(buffer);
+  document.getElementById('dropLabel').innerHTML =
+    `<span class="filename">${fileName}</span> (${fileBytes.length.toLocaleString()} bytes)`;
+  const version = findVersionString(fileBytes);
+  fwVersionEl.textContent = version ? `Version: ${version}` : '';
+  configSelect.value = '';
+  configNote.style.opacity = '0';
+  parseAndRender();
+}
+
+function loadFile(file){
+  const reader = new FileReader();
+  reader.onload = () => loadBytes(reader.result, file.name);
+  reader.onerror = () => setStatus('Could not read the file.', true);
+  reader.readAsArrayBuffer(file);
+}
+
+function parseAndRender(){
+  const found = parseConfigBlocks(fileBytes);
+  if (found.length === 0){
+    setStatus('No <config> blocks found in this file.', true);
+    tablePanel.style.display = 'none';
+    actionsEl.style.display = 'none';
+    return;
+  }
+  // snapshot original values once, before any edits, so "changed" styling stays correct across re-renders
+  blocks = found.map(b => ({ ...b, originalValue: readValue(fileBytes, b.valueOffset, b.valueLen, b.type) }));
+  setStatus(`Found ${blocks.length} config values.`, false);
+  render();
+  tablePanel.style.display = 'block';
+  actionsEl.style.display = 'flex';
+}
+
+function render(){
+  rowsEl.innerHTML = '';
+  blocks.forEach(b => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.innerHTML = `<span class="name">${b.name}</span>`;
+    const typeTd = document.createElement('td');
+    typeTd.innerHTML = `<span class="type">${b.type}</span><span class="badge">${b.valueLen}B</span>`;
+    const origTd = document.createElement('td');
+    origTd.style.textAlign = 'right';
+    origTd.style.color = 'var(--dim)';
+    origTd.textContent = b.type === 'bool'
+      ? (readValue(fileBytes, b.orgValueOffset, b.valueLen, b.type) ? 'true' : 'false')
+      : readValue(fileBytes, b.orgValueOffset, b.valueLen, b.type);
+    const valTd = document.createElement('td');
+    valTd.style.textAlign = 'right';
+
+    if (b.type === 'bool'){
+      const val = readValue(fileBytes, b.valueOffset, b.valueLen, b.type);
+      const label = document.createElement('label');
+      label.className = 'toggle';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!val;
+      cb.addEventListener('change', () => {
+        writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, cb.checked ? 1 : 0);
+      });
+      label.appendChild(cb);
+      const track = document.createElement('span'); track.className = 'track';
+      const knob = document.createElement('span'); knob.className = 'knob';
+      track.appendChild(knob); label.appendChild(track);
+      valTd.appendChild(label);
+    } else {
+      const val = readValue(fileBytes, b.valueOffset, b.valueLen, b.type);
+      const [min, max] = bounds(b.type, b.valueLen);
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = min; input.max = max; input.step = 1;
+      input.value = val;
+      if (val !== b.originalValue) input.classList.add('changed');
+      input.addEventListener('input', () => {
+        let n = parseInt(input.value, 10);
+        if (isNaN(n)) return;
+        const clamped = Math.max(min, Math.min(max, n));
+        if (clamped !== n) input.value = clamped; // keep the field honest about what's actually stored
+        writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, clamped);
+        input.classList.toggle('changed', clamped !== b.originalValue);
+      });
+      valTd.appendChild(input);
+    }
+    tr.appendChild(nameTd); tr.appendChild(typeTd); tr.appendChild(origTd); tr.appendChild(valTd);
+    rowsEl.appendChild(tr);
+  });
+}
+
+function restoreOriginalValues(){
+  blocks.forEach(b => writeValue(fileBytes, b.valueOffset, b.valueLen, b.type, b.originalValue));
+}
+
+function resetChanges(){
+  if (!blocks.length) return;
+  restoreOriginalValues();
+  configSelect.value = '';
+  configNote.style.opacity = '0';
+  render();
+  setStatus('Reset to original.', false, true);
+}
+
+function downloadPatched(){
+  const blob = new Blob([fileBytes], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  setStatus(`Downloaded ${fileName}`, false, true);
+}
+
+function setStatus(msg, isErr, isOk){
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (isErr ? ' err' : isOk ? ' ok' : '');
+}
+
+// ---- configs ----
+
+function setConfigs(json){
+  configs = loadConfigList(json);
+  configSelect.innerHTML = '<option value="">— Custom / no config —</option>' +
+    configs.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+}
+
+function loadConfigsFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      setConfigs(JSON.parse(reader.result));
+      setStatus(`Loaded ${configs.length} configs.`, false, true);
+    } catch(e){
+      setStatus('Invalid config JSON: ' + e.message, true);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// configs.json sits next to this page — load it automatically. Falls back silently
+// to the manual file picker / drag-and-drop above if this fetch fails (e.g. opened
+// as a local file:// page, or there's simply no configs.json here).
+fetch('configs.json')
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then(json => {
+    setConfigs(json);
+    setStatus(`Loaded ${configs.length} configs from configs.json.`, false, true);
+  })
+  .catch(() => { /* no configs.json here — that's fine, use the manual loader */ });
+</script>
+</body>
+</html>

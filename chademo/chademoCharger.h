@@ -618,15 +618,13 @@ struct CarData
     bool HasDynamicControl() const
     {
         bool dynamicControl = has_flag(ExtendedFunction1, ExtendedFunction1Flags::DYNAMIC_CONTROL) || has_flag(Status, CarStatus::LEGACY_DYNAMIC_CONTROL);
+        // If car says it support it, then assume it does:-)
         if (dynamicControl)
             return true;
 
         // jdemo dont allow it and stops when available current is reduced to 10 during ramp up.
-        if (CONFIG_JDEMO)
-            return false;
-
         // Try to pretent all other cars allows it (even thou some may not respect it, it should not matter)
-        return true;
+        return DYNAMIC_CONTROL_FALLBACK;
     }
 };
 

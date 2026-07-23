@@ -105,8 +105,6 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg100.m.SocPercentConstant, _msg100_isr.m.SocPercentConstant, "100.SocPercentConstant %d -> %d");
         
-        COMPARE_SET(_msg100.m.Unused7, _msg100_isr.m.Unused7, "100.Unused7 %d -> %d");
-
         _carData.MinVoltage = _msg100.m.MinVoltage;
         _carData.MaxVoltage = _msg100.m.MaxVoltage;
 
@@ -121,10 +119,6 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg101.m.MaxChargingTimeMinutes, _msg101_isr.m.MaxChargingTimeMinutes, "101.MaxChargingTimeMinutes %d -> %d");
         COMPARE_SET(_msg101.m.EstimatedChargingTimeMinutes, _msg101_isr.m.EstimatedChargingTimeMinutes, "101.EstimatedChargingTimeMins %d -> %d");
         COMPARE_SET(_msg101.m.BatteryCapacity, _msg101_isr.m.BatteryCapacity, "101.BatteryCapacity %d -> %d");
-
-        COMPARE_SET(_msg101.m.Unused0, _msg101_isr.m.Unused0, "101.Unused0 %d -> %d");
-        COMPARE_SET(_msg101.m.Unused4, _msg101_isr.m.Unused4, "101.Unused4 %d -> %d");
-        COMPARE_SET(_msg101.m.Unused7, _msg101_isr.m.Unused7, "101.Unused7 %d -> %d");
 
         _carData.EstimatedChargingTimeMins = _msg101.m.EstimatedChargingTimeMinutes;
 
@@ -146,7 +140,6 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg102.m.Faults, _msg102_isr.m.Faults, "102.Faults 0x%02x -> 0x%02x");
         COMPARE_SET_X2(_msg102.m.Status, _msg102_isr.m.Status, "102.Status %08b (0x%02x) -> %08b (0x%02x)");
         COMPARE_SET(_msg102.m.SocPercent, _msg102_isr.m.SocPercent, "102.SocPercent %d -> %d");
-        COMPARE_SET(_msg102.m.Unused7, _msg102_isr.m.Unused7, "102.Unused7 %d -> %d");
 
         _carData.CyclesSinceCarLastRequestCurrent = 0; // for timeout
         _carData.Faults = (CarFaults)_msg102.m.Faults;
@@ -221,9 +214,6 @@ void ChademoCharger::HandlePendingCarMessages()
         _msg200_pending = false;
 
         COMPARE_SET(_msg200.m.MaxDischargeCurrentInverted, _msg200_isr.m.MaxDischargeCurrentInverted, "200.MaxDischargeCurrentInverted %d -> %d");
-        COMPARE_SET(_msg200.m.Unused1, _msg200_isr.m.Unused1, "200.Unused1 %d -> %d");
-        COMPARE_SET(_msg200.m.Unused2, _msg200_isr.m.Unused2, "200.Unused2 %d -> %d");
-        COMPARE_SET(_msg200.m.Unused3, _msg200_isr.m.Unused3, "200.Unused3 %d -> %d");
         COMPARE_SET(_msg200.m.MinDischargeVoltage, _msg200_isr.m.MinDischargeVoltage, "200.MinDischargeVoltage %d -> %d");
         COMPARE_SET(_msg200.m.MinBatteryDischargeLevel, _msg200_isr.m.MinBatteryDischargeLevel, "200.MinBatteryDischargeLevel %d -> %d");
         COMPARE_SET(_msg200.m.MaxRemainingCapacityForCharging, _msg200_isr.m.MaxRemainingCapacityForCharging, "200.MaxRemainingCapacityForCharging %d -> %d");
@@ -238,9 +228,6 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg201.m.ProtocolNumber, _msg201_isr.m.ProtocolNumber, "201.ProtocolNumber %d -> %d");
         COMPARE_SET(_msg201.m.ApproxDischargeCompletionTime, _msg201_isr.m.ApproxDischargeCompletionTime, "201.ApproxDischargeCompletionTime %d -> %d");
         COMPARE_SET(_msg201.m.AvailableVehicleEnergy, _msg201_isr.m.AvailableVehicleEnergy, "201.AvailableVehicleEnergy %d -> %d");
-        COMPARE_SET(_msg201.m.Unused5, _msg201_isr.m.Unused5, "201.Unused5 %d -> %d");
-        COMPARE_SET(_msg201.m.Unused6, _msg201_isr.m.Unused6, "201.Unused6 %d -> %d");
-        COMPARE_SET(_msg201.m.Unused7, _msg201_isr.m.Unused7, "201.Unused7 %d -> %d");
     }
 }
 
@@ -319,7 +306,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
 
     if (_carData.TargetVoltage == 410)
     {
-        if (CONFIG_ALTERNATIVE_VOLTAGE == 1) // Leaf 20-30
+        if (CONFIG_ALT_ESTIMATED_VOLTAGE == 1) // Leaf 20-30
         {
             _carData.NomVoltOverride = 380;
             _carData.AdjustBelowSoc = 29;
@@ -340,7 +327,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
 
     if (override)
         println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
-            CONFIG_ALTERNATIVE_VOLTAGE, 
+            CONFIG_ALT_ESTIMATED_VOLTAGE, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
             _carData.MaxVoltOverride,
@@ -724,10 +711,9 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        // C-time <= 4.0s / T-time 10.0s, after Switch(k) cleared?
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
-            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) :
-            HasElapsedSec(4)
+            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false
+            HasElapsedSec(4) // Keep 4s after ChargerStatus::CHARGING = false
             )
         {
             // welding detection done & car contactors open

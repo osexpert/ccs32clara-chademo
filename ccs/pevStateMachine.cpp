@@ -63,7 +63,7 @@ const char* pevSttString = STRINGIFY(STATE_LIST);
 
 //String array for logging
 #define STATE_ENTRY(name, fname, timeout) #fname,
-const char pevSttLabels[][MAX_LABEL_LEN] = { STATE_LIST };
+const char* const pevSttLabels[] = { STATE_LIST };
 #undef STATE_ENTRY
 
 #define MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS 10 /* The process time is specified with 1.5s. Ten loops should be fine. */
