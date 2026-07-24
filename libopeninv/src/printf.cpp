@@ -96,7 +96,7 @@ static int printi(IPutChar* put, int i, int b, int sg, int width, int pad, int l
 	if (i == 0) {
 		print_buf[0] = '0';
 		print_buf[1] = '\0';
-		return prints (put, print_buf, width, pad);
+		return prints(put, print_buf, width, pad);
 	}
 
 	if (sg && b == 10 && i < 0) {
@@ -126,14 +126,14 @@ static int printi(IPutChar* put, int i, int b, int sg, int width, int pad, int l
 		}
 	}
 
-	return pc + prints (put, s, width, pad);
+	return pc + prints(put, s, width, pad);
 }
 
 static int printfp(IPutChar* put, float* f, int width, int pad)
 {
 	char print_buf[PRINT_BUF_LEN];
 	my_ftoa(print_buf, *f);
-	return prints (put, print_buf, width, pad);
+	return prints(put, print_buf, width, pad);
 }
 
 static int print(IPutChar* put, const char *format, va_list args )
@@ -160,38 +160,39 @@ static int print(IPutChar* put, const char *format, va_list args )
 				width *= 10;
 				width += *format - '0';
 			}
-			if( *format == 's' ) {
-				char *s = (char *)va_arg( args, int );
-				pc += prints (put, s?s:"(null)", width, pad);
+			if (*format == 's') {
+				char *s = va_arg(args, char*);
+				pc += prints(put, s?s:"(null)", width, pad);
 				continue;
 			}
-			if( *format == 'd' || *format == 'i') {
-				pc += printi (put, va_arg( args, int ), 10, 1, width, pad, 'a');
+			if (*format == 'd' || *format == 'i') {
+				pc += printi(put, va_arg(args, int), 10, 1, width, pad, 'a');
 				continue;
 			}
 			if (*format == 'u') {
 				pc += printi(put, va_arg(args, unsigned int), 10, 0, width, pad, 'a');
 				continue;
 			}
-			if( *format == 'x' ) {
-				pc += printi (put, va_arg( args, int ), 16, 0, width, pad, 'a');
+			if (*format == 'x') {
+				pc += printi(put, va_arg(args, int), 16, 0, width, pad, 'a');
 				continue;
 			}
-			if( *format == 'X' ) {
-				pc += printi (put, va_arg( args, int ), 16, 0, width, pad, 'A');
+			if (*format == 'X') {
+				pc += printi(put, va_arg(args, int), 16, 0, width, pad, 'A');
 				continue;
 			}
 			if (*format == 'b') {
-				pc += printi(put, va_arg(args, int), 2, 0, width, pad, 'a');
+				int b = va_arg(args, int);
+				pc += prints(put, b ? "true" : "false", width, pad);
 				continue;
 			}
-			if ( *format == 'f' ) {
-				pc += printfp (put, va_arg( args, float*), width, pad);
+			if (*format == 'f') {
+				pc += printfp(put, va_arg(args, float*), width, pad);
 				continue;
 			}
-			if( *format == 'c' ) {
+			if (*format == 'c') {
 				/* char are converted to int then pushed on the stack */
-				scr[0] = (char)va_arg( args, int );
+				scr[0] = (char)va_arg( args, int);
 				scr[1] = '\0';
 				pc += prints (put, scr, width, pad);
 				continue;
@@ -203,7 +204,7 @@ static int print(IPutChar* put, const char *format, va_list args )
 			++pc;
 		}
 	}
-	va_end( args );
+	va_end(args);
 	return pc;
 }
 

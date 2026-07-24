@@ -51,7 +51,6 @@
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
 
 #define CONFIG_ITEM(var_name, cfg_name, type, def_value) \
-    __attribute__((used, section(".config")))            \
     ConfigBlock<sizeof(cfg_name), sizeof(#type), type> var_name##_block = { \
         "<config>",                                      \
         cfg_name,                                        \
@@ -688,6 +687,7 @@ extern "C" int main(void)
 
     println("ccs32clara-chademo " GITHUB_VERSION);
     print_config_changes();
+
     println("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
 
     adc_setup();
@@ -722,7 +722,6 @@ extern "C" int main(void)
 
     if (CONFIG_V2X)
     {
-        println("V2X build -> enable discharge");
         chademoCharger->EnableDischarge();
     }
 
