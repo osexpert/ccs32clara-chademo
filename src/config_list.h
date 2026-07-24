@@ -34,7 +34,8 @@ CONFIG_ITEM(CHADEMO_PRE1_WaitForCarContactorsClosed_MS, "wait-for-contactors-clo
 // Fake output current towards the car. May need to use 2 or 5 to make it work on all cars?
 CONFIG_ITEM(CHADEMO_FAKE_IDLE_AMPS, "fake-idle-amps", uint8_t, 1);
 
-CONFIG_ITEM(CHADEMO_VOLTAGE_MODULATION, "voltage-modulation", bool, false);
+// car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-) But 0 is default (no modulation).
+CONFIG_ITEM(CHADEMO_VOLTAGE_MODULATION, "voltage-modulation", uint8_t, 0);
 
 CONFIG_ITEM(DX_CCS_WaitForPreChargeStart_MS, "wait-for-precharge-start-ms", uint16_t, 2000);
 

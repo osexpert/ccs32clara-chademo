@@ -338,13 +338,17 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     _carData.OverridesJudged = true;
 }
 
-// car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-)
-static const int offsets[] = { 0, 20, 0, -20 };
-
-int ChademoCharger::GetCyclicOffset()
+int ChademoCharger::GetCyclicOffset(uint8_t offset)
 {
-    int result = offsets[_offset_index];
-    _offset_index = (_offset_index + 1) % (sizeof(offsets) / sizeof(offsets[0]));
+    int result = 0;
+
+    if (_offset_index == 1)
+        result = offset;
+    else if (_offset_index == 3)
+        result = -offset;
+
+    _offset_index = (_offset_index + 1) % 4;
+
     return result;
 }
 
@@ -559,8 +563,9 @@ void ChademoCharger::RunStateMachine()
                 _chargerData.OutputVoltageIsEstimated = true;
             }
 
-            if (_chargerData.OutputVoltageIsEstimated && _estimatedOutputVoltageModulation) {
-                _chargerData.OutputVoltage += GetCyclicOffset();
+            if (_chargerData.OutputVoltageIsEstimated && _estimatedOutputVoltageModulation != 0) {
+                // max to prevent less than 0
+                _chargerData.OutputVoltage = max(0, _chargerData.OutputVoltage + GetCyclicOffset(_estimatedOutputVoltageModulation));
             }
 
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?

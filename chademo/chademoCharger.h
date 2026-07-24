@@ -697,7 +697,7 @@ struct ChargerData
 class ChademoCharger
 {
 public:
-    int GetCyclicOffset();
+    int GetCyclicOffset(uint8_t offset);
     bool IsPowerOffOk();
     bool PreChargeCompleted();
     bool AdapterContactorOpened();
@@ -796,7 +796,7 @@ public:
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
         bool _isDischarging = false;
-        bool _estimatedOutputVoltageModulation = CHADEMO_VOLTAGE_MODULATION;
+        uint8_t _estimatedOutputVoltageModulation = CHADEMO_VOLTAGE_MODULATION;
 
         // only allowed to use in: HandlePendingIsrMessages, HandleCanMessage
         volatile bool _msg100_pending = false;
