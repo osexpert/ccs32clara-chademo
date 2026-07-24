@@ -50,6 +50,42 @@
 #define __DSB()  __asm__ volatile ("dsb" ::: "memory")
 #define __ISB()  __asm__ volatile ("isb" ::: "memory")
 
+#define CONFIG_ITEM(var_name, cfg_name, type, def_value) \
+    ConfigBlock<sizeof(cfg_name), sizeof(#type), type> var_name##_block = { \
+        "<config>",                                      \
+        cfg_name,                                        \
+        #type,                                           \
+        sizeof(type),                                    \
+        def_value,                                       \
+        def_value,                                       \
+        "</config>"                                      \
+    };                                                   \
+    volatile type& var_name = var_name##_block.config_value;
+
+#include "config_list.h"
+#undef CONFIG_ITEM
+
+inline void PrintConfigValue(const char* name, bool value){
+    println("config %s:%s", name, value ? "true" : "false");
+}
+template<typename T>
+inline void PrintConfigValue(const char* name, T value){
+    println("config %s:%d", name, value);
+}
+
+#define CONFIG_ITEM(var_name, cfg_name_unused, type_unused, def_value_unused) \
+    do {                                                                      \
+        if (var_name##_block.config_value != var_name##_block.def_value)      \
+            PrintConfigValue(var_name##_block.name, var_name##_block.config_value); \
+    } while (0)
+
+void print_config_changes()
+{
+#include "config_list.h"
+}
+#undef CONFIG_ITEM
+
+
 ChademoCharger* chademoCharger;
 LedBlinker* ledBlinker;
 
@@ -220,7 +256,11 @@ void power_off_no_return()
         msleep(100);
     }
 
-    println("Power off %s. Bye!", GITHUB_VERSION);
+    println("ccs32clara-chademo " GITHUB_VERSION);
+    print_config_changes();
+
+    println("Power off. Bye!");
+
     DigIo::power_on_out.Clear();
 
     led_off();
@@ -645,12 +685,10 @@ extern "C" int main(void)
 
     enable_all_faults();
 
-    println("ccs32clara-chademo %s", GITHUB_VERSION);
-
-    //println("experiment: {experiment info here}");
+    println("ccs32clara-chademo " GITHUB_VERSION);
+    print_config_changes();
 
     println("rcc_ahb_frequency:%d rcc_apb1_frequency:%d rcc_apb2_frequency:%d", rcc_ahb_frequency, rcc_apb1_frequency, rcc_apb2_frequency);
-    // rcc_ahb_frequency:168000000, rcc_apb1_frequency:42000000, rcc_apb2_frequency:84000000
 
     adc_setup();
     adc_read_all();
@@ -684,7 +722,6 @@ extern "C" int main(void)
 
     if (CONFIG_V2X)
     {
-        println("V2X build -> enable discharge");
         chademoCharger->EnableDischarge();
     }
 

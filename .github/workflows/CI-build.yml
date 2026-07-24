@@ -20,110 +20,91 @@ on:
       - 'volts/**'
       - 'add_d2_relay/**'
       - '.github/**'
-
 jobs:
   build:
     name: build-linux
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
       - name: Install build package dependencies
         run: |
           sudo apt-get update
           sudo apt-get install gcc-arm-none-eabi
-
       - name: Build dependencies
         run: |
           echo "Number of processors:" `nproc`
           make get-deps -j `nproc`
-
       - name: Set build date
         id: set_date
         run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
-      # --- Default build ---
+      # --- Default build — the only one that's actually compiled ---
       - name: Build default firmware
         run: |
           make clean all
-
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}
           path: My407ccs2chademo.bin
 
-      # --- AV1 build ---
-      - name: Build AV1 firmware
-        run: |
-          export GITHUB_AV=1
-          export GITHUB_APPEND_VER=-AV1
-          make clean all
+      # --- AV1 / V2X / V2X-AO / SX: patched from the root binary into their own
+      # subfolder via config.js, so the root file is never overwritten and each
+      # variant always reads the same untouched source. upload-artifact strips
+      # the subfolder for a single-file path, so the zip still contains
+      # My407ccs2chademo.bin at its root. ---
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
+      - name: Patch AV1 variant
+        run: node config.js My407ccs2chademo.bin configs.json AV1 av1/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-AV1
-          path: My407ccs2chademo.bin
+          path: av1/My407ccs2chademo.bin
 
-      # --- V2X build ---
-      - name: Build V2X firmware
-        run: |
-          export GITHUB_V2X=1
-          export GITHUB_APPEND_VER=-V2X
-          make clean all
-
+      - name: Patch V2X variant
+        run: node config.js My407ccs2chademo.bin configs.json V2X v2x/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X
-          path: My407ccs2chademo.bin
+          path: v2x/My407ccs2chademo.bin
 
-
-      # --- V2X-AO build ---
-      - name: Build V2X-AO firmware
-        run: |
-          export GITHUB_V2X=1
-          export GITHUB_AO=1
-          export GITHUB_APPEND_VER=-V2X-AO
-          make clean all
-
+      - name: Patch V2X-AO variant
+        run: node config.js My407ccs2chademo.bin configs.json V2X-AO v2x-ao/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-V2X-AO
-          path: My407ccs2chademo.bin
+          path: v2x-ao/My407ccs2chademo.bin
 
-      # --- SX build ---
-      - name: Build SX firmware
-        run: |
-          export GITHUB_SX=1
-          export GITHUB_APPEND_VER=-SX
-          make clean all
-
+      - name: Patch SX variant
+        run: node config.js My407ccs2chademo.bin configs.json SX sx/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-SX
-          path: My407ccs2chademo.bin
+          path: sx/My407ccs2chademo.bin
 
-      # --- JDEMO build ---
-      - name: Build JDEMO firmware
-        run: |
-          export GITHUB_JDEMO=1
-          export GITHUB_APPEND_VER=-JDEMO
-          make clean all
-
+      - name: Patch JDEMO variant
+        run: node config.js My407ccs2chademo.bin configs.json JDEMO jdemo/My407ccs2chademo.bin
       - uses: actions/upload-artifact@v4
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-JDEMO
-          path: My407ccs2chademo.bin
+          path: jdemo/My407ccs2chademo.bin
 
       - name: Add info to summary
         run: |
-          echo "### Build tags" >> $GITHUB_STEP_SUMMARY
-          echo "- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery." >> $GITHUB_STEP_SUMMARY
-          echo "- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation)." >> $GITHUB_STEP_SUMMARY
-          echo "- **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual." >> $GITHUB_STEP_SUMMARY
-          echo "- **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus." >> $GITHUB_STEP_SUMMARY
-          echo "- **JDEMO**: Jdemo quirk: disable dynamic current." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+          ### Build tags
+          - **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery.
+          - **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
+          - **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual.
+          - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
+          - **JDEMO**: Jdemo quirk: disable dynamic current.
+
+          ### Config editor
+          - If you need something special, eg. reduce max amps, you can use this [Config editor](https://osexpert.github.io/ccs32clara-chademo/config.html) to customize the downloaded firmware.
+          EOF
