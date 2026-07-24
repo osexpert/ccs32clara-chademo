@@ -12,6 +12,12 @@ CONFIG_ITEM(ADAPTER_MAX_VOLTS, "max-volts", uint16_t, 500);
 // For any current above 20A then need real measured amps? Try 40.
 CONFIG_ITEM(MAX_DISCHARGE_AMPS_FALLBACK, "max-discharge-amps-fallback", uint8_t, 40);
 
+// Jdemo: custom kit for Toyota RAV4, Tesla Rodster etc. Made by Quick Charge Power https://quickchargepower.com/ (QC Charge https://qccharge.com/).
+// Jdemo is quirky in some ways:
+// - after D2=true, charger must ACK (ChargerStatus::CHARGING=true / ChargerStatus::STOPPED=false) within 2 sec. It is more restrictive than the spec: 2.5sec.
+// - If AvailableOutputCurrent is changed/lowered so that RequestCurrent reack AvailableOutputCurrent, the charging just stops (at least for lower values as 10).
+// - It will/can increase RequestCurrent until it reaches AvailableOutputCurrent - 10 (so for a 200A charger, it will/can ask for 190A until it backs down). The kits were sold as 125A kits, but some were delivered with 200A cables.
+// - It is possible that CHADEMO_MAX_UNDERSUPPLY_AMPS = 20 would work...since it has this weird 10A thing...but also never changing AvailableOutputCurrent seems to work (dynamic-control-fallback = false).
 CONFIG_ITEM(DYNAMIC_CONTROL_FALLBACK, "dynamic-control-fallback", bool, true);
 
 CONFIG_ITEM(CONFIG_SX, "sx", bool, false);
