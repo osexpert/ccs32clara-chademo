@@ -182,8 +182,7 @@ static int print(IPutChar* put, const char *format, va_list args )
 				continue;
 			}
 			if (*format == 'b') {
-				int b = va_arg(args, int);
-				pc += prints(put, b ? "true" : "false", width, pad);
+				pc += printi(put, va_arg(args, int), 2, 0, width, pad, 'a');
 				continue;
 			}
 			if (*format == 'f') {

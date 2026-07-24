@@ -66,7 +66,7 @@
 #undef CONFIG_ITEM
 
 inline void PrintConfigValue(const char* name, bool value){
-    println("config %s:%b", name, value);
+    println("config %s:%s", name, value ? "true" : "false");
 }
 template<typename T>
 inline void PrintConfigValue(const char* name, T value){
