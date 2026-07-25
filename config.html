@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ccs32clara-chademo config editor</title>
 <style>
-  :root{
+:root{
     --bg: #0d1210;
     --panel: #131a17;
     --line: #24322c;
@@ -74,20 +74,45 @@
   }
   .type{color:var(--dim); word-break: break-word;}
   
+  /* --- INPUT FIELDS --- */
   input[type=number]{
     width:100%; 
     max-width:6rem; 
     background:#0a0f0d; border:1px solid var(--line); color:var(--text);
     font-family:var(--mono); font-size:11px; padding:.25rem .4rem; border-radius:4px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  input[type=number]:focus{outline:none; border-color:var(--accent);}
-  input[type=number].changed{border-color:var(--warn); color:var(--warn);}
+  /* Focus for standard number inputs (green glow) */
+  input[type=number]:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(94, 230, 160, 0.25);
+  }
+  /* Modified number inputs (orange border) */
+  input[type=number].changed {
+    border-color: var(--warn); 
+    color: var(--warn);
+  }
+  /* Focus for modified number inputs (orange glow instead of green) */
+  input[type=number].changed:focus-visible {
+    border-color: var(--warn);
+    box-shadow: 0 0 0 2px rgba(224, 164, 88, 0.3);
+  }
+
+  /* --- SELECT MENUS --- */
   select{
     background:#0a0f0d; border:1px solid var(--line); color:var(--text);
     font-family:var(--mono); font-size:11px; padding:.3rem .5rem; border-radius:4px;
     width:100%;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  select:focus{outline:none; border-color:var(--accent);}
+  select:focus-visible{
+    border-color:var(--accent);
+    box-shadow: 0 0 0 2px rgba(94, 230, 160, 0.25);
+  }
+
+  /* --- TOGGLE SWITCHES --- */
   .toggle{position:relative; width:2.2rem; height:1.2rem; cursor:pointer; display:inline-block;}
   .toggle input{position:absolute; opacity:0; inset:0; cursor:pointer; margin:0;}
   .track{
@@ -98,6 +123,7 @@
     position:absolute; top:1px; left:1px; width:0.95rem; height:0.95rem;
     background:var(--dim); border-radius:50%; transition:transform .15s, background .15s;
   }
+  
   input:checked + .track {
     border-color: var(--line); 
     background: #0a0f0d; 
@@ -106,10 +132,24 @@
     transform: translateX(1rem); 
     background: var(--dim); 
   }
+  
+  /* Modified toggles (orange border) */
   input.changed + .track {
     border-color: var(--warn) !important;
-    box-shadow: 0 0 0 1px var(--warn);
   }
+
+  /* Focus for standard toggles (green glow) */
+  .toggle input:focus-visible + .track {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(94, 230, 160, 0.25);
+  }
+  /* Focus for modified toggles (orange glow) */
+  .toggle input.changed:focus-visible + .track {
+    border-color: var(--warn) !important;
+    box-shadow: 0 0 0 2px rgba(224, 164, 88, 0.3);
+  }
+
+  /* --- OTHER ELEMENTS --- */
   .row{display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;}
   button{
     background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent-dim);
