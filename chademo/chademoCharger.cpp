@@ -177,15 +177,14 @@ void ChademoCharger::HandlePendingCarMessages()
             // now that TargetVoltage is stable, set overrides, if any
             SetBatteryVoltOverridesOnce();
 
-            if (not _carData.EstimatedBatteryVoltageOverride) {
-                _carData.EstimatedBatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
+            // estimate if not measured
+            if (not _carData.BatteryVoltageIsMeasured) {
+                _carData.BatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
                     _carData.SocPercent, 
                     _carData.NomVoltOverride, 
                     _carData.MaxVoltOverride,
                     _carData.AdjustBelowSoc, 
                     _carData.AdjustBelowFactor);
-
-                _carData.EstimatedBatteryVoltageSet = true;
             }
         }
 
@@ -197,9 +196,8 @@ void ChademoCharger::HandlePendingCarMessages()
 
         COMPARE_SET(_msg103.m.BatteryVoltage, _msg103_isr.m.BatteryVoltage, "103.BatteryVoltage %d -> %d");
 
-        _carData.EstimatedBatteryVoltage = _msg103.m.BatteryVoltage;
-        _carData.EstimatedBatteryVoltageSet = true;
-        _carData.EstimatedBatteryVoltageOverride = true;
+        _carData.BatteryVoltage = _msg103.m.BatteryVoltage;
+        _carData.BatteryVoltageIsMeasured = true;
     }
     if (_msg110_pending)
     {
@@ -251,7 +249,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
     // TODO: use _carData.MaxVoltage? But what is the point? We always just ask for target voltage anyways...
     _ccs_params.MaxVoltage = _carData.TargetVoltage + 1;
     _ccs_params.soc = _carData.SocPercent;
-    _ccs_params.BatteryVoltage = _carData.EstimatedBatteryVoltage;
+    _ccs_params.BatteryVoltage = _carData.BatteryVoltage;
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
 
     // Only ask ccs for amps in the charging loop, regardless of what the car says (hide that eg. iMiev is always asking for min 1A regardless)
@@ -426,6 +424,7 @@ void ChademoCharger::RunStateMachine()
 
                 _send_can = false;  // PS: even if we stop sending, car may continue to send 102 for a short time
                 _discovery = false;
+                _discoveryIsDone = true;
                 println("[cha] Discovery completed => ccs kickoff");
                 _global.ccsKickoff = true;
 
@@ -559,11 +558,12 @@ void ChademoCharger::RunStateMachine()
             if (chademoInterface_ccsPresentVoltageMirrorsTarget())
             {
                 // All(?) portable dischargers mirror TargetVoltage -> PresentVoltage. Chademo does not like this and will give deviating volts error.
-                _chargerData.OutputVoltage = _carData.EstimatedBatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
-                _chargerData.OutputVoltageIsEstimated = true;
+                _chargerData.OutputVoltage = _carData.BatteryVoltage; // else OutputVoltage would be Target, but this would only work on max soc.
+                _chargerData.OutputVoltageIsMeasured = _carData.BatteryVoltageIsMeasured;
             }
 
-            if (_chargerData.OutputVoltageIsEstimated && _estimatedOutputVoltageModulation != 0) {
+            // not measured = estimated
+            if (not _chargerData.OutputVoltageIsMeasured && _estimatedOutputVoltageModulation != 0) {
                 // max to prevent less than 0
                 _chargerData.OutputVoltage = max(0, _chargerData.OutputVoltage + GetCyclicOffset(_estimatedOutputVoltageModulation));
             }
@@ -824,7 +824,7 @@ const char* ChademoCharger::GetStateName()
     return _stateNames[_state];
 };
 
-void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_estimated, uint16_t outA)
+void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_measured, uint16_t outA)
 {
     _chargerData.AvailableOutputVoltage = maxV;
     if (_chargerData.AvailableOutputVoltage > ADAPTER_MAX_VOLTS)
@@ -839,7 +839,7 @@ void ChademoCharger::SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA,
         _chargerData.DynAvailableOutputCurrent = ADAPTER_MAX_AMPS;
 
     _chargerData.OutputVoltage = outV;
-    _chargerData.OutputVoltageIsEstimated = outV_is_estimated;
+    _chargerData.OutputVoltageIsMeasured = outV_is_measured;
 
     _chargerData.OutputCurrent = clampToUint8(outA);
 
@@ -870,8 +870,8 @@ void ChademoCharger::SetChargerDataFromCcsParams()
         SetChargerData(ADAPTER_MAX_VOLTS,
             ADAPTER_MAX_AMPS,
             ADAPTER_MAX_AMPS, // dyn
-            _carData.EstimatedBatteryVoltage,
-            true, // voltage is estimated
+            _carData.BatteryVoltage,
+            _carData.BatteryVoltageIsMeasured,
             0 // _carData.RequestCurrent
         );
     }
@@ -883,7 +883,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
             _ccs_params.EvseMaxCurrent,
             _ccs_params.EvseDynMaxCurrent(),
             _ccs_params.EvseVoltage,
-            false, // voltage not estimated
+            true, // measured until proven otherwise
             _ccs_params.EvseCurrent
         );
     }
@@ -913,7 +913,7 @@ void ChademoCharger::Log()
             _carData.TargetVoltage,
             _carData.MaxVoltage,
             _carData.SocPercent,
-            _carData.EstimatedBatteryVoltage,
+            _carData.BatteryVoltage,
             &_carData.BatteryCapacityKwh // bypass float to double promotion by passing as reference
         );
 

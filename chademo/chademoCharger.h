@@ -535,8 +535,8 @@ struct msg209
 
 struct ChademoAlwaysOnBackup
 {
-    bool EstimatedBatteryVoltageSet;
-    uint16_t EstimatedBatteryVoltage;
+    bool DiscoveryIsDone;
+    uint16_t BatteryVoltage;
     uint16_t TargetVoltage;
     uint8_t SocPercent;
 
@@ -559,9 +559,10 @@ struct CarData
 //    uint16_t TargetVoltage;
 //#endif
 
-    uint16_t EstimatedBatteryVoltage;
-    bool EstimatedBatteryVoltageSet = false;
-    bool EstimatedBatteryVoltageOverride = false;
+    uint16_t BatteryVoltage;
+    
+    // false: estimated (default)
+    bool BatteryVoltageIsMeasured = false;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
@@ -671,7 +672,7 @@ struct ChargerData
 
     uint8_t OutputCurrent;
     uint16_t OutputVoltage;
-    bool OutputVoltageIsEstimated;
+    bool OutputVoltageIsMeasured = true; // assume measured until proven otherwise
 
     uint8_t DischargeCurrent;
 
@@ -714,7 +715,7 @@ public:
     void SetSwitchD1(bool set);
     void SetSwitchD2(bool set);
     void SetCcsParamsFromCarData();
-    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_estimated, uint16_t outA);
+    void SetChargerData(uint16_t maxV, uint16_t maxA, uint16_t dynA, uint16_t outV, bool outV_is_measured, uint16_t outA);
     bool GetSwitchK();
     void SetBatteryVoltOverridesOnce();
     void CloseAdapterContactor();
@@ -728,8 +729,8 @@ public:
     {
         ChademoAlwaysOnBackup backup;
 
-        backup.EstimatedBatteryVoltage = _carData.EstimatedBatteryVoltage;
-        backup.EstimatedBatteryVoltageSet = _carData.EstimatedBatteryVoltageSet;
+        backup.DiscoveryIsDone = _discoveryIsDone;
+        backup.BatteryVoltage = _carData.BatteryVoltage;
         backup.SocPercent = _carData.SocPercent;
         backup.TargetVoltage = _carData.TargetVoltage;
 
@@ -743,11 +744,10 @@ public:
         {
             // nothing, clean slate
         }
-        else if (bk.EstimatedBatteryVoltageSet) // DX + EstimatedBatteryVoltageSet
+        else if (bk.DiscoveryIsDone) // DX + DiscoveryIsDone
         {
-            // discovery must already be done since EstimatedBatteryVoltageSet, so skip discovery
-            _carData.EstimatedBatteryVoltage = bk.EstimatedBatteryVoltage;
-            _carData.EstimatedBatteryVoltageSet = bk.EstimatedBatteryVoltageSet;
+            // discovery already done, so skip discovery
+            _carData.BatteryVoltage = bk.BatteryVoltage;
             _carData.SocPercent = bk.SocPercent;
             _carData.TargetVoltage = bk.TargetVoltage;
 
@@ -792,6 +792,7 @@ public:
         bool _adapterContactorClosed = false;
 
         bool _discovery = CONFIG_SX ? false : true;
+        bool _discoveryIsDone = false;
 
         bool _preChargeDoneButStalled = false;
         bool _dischargeEnabled = false;
