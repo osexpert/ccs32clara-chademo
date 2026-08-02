@@ -1,0 +1,32 @@
+DIN page 153
+Timeout for CurrentDemandReq: 0.25sec
+Timeout for the remaining messagetypes: 2sec
+
+DIN page 160 sequence timeouts:
+V2G_SECC_ReadyToCharge_Performance_Time:      148sec
+V2G_EVCC_ReadyToCharge_Timeout:               150sec
+V2G_SECC_CommunicationSetup_Performance_Time: 18sec
+V2G_EVCC_CommunicationSetup_Timeout:          20sec
+V2G_SECC_CableCheck_Performance_Time:         38sec
+V2G_EVCC_CableCheck_Timeout:                  40sec
+V2G_SECC_PreCharge_Performance_Time:          5sec
+V2G_EVCC_PreCharge_Timeout:                   7sec
+V2G_SECC_CPState_Detection_Timeout:           1.5sec
+V2G_SECC_CPOscillator_Retain_Time:            1.5sec
+
+ISO page 172
+Timeout for ServiceDetailReq: 5sec
+Timeout for PaymentDetailReq: 5sec
+Timeout for PowerDeliveryReq: 5sec
+Timeout for CurrentDemandReq: 0.25sec
+Timeout for CertificationInstallationReq: 5sec
+Timeout for CertificationUpdateReq: 5sec
+Timeout for the remaining messagetypes: 2sec
+
+ISO page 172 sequence timeouts:
+V2G_SECC_CommunicationSetup_Performance_Time: 18sec
+V2G_EVCC_CommunicationSetup_Timeout:          20sec
+V2G_SECC_CableCheck_Performance_Time:         38sec
+V2G_EVCC_CableCheck_Timeout:                  40sec
+V2G_SECC_PreCharge_Performance_Time:          5sec
+V2G_EVCC_PreCharge_Timeout:                   7sec

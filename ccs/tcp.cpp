@@ -83,7 +83,7 @@ void evaluateTcpPacket(void)
    destinationPort = (((uint16_t)myethreceivebuffer[56])<<8) +  myethreceivebuffer[57];
    if ((sourcePort != seccTcpPort) || (destinationPort != evccPort))
    {
-      addToTrace(MOD_TCP, "[TCP] wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
+      log(MOD_TCP, "wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
       return; /* wrong port */
    }
 
@@ -101,7 +101,7 @@ void evaluateTcpPacket(void)
 
    if (flags & TCP_FLAG_RST)
    {
-       addToTrace(MOD_TCP, "[TCP] RST received, closing connection");
+       log(MOD_TCP, "RST received, closing connection");
        tcpState = TCP_STATE_CLOSED;
        finPending = peerFinPending = false;
        return;
@@ -111,7 +111,7 @@ void evaluateTcpPacket(void)
    if (tcpState == TCP_STATE_CLOSED && not peerFinPending)
    {
        /* received something while the connection is closed. Just ignore it. */
-       addToTrace(MOD_TCP, "[TCP] ignore, not connected.");
+       log(MOD_TCP, "ignore, not connected.");
        return;
    }
 
@@ -126,7 +126,7 @@ void evaluateTcpPacket(void)
          lastTransmitAckPending = false;
          tcp_sendAck();
 
-         addToTrace(MOD_TCP, "[TCP] connected.");
+         log(MOD_TCP, "connected.");
          finPending = peerFinPending = true;
          connMgr_setLevel(CONNLEVEL_80_TCP_CONNECTED);
       }
@@ -166,7 +166,7 @@ void evaluateTcpPacket(void)
 
    if (flags & TCP_FLAG_FIN)
    {
-       addToTrace(MOD_TCP, "[TCP] FIN received, sending ACK");
+       log(MOD_TCP, "FIN received, sending ACK");
        TcpAckNr = remoteSeqNr + 1;
        tcp_sendAck();
        tcpState = TCP_STATE_CLOSED; // even if some chargers keep sending data, AI is very clear about FIN and RST both terminate the session. I agree.
@@ -176,7 +176,7 @@ void evaluateTcpPacket(void)
 
 void tcp_connect(void)
 {
-   addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting from %d", evccPort);
+   log(MOD_TCP, "Checkpoint301: connecting from %d", evccPort);
    setCheckpoint(301);
 
    tcpHeaderLen = 20; /* 20 bytes normal header, no options */
@@ -190,7 +190,7 @@ void tcp_connect(void)
 
 static void tcp_sendAck(void)
 {
-//   addToTrace(MOD_TCP, "[TCP] sending ACK");
+//   log(MOD_TCP, "sending ACK");
    tcpHeaderLen = 20; /* 20 bytes normal header, no options */
    tcpPayloadLen = 0;   /* only the TCP header, no data is in the first ACK message. */
    tcp_prepareTcpHeader(TCP_FLAG_ACK);
@@ -209,7 +209,7 @@ void tcp_transmit(void)
 {
    if (tcpState == TCP_STATE_ESTABLISHED)
    {
-      //addToTrace("[TCP] sending data");
+      //log("sending data");
       tcpHeaderLen = 20; /* 20 bytes normal header, no options */
       if (tcpPayloadLen+tcpHeaderLen<TCP_TRANSMIT_PACKET_LEN)
       {
@@ -221,7 +221,7 @@ void tcp_transmit(void)
       }
       else
       {
-         addToTrace(MOD_TCP, "Error: tcpPayload and header do not fit into TcpTransmitPacket.");
+         log(MOD_TCP, "Error: tcpPayload and header do not fit into TcpTransmitPacket.");
       }
    }
 }
@@ -324,7 +324,7 @@ static void tcp_packRequestIntoEthernet(void)
 
 static void tcp_sendFin()
 {
-    addToTrace(MOD_TCP, "[TCP] sending FIN");
+    log(MOD_TCP, "sending FIN");
     tcpHeaderLen = 20;  // no options
     tcpPayloadLen = 0;  // no payload
     tcp_prepareTcpHeader(TCP_FLAG_FIN | TCP_FLAG_ACK);
@@ -333,7 +333,7 @@ static void tcp_sendFin()
 
 void tcp_sendRst()
 {
-    addToTrace(MOD_TCP, "[TCP] sending RST");
+    log(MOD_TCP, "sending RST");
     tcpHeaderLen = 20;  // no options
     tcpPayloadLen = 0;  // no payload
     tcp_prepareTcpHeader(TCP_FLAG_RST);
@@ -374,13 +374,13 @@ void tcp_checkRetry(void)
             bool syn = (tcpState == TCP_STATE_SYN_SENT);
             if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
             {
-                addToTrace(MOD_TCP, syn ? "[TCP] Giving up SYN retry -> connMgr_restart" : "[TCP] Giving up the retry");
+                log(MOD_TCP, syn ? "Giving up SYN retry -> connMgr_restart" : "Giving up the retry");
                 tcp_disconnect();
                 if (syn) connMgr_restart();
                 return;
             }
 
-            addToTrace(MOD_TCP, syn ? "[TCP] SYN wasn't ACKed, retransmitting" : "[TCP] Last packet wasn't ACKed, retransmitting");
+            log(MOD_TCP, syn ? "SYN wasn't ACKed, retransmitting" : "Last packet wasn't ACKed, retransmitting");
 
             tcp_packRequestIntoEthernet(); // retransmit the same content
 

@@ -5,6 +5,7 @@
 #include "ccs_params.h"
 #include "main.h"
 #include "pevStateMachine.h"
+#include "logging.h"
 
 #include <libopencm3/stm32/can.h>
 
@@ -170,7 +171,7 @@ void ChademoCharger::HandlePendingCarMessages()
             if (_carData.SocPercent > 100)
             {
                 // TODO: if this happens...maybe failing would be a better way to handle it...
-                println("[cha] Car report soc %d > 100. Failover to 100.", _carData.SocPercent);
+                log(MOD_CHA, "Car report soc %d > 100. Failover to 100.", _carData.SocPercent);
                 _carData.SocPercent = 100;
             }
 
@@ -278,7 +279,7 @@ bool ChademoCharger::IsTimeoutSec(uint16_t sec)
 {
     if (_cyclesInState > (sec * CHA_CYCLES_PER_SEC))
     {
-        println("[cha] Timeout in %s (max:%dsec)", GetStateName(), sec);
+        log(MOD_CHA, "Timeout in state %s", GetStateName());
         return true;
     }
     return false;
@@ -324,7 +325,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     }
 
     if (override)
-        println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
+        log(MOD_CHA, "AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)",
             CONFIG_ALT_ESTIMATED_VOLTAGE, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
@@ -366,7 +367,7 @@ void ChademoCharger::RunStateMachine()
 
         if (stopReason != StopReason::NONE)
         {
-            println("[cha] Stopping before ChargingLoop");
+            log(MOD_CHA, "Stopping before ChargingLoop");
             SetState(ChargerState::Stopping_Start, stopReason);
         }
 
@@ -380,7 +381,7 @@ void ChademoCharger::RunStateMachine()
         {
             if (_global.ccsLifesign)
             {
-                println("[cha] ccsLifesign -> start Chademo");
+                log(MOD_CHA, "ccsLifesign -> start Chademo");
                 SetState(ChargerState::Start);
             }
         }
@@ -388,7 +389,7 @@ void ChademoCharger::RunStateMachine()
         {
             if (chademoInterface_ccsInStateWaitForPreChargeStart())
             {
-                println("[cha] ccs CableCheck done -> start Chademo");
+                log(MOD_CHA, "ccs CableCheck done -> start Chademo");
                 SetState(ChargerState::Start);
             }
         }
@@ -425,7 +426,7 @@ void ChademoCharger::RunStateMachine()
                 _send_can = false;  // PS: even if we stop sending, car may continue to send 102 for a short time
                 _discovery = false;
                 _discoveryIsDone = true;
-                println("[cha] Discovery completed => ccs kickoff");
+                log(MOD_CHA, "Discovery completed => ccs kickoff");
                 _global.ccsKickoff = true;
 
                 SetState(ChargerState::WaitForChademoKickoff);
@@ -434,7 +435,7 @@ void ChademoCharger::RunStateMachine()
             {
                 // Spec is confusing, but MinBatteryVoltage is ment to be used to judge incompatible battery (but only using target here),
                 // and MinBatteryVoltage is unstable before switch(k), so indirectly, incompatible battery can not be judged before switch(k)
-                println("[cha] car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
+                log(MOD_CHA, "car TargetVoltage %d > charger AvailableOutputVoltage %d (incompatible).", _carData.TargetVoltage, _chargerData.AvailableOutputVoltage);
                 set_flag(&_chargerData.Status, ChargerStatus::BATTERY_INCOMPATIBLE); // let error handler deal with it
             }
             else
@@ -462,7 +463,7 @@ void ChademoCharger::RunStateMachine()
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
-            println("[cha] Car progressing to ChargingLoop in its own time");
+            log(MOD_CHA, "Car progressing to ChargingLoop in its own time");
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }
@@ -484,7 +485,7 @@ void ChademoCharger::RunStateMachine()
             // After car closes contactors, and it senses high voltage at the inlet (its own battery voltage), it will start to ask for amps.
             // Eg. i-Miev will never ask for amps, so guessing contactors are never closed (12V supply insuficient?) so it never senses its own high voltage. Doing CloseAdapterContactor anyways, so car will sense high voltage (thinking it is its own?) and ask for amps, does not help, and it make the situation look better than it is.
 
-            println("[cha] Car contactors closed");
+            log(MOD_CHA, "Car contactors closed");
             _carData.CarContactorsClosed = true;
             _reportOutputVoltage = true; // let car "see"  the charger voltage
 
@@ -576,7 +577,7 @@ void ChademoCharger::RunStateMachine()
                 if (_sxState == SX_INITIAL)
                 {
                     _sxState = SX_WAIT_FOR_preChargeDoneButStalled;
-                    println("[cha] set sxState:%d", _sxState);
+                    log(MOD_CHA, "set sxState:%d", _sxState);
                 }
 
                 if (_sxState == SX_WAIT_FOR_preChargeDoneButStalled)
@@ -585,7 +586,7 @@ void ChademoCharger::RunStateMachine()
                     {
                         CloseAdapterContactor(); // will trigger complete of ccs precharge
                         _sxState = SX_WAIT_FOR_ccsCurrentDemand;
-                        println("[cha] set sxState:%d", _sxState);
+                        log(MOD_CHA, "set sxState:%d", _sxState);
                     }
                 }
                 else if (_sxState == SX_WAIT_FOR_ccsCurrentDemand)
@@ -594,7 +595,7 @@ void ChademoCharger::RunStateMachine()
                     if (chademoInterface_ccsCurrentDemandPos() == 0)
                     {
                         _sxState = SX_DONE;
-                        println("[cha] set sxState:%d", _sxState);
+                        log(MOD_CHA, "set sxState:%d", _sxState);
                     }
                 }
             }
@@ -723,7 +724,7 @@ void ChademoCharger::RunStateMachine()
         {
             // welding detection done & car contactors open
             _carData.CarContactorsClosed = false;
-            println("[cha] Car contactors opened");
+            log(MOD_CHA, "Car contactors opened");
 
             SetSwitchD2(false);
 
@@ -766,14 +767,14 @@ bool ChademoCharger::PreChargeCompleted()
     if (CONFIG_SX)
     {
         if (not _adapterContactorClosed)
-            println("[cha] PreCharge stalled until adapter contactor closed");
+            log(MOD_CHA, "PreCharge stalled until adapter contactor closed");
         return _adapterContactorClosed;
     }
     else // DX
     {
         // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
         if (not _carData.CarContactorsClosed)
-            println("[cha] PreCharge stalled until car contactors closed");
+            log(MOD_CHA, "PreCharge stalled until car contactors closed");
         return _carData.CarContactorsClosed;
     }
 }
@@ -810,13 +811,13 @@ int chademoInterface_chargingLoopPos()
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
 {
-    println("[cha] ====>>>> set state %s", _stateNames[newState]);
+    log(MOD_CHA, "=> set state %s", _stateNames[newState]);
     _state = newState;
     _cyclesInState = 0;
 
     set_flag(&_stopReason, stopReason);
     if (stopReason != StopReason::NONE)
-        println("[cha] Stopping: 0x%02x", stopReason);
+        log(MOD_CHA, "Stopping: 0x%02x", stopReason);
 };
 
 const char* ChademoCharger::GetStateName()
@@ -894,8 +895,7 @@ void ChademoCharger::Log()
     if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
     {
         // every second
-        println("[cha] state:%s cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
-            GetStateName(),
+        log(MOD_CHA, "cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             _cyclesInState,
             _chargerData.OutputVoltage,
             _chargerData.OutputCurrent,
@@ -904,7 +904,7 @@ void ChademoCharger::Log()
             _chargerData.DynAvailableOutputCurrent,
             _chargerData.RemainingChargeTimeSec(),
             _chargerData.Status,
-
+            // car
             _carData.RequestCurrent,
             _carData.EstimatedChargingTimeMins,
             _carData.MaxChargingTimeSec,
@@ -1004,13 +1004,13 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
 {
     // Check if CAN is initialized and not in bus-off state
     //if (CAN_MSR(canport) & CAN_MSR_INAK) {
-    //    println("[can] transmit: peripheral not initialized");
+    //    println("transmit: peripheral not initialized");
     //    return;// CAN_TX_ERROR;
     //}
 
     int mailbox = can_transmit(canport, id, ext, rtr, len, data);
     if (mailbox < 0) {
-        println("[cha] can transmit: msg:0x%x no mailbox available", id);
+        log(MOD_CHA, "can transmit: msg:0x%x no mailbox available", id);
         return;// CAN_TX_NO_MAILBOX;
     }
 
@@ -1022,7 +1022,7 @@ void can_transmit_blocking_fifo(uint32_t canport, uint32_t id, bool ext, bool rt
     uint32_t start = system_millis;
     while ((CAN_TSR(canport) & rqcp_mask) == 0) {
         if ((system_millis - start) > CAN_TRANSMIT_TIMEOUT_MS) {
-            println("[cha] can transmit: msg:0x%x timeout", id);
+            log(MOD_CHA, "can transmit: msg:0x%x timeout", id);
             break;
         }
     }

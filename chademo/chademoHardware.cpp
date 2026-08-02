@@ -4,10 +4,11 @@
 #include "digio.h"
 #include "hwinit.h"
 #include "main.h"
+#include "logging.h"
 
 void ChademoCharger::SetSwitchD2(bool set)
 {
-    println("[cha] set switch (d2) -> %d", set);
+    log(MOD_CHA, "set switch (d2) -> %d", set);
     _d2 = set;
 
     if (set)
@@ -18,7 +19,7 @@ void ChademoCharger::SetSwitchD2(bool set)
 
 void ChademoCharger::SetSwitchD1(bool set)
 {
-    println("[cha] set switch (d1) -> %d", set);
+    log(MOD_CHA, "set switch (d1) -> %d", set);
     _d1 = set;
 
     if (set)
@@ -46,14 +47,14 @@ bool ChademoCharger::GetSwitchK()
 /// </summary>
 void ChademoCharger::CloseAdapterContactor()
 {
-    println("[cha] Adapter contactor closing");
+    log(MOD_CHA, "Adapter contactor closing");
     _adapterContactorClosed = true;
     DigIo::contactor_out.Set();
 };
 
 void ChademoCharger::OpenAdapterContactor()
 {
-    println("[cha] Adapter contactor opening");
+    log(MOD_CHA, "Adapter contactor opening");
     _adapterContactorClosed = false;
     DigIo::contactor_out.Clear();
 };

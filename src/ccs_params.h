@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "myLogging.h"
+#include "logging.h"
 #include "main.h"
 
 /***** enums ******/
@@ -39,7 +39,7 @@ enum _stopreasons
 struct ccs_params
 {
     int logging = DEFAULT_LOGGINGMASK;
-    int opmode = 0;
+    int state = 0;
     int checkpoint = 0;
 
     int MaxPower = 100; // kW

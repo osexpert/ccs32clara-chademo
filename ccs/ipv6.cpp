@@ -52,7 +52,7 @@ void evaluateUdpPayload(void) {
          //# 0x9001 SDP response message (SECC response to the EVCC)
          if (v2gptPayloadType == 0x9001) {
             //# it is a SDP response from the charger to the car
-            //addToTrace("it is a SDP response from the charger to the car");
+            //log("it is a SDP response from the charger to the car");
             v2gptPayloadLen = (((uint32_t)udpPayload[4])<<24)  +
                               (((uint32_t)udpPayload[5])<<16) +
                               (((uint32_t)udpPayload[6])<<8) +
@@ -63,10 +63,10 @@ void evaluateUdpPayload(void) {
                     /* we have TCP traffic running, so we ignore additional SDP messages. This
                     makes us robust against cross-talk from other charging cables.
                     Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */
-                    addToTrace(MOD_SDP, "[SDP] Ignoring SDP response, because high level communication is ongoing.");
+                    log(MOD_SDP, "Ignoring SDP response, because high level communication is ongoing.");
                     return;
                }
-               addToTrace(MOD_SDP, "[SDP] Checkpoint203: Received SDP response");
+               log(MOD_SDP, "Checkpoint203: Received SDP response");
                setCheckpoint(203);
                //# at byte 8 of the UDP payload starts the IPv6 address of the charger.
                for (i=0; i<16; i++) {
@@ -77,17 +77,17 @@ void evaluateUdpPayload(void) {
 
                /* Generally trust the SDP source MAC, this is the MAC actually sending IPv6 traffic on the link. */
                if (memcmp(evseMac, &myethreceivebuffer[6], 6) != 0) {
-                  addToTrace(MOD_SDP, "[SDP] SDP source MAC differs from SLAC source MAC => prefer SDP");
+                  log(MOD_SDP, "SDP source MAC differs from SLAC source MAC => prefer SDP");
                   memcpy(evseMac, &myethreceivebuffer[6], 6); // source MAC starts at offset 6
                }
 
-               addToTrace(MOD_SDP, "[SDP] Now we know the chargers IP.");
+               log(MOD_SDP, "Now we know the chargers IP.");
                readModemVersions(); /* read the software versions from our modem and from the chargers modem. Just for information/logging. */
                connMgr_setLevel(CONNLEVEL_50_SDP_DONE_TCP_NEXT);
             }
          }
          else {
-            addToTrace(MOD_SDP, "v2gptPayloadType 0x%x not supported", v2gptPayloadType);
+            log(MOD_SDP, "v2gptPayloadType 0x%x not supported", v2gptPayloadType);
          }
       }
    }
@@ -103,7 +103,7 @@ void ipv6_evaluateReceivedPacket(void) {
       memcpy(sourceIp, &myethreceivebuffer[22], 16);
       nextheader = myethreceivebuffer[20];
       if (nextheader == 0x11) { //  it is an UDP frame
-         addToTrace(MOD_IPV6, "Its a UDP.");
+         log(MOD_IPV6, "Its a UDP.");
          sourceport = myethreceivebuffer[54] * 256 + myethreceivebuffer[55];
          destinationport = myethreceivebuffer[56] * 256 + myethreceivebuffer[57];
          udplen = myethreceivebuffer[58] * 256 + myethreceivebuffer[59];
@@ -111,7 +111,7 @@ void ipv6_evaluateReceivedPacket(void) {
          //# udplen is including 8 bytes header at the begin
          if (udplen>UDP_PAYLOAD_LEN) {
             /* ignore long UDP */
-            addToTrace(MOD_IPV6, "Ignoring too long UDP");
+            log(MOD_IPV6, "Ignoring too long UDP");
             return;
          }
          if (udplen>8) {
@@ -122,16 +122,16 @@ void ipv6_evaluateReceivedPacket(void) {
          }
       }
       if (nextheader == 0x06) { // # it is an TCP frame
-         addToTrace(MOD_IPV6, "TCP received");
+         log(MOD_IPV6, "TCP received");
          sanityCheck("before evaluateTcpPacket");
          evaluateTcpPacket();
          sanityCheck("before evaluateTcpPacket");
       }
       if (nextheader == NEXT_ICMPv6) { // it is an ICMPv6 (NeighborSolicitation etc) frame
-         addToTrace(MOD_IPV6, "ICMPv6 received");
+         log(MOD_IPV6, "ICMPv6 received");
          icmpv6type = myethreceivebuffer[54];
          if (icmpv6type == 0x87) { /* Neighbor Solicitation */
-            //addToTrace("[PEV] Neighbor Solicitation received");
+            //log("[PEV] Neighbor Solicitation received");
             sanityCheck("before evaluateNeighborSolicitation");
             evaluateNeighborSolicitation();
             sanityCheck("after evaluateNeighborSolicitation");
@@ -145,7 +145,7 @@ void ipv6_initiateSdpRequest(void) {
    //# send a SECC Discovery Request.
    //# The payload is just two bytes: 10 00.
    //# First step is, to pack this payload into a V2GTP frame.
-   addToTrace(MOD_SDP, "[SDP] initiating SDP request");
+   log(MOD_SDP, "initiating SDP request");
    v2gtpFrameLen = 8 + 2; // # 8 byte header plus 2 bytes payload
    v2gtpFrame[0] = 0x01; // # version
    v2gtpFrame[1] = 0xFE; // # version inverted
@@ -323,7 +323,7 @@ void evaluateNeighborSolicitation(void) {
    myethtransmitbuffer[56] = checksum >> 8;
    myethtransmitbuffer[57] = checksum & 0xFF;
    myethtransmitbufferLen = 86; /* Length of the NeighborAdvertisement */
-   addToTrace(MOD_IPV6, "transmitting Neighbor Advertisement");
+   log(MOD_IPV6, "transmitting Neighbor Advertisement");
    myEthTransmit();
 }
 

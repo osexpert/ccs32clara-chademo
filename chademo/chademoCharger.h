@@ -3,9 +3,10 @@
 #include <type_traits>
 #include "printf.h"
 #include "main.h"
+#include "logging.h"
 
 #define CHA_CYCLE_MS 100
-#define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
+#define CHA_CYCLES_PER_SEC 10
 
 template<typename T>
 constexpr T min(T a, T b) {
@@ -770,12 +771,12 @@ public:
     
     void LockChargingPlug() {
         _chargingPlugLocked = true;
-        println("[cha] Lock charging plug");
+        log(MOD_CHA, "Lock charging plug");
     }
 
     void UnlockChargingPlug() {
         _chargingPlugLocked = false;
-        println("[cha] Unlock charging plug");
+        log(MOD_CHA, "Unlock charging plug");
     }
 
     private:

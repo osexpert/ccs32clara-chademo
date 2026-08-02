@@ -33,15 +33,14 @@ uint8_t connMgr_getLevel(void)
 
 void connMgr_printDebugInfos(void)
 {
-    addToTrace(MOD_CONNMGR, "[CONNMGR] %d", connMgr_level
-    );
+    log(MOD_CONNMGR, "%d", connMgr_level);
 }
 
 void connMgr_setLevel(uint16_t level)
 {
     if (level != connMgr_level)
     {
-        addToTrace(MOD_CONNMGR, "[CONNMGR] Level changed from %d to %d.", connMgr_level, level);
+        log(MOD_CONNMGR, "Level changed from %d to %d.", connMgr_level, level);
         connMgr_level = level;
     }
 

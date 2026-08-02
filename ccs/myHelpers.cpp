@@ -11,16 +11,6 @@ void setCheckpoint(uint16_t newcheckpoint) {
     _ccs_params.checkpoint = newcheckpoint;
 }
 
-void addToTrace(enum Module module, const char* format, ...) {
-    if (_ccs_params.logging & module)
-    {
-        va_list args;
-        va_start(args, format);
-        vprintf(format, args);
-        println();
-    }
-}
-
 void addToTrace_bytes(enum Module module, const char * s, uint8_t* data, uint16_t len) {
    if (_ccs_params.logging & module) {
       printf("%s ", s);

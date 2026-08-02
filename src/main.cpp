@@ -458,11 +458,7 @@ static void print_ccs_trace()
     static uint32_t nextPrint = 0;
     if (system_millis >= nextPrint)
     {
-        int state = _ccs_params.opmode;
-        const char* label = pevSttLabels[state];
-
-        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA  mirror:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA",
-            label,
+        log(MOD_PEV, "TcpRetries:%u out:%uV/%uA max:%uV/%uA/%uA mirror:%uV/%uA ask:%uA target:%uV batt:%uV max:%uV/%uA",
             tcp_getTotalNumberOfRetries(),
             _ccs_params.EvseVoltage,
             _ccs_params.EvseCurrent,

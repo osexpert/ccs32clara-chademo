@@ -36,37 +36,37 @@ bool hardwareInterface_getIsBatteryFull(void)
 
 void hardwareInterface_setPowerRelayOn(void)
 {
-    println("hardwareInterface_setPowerRelayOn");
+    log(MOD_PEV, "hardwareInterface_setPowerRelayOn");
     _ccs_params.PowerRelayOn = true;
 }
 
 void hardwareInterface_setPowerRelayOff(void)
 {
-    println("hardwareInterface_setPowerRelayOff");
+    log(MOD_PEV, "hardwareInterface_setPowerRelayOff");
     _ccs_params.PowerRelayOn = false;
 }
 
 void hardwareInterface_setStateB(void)
 {
-    println("hardwareInterface_setStateB");
+    log(MOD_PEV, "hardwareInterface_setStateB");
     DigIo::state_c_out_inverted.Set();
 }
 
 void hardwareInterface_setStateC(void)
 {
-    println("hardwareInterface_setStateC");
+    log(MOD_PEV, "hardwareInterface_setStateC");
     DigIo::state_c_out_inverted.Clear();
 }
 
 void hardwareInterface_lockConnector(void)
 {
-    println("[ccs] Lock charging plug");
+    log(MOD_PEV, "Lock charging plug");
     _ccs_params.ConnectorLocked = true;
 }
 
 void hardwareInterface_unlockConnector(void)
 {
-    println("[ccs] Unlock charging plug");
+    log(MOD_PEV, "Unlock charging plug");
     _ccs_params.ConnectorLocked = false;
 }
 

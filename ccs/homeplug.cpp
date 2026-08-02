@@ -185,7 +185,7 @@ static void evaluateSlacParamCnf(void)
 {
     /* As PEV, we receive the first response from the charger. */
     _global.ccsLifesign = true;
-    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint102: received SLAC_PARAM.CNF");
+    log(MOD_HOMEPLUG, "Checkpoint102: received SLAC_PARAM.CNF");
     setCheckpoint(102);
     if (iAmPev)
     {
@@ -260,10 +260,10 @@ static void composeNmbcSoundInd(void)
 static void evaluateAttenCharInd(void)
 {
     uint8_t i;
-    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received ATTEN_CHAR.IND");
+    log(MOD_HOMEPLUG, "received ATTEN_CHAR.IND");
     if (iAmPev == 1)
     {
-        //addToTrace("[PEVSLAC] received AttenCharInd in state %d", pevSequenceState);
+        //log("received AttenCharInd in state %d", pevSequenceState);
         if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // we were waiting for the AttenCharInd
         {
             //todo: Handle the case when we receive multiple responses from different chargers.
@@ -274,9 +274,9 @@ static void evaluateAttenCharInd(void)
                 evseMac[i] = myethreceivebuffer[6 + i]; // source MAC starts at offset 6
             }
             AttenCharIndNumberOfSounds = myethreceivebuffer[69];
-            //addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): %d", AttenCharIndNumberOfSounds);
+            //log("number of sounds reported by the EVSE (should be 10): %d", AttenCharIndNumberOfSounds);
             composeAttenCharRsp();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
+            log(MOD_HOMEPLUG, "transmitting ATTEN_CHAR.RSP...");
             setCheckpoint(140);
             myEthTransmit();
 
@@ -344,7 +344,7 @@ static void evaluateSlacMatchCnf(void)
 {
     if (pevSequenceState != STATE_WAITING_FOR_SLAC_MATCH_CNF)
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF in unexpected state %d, ignoring", pevSequenceState);
+        log(MOD_HOMEPLUG, "received SLAC_MATCH.CNF in unexpected state %d, ignoring", pevSequenceState);
         return;
     }
 
@@ -369,10 +369,10 @@ static void evaluateSlacMatchCnf(void)
             }
         }
         if (!blIsDestinationMacForMe) {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF but with foreign destination MAC. Ignoring.");
+            log(MOD_HOMEPLUG, "received SLAC_MATCH.CNF but with foreign destination MAC. Ignoring.");
         }
         else {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF");
+            log(MOD_HOMEPLUG, "received SLAC_MATCH.CNF");
             for (i = 0; i < 7; i++)   // NID has 7 bytes
             {
                 NID[i] = myethreceivebuffer[85 + i];
@@ -381,11 +381,11 @@ static void evaluateSlacMatchCnf(void)
             {
                 NMK[i] = myethreceivebuffer[93 + i];
             }
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SlacMatchCnf, got network membership key (NMK) and NID.");
+            log(MOD_HOMEPLUG, "From SlacMatchCnf, got network membership key (NMK) and NID.");
 
             // use the extracted NMK and NID to set the key in the adaptor:
             composeSetKey();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint170: transmitting SET_KEY.REQ");
+            log(MOD_HOMEPLUG, "Checkpoint170: transmitting SET_KEY.REQ");
             setCheckpoint(170);
             myEthTransmit();
 
@@ -447,7 +447,7 @@ static void evaluateSetKeyCnf(void)
 {
     if (pevSequenceState != STATE_WAITING_FOR_SET_KEY_CNF)
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SET_KEY.CNF in unexpected state %d, ignoring", pevSequenceState);
+        log(MOD_HOMEPLUG, "received SET_KEY.CNF in unexpected state %d, ignoring", pevSequenceState);
         return;
     }
 
@@ -459,16 +459,16 @@ static void evaluateSetKeyCnf(void)
     // if (! confirm->RESULT) return (slac_debug(session, session->exit, __func__, "Device refused request"));
 	// So for some reason, they did not follow the spec:-)
 
-    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SET_KEY.CNF");
+    log(MOD_HOMEPLUG, "received SET_KEY.CNF");
     result = myethreceivebuffer[19];
     if (result == 0)
     {
         //this would be a bad sign for local modem, but normal for remote
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says 0: Device refused request.");
+        log(MOD_HOMEPLUG, "SetKeyCnf says 0: Device refused request.");
     }
     else
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says %d: Success.", result);
+        log(MOD_HOMEPLUG, "SetKeyCnf says %d: Success.", result);
         slac_enterState(STATE_INITIAL); // this would have happened anyways, but for readability
         connMgr_setLevel(CONNLEVEL_15_SLAC_DONE_SDP_NEXT);
     }
@@ -521,7 +521,7 @@ void evaluateGetSwCnf(void)
     /* The GET_SW confirmation. This contains the software version of the homeplug modem.
        Reference: see wireshark interpreted frame from TPlink, Ioniq and Alpitronic charger */
     uint8_t i, x;
-    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received GET_SW.CNF");
+    log(MOD_HOMEPLUG, "received GET_SW.CNF");
     numberOfSoftwareVersionResponses += 1;
     for (i = 0; i < 6; i++)
     {
@@ -543,7 +543,7 @@ void evaluateGetSwCnf(void)
             strVersion[i] = x;
         }
         strVersion[i] = 0;
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
+        log(MOD_HOMEPLUG, "MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
             sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
             strVersion);
     }
@@ -551,7 +551,7 @@ void evaluateGetSwCnf(void)
 
 void slac_enterState(int n)
 {
-    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] from %d entering %d", pevSequenceState, n);
+    log(MOD_HOMEPLUG, "from %d entering %d", pevSequenceState, n);
     pevSequenceState = n;
     pevSequenceCyclesInState = 0;
     if (n == STATE_INITIAL) pevTotalCycles = 0;
@@ -571,7 +571,7 @@ void runSlacSequencer(void)
     // 15s timeout for SLAC in total.
     if (pevSequenceCyclesInState > 500)
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ERROR: Timeout");
+        log(MOD_HOMEPLUG, "ERROR: Timeout");
         slac_enterState(STATE_INITIAL);
     }
 
@@ -582,7 +582,7 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_SEND_SLAC_PARAM_REQ)
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
+        log(MOD_HOMEPLUG, "Checkpoint100: Sending SLAC_PARAM.REQ...");
         setCheckpoint(100);
         composeSlacParamReq();
         myEthTransmit();
@@ -593,7 +593,7 @@ void runSlacSequencer(void)
         if (pevSequenceCyclesInState > 33)
         {
             // No response for 1s, this is an error.
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
+            log(MOD_HOMEPLUG, "Timeout while waiting for SLAC_PARAM.CNF");
             slac_enterState(STATE_INITIAL);
         }
         // (the normal state transition is done in the reception handler)
@@ -620,7 +620,7 @@ void runSlacSequencer(void)
         {
             nRemainingStartAttenChar -= 1;
             composeStartAttenCharInd();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting START_ATTEN_CHAR.IND...");
+            log(MOD_HOMEPLUG, "transmitting START_ATTEN_CHAR.IND...");
             myEthTransmit();
             pevSequenceDelayCycles = 0; // original from ioniq is 20ms between the START_ATTEN_CHAR. Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
         }
@@ -643,7 +643,7 @@ void runSlacSequencer(void)
         {
             remainingNumberOfSounds -= 1;
             composeNmbcSoundInd();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting MNBC_SOUND.IND..."); // original from ioniq is 40ms after the last START_ATTEN_CHAR.IND
+            log(MOD_HOMEPLUG, "transmitting MNBC_SOUND.IND..."); // original from ioniq is 40ms after the last START_ATTEN_CHAR.IND
             setCheckpoint(104);
             myEthTransmit();
             if (remainingNumberOfSounds == 0)
@@ -663,7 +663,7 @@ void runSlacSequencer(void)
         // Since TT_EV_atten_results include 2 more START_ATTEN_CHAR.IND and 10 x NMBC_SOUND.IND, waiting additional 1s should be plenty.
         if (pevSequenceCyclesInState > 33) // 1s
         {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for ATTEN_CHAR.IND");
+            log(MOD_HOMEPLUG, "Timeout waiting for ATTEN_CHAR.IND");
             slac_enterState(STATE_INITIAL);
         }
         // (the normal state transition is done in the reception handler)
@@ -682,7 +682,7 @@ void runSlacSequencer(void)
         else
         {
             composeSlacMatchReq();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...");
+            log(MOD_HOMEPLUG, "Checkpoint150: transmitting SLAC_MATCH.REQ...");
             setCheckpoint(150);
             myEthTransmit();
             slac_enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF);
@@ -692,7 +692,7 @@ void runSlacSequencer(void)
     {
         if (pevSequenceCyclesInState > 66) // 2s
         {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SLAC_MATCH.CNF");
+            log(MOD_HOMEPLUG, "Timeout waiting for SLAC_MATCH.CNF");
             slac_enterState(STATE_INITIAL);
         }
         // evaluateSlacMatchCnf() will bring us further into STATE_WAITING_FOR_SET_KEY_CNF after it send SET_KEY.REQ
@@ -701,7 +701,7 @@ void runSlacSequencer(void)
     {
         if (pevSequenceCyclesInState > 33) // 1s
         {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SET_KEY.CNF");
+            log(MOD_HOMEPLUG, "Timeout waiting for SET_KEY.CNF");
             slac_enterState(STATE_INITIAL);
         }
         // evaluateSefKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP....or stay until ConnMgr timeout:-)
@@ -709,7 +709,7 @@ void runSlacSequencer(void)
     else
     {
         // invalid state is reached. As robustness measure, go to initial state.
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ERROR: Invalid state reached");
+        log(MOD_HOMEPLUG, "ERROR: Invalid state reached");
         slac_enterState(STATE_INITIAL);
     }
 }
@@ -729,7 +729,7 @@ void runSdpRecoveryStateMachine(void)
     {
         if (sdpRecoveryState == 0)
         {
-            addToTrace(MOD_HOMEPLUG, "[SDP] Try SDP recovery before SLAC...");
+            log(MOD_SDP, "Try SDP recovery before SLAC...");
             ipv6_initiateSdpRequest();
             sdpRecoveryState = 1;
             sdpRecoveryDelay = 15; // 0.5s
@@ -767,7 +767,7 @@ void runSdpStateMachine(void)
     if (sdp_state == 0)
     {
         // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
-        addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
+        log(MOD_SDP, "Checkpoint200: Starting SDP.");
         setCheckpoint(200);
         pevSequenceDelayCycles = 0;
         SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.
@@ -794,7 +794,7 @@ void runSdpStateMachine(void)
         else
         {
             // All repetitions are over, no SDP response was seen. Back to the beginning.
-            addToTrace(MOD_HOMEPLUG, "[SDP] ERROR: Did not receive SDP response -> restart");
+            log(MOD_SDP, "ERROR: Did not receive SDP response -> restart");
             sdp_state = 0;
             connMgr_restart();
         }
@@ -809,7 +809,7 @@ void evaluateReceivedHomeplugPacket(void)
         /* we have TCP traffic running, so we ignore all homeplug management packets. This
         makes us robust against cross-talk from other charging cables.
         Discussion here: https://github.com/uhi22/ccs32clara/issues/24 */
-        addToTrace(MOD_HOMEPLUG, "[HOMEPLUG] Ignoring homeplug message, because high level communication is ongoing.");
+        log(MOD_HOMEPLUG, "Ignoring homeplug message, because high level communication is ongoing.");
         return;
     }
     switch (getManagementMessageType())
