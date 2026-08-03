@@ -154,7 +154,7 @@ void evaluateTcpPacket(void)
            TcpAckNr = remoteSeqNr + tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
            tcp_sendAck();
 
-           addToTrace_bytes(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
+           log_bytes(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
        }
    }
 
@@ -176,7 +176,7 @@ void evaluateTcpPacket(void)
 
 void tcp_connect(void)
 {
-   log(MOD_TCP, "Checkpoint301: connecting from %d", evccPort);
+   log(MOD_TCP, "connecting from port %d", evccPort);
    setCheckpoint(301);
 
    tcpHeaderLen = 20; /* 20 bytes normal header, no options */
@@ -214,7 +214,7 @@ void tcp_transmit(void)
       if (tcpPayloadLen+tcpHeaderLen<TCP_TRANSMIT_PACKET_LEN)
       {
           /* The packet fits into our transmit buffer. */
-          addToTrace_bytes(MOD_TCPTRAFFIC, "TCP will transmit:", tcpPayload, tcpPayloadLen);
+          log_bytes(MOD_TCPTRAFFIC, "TCP will transmit:", tcpPayload, tcpPayloadLen);
           tcp_prepareTcpHeader(TCP_FLAG_PSH | TCP_FLAG_ACK); /* data packets are always sent with flags PUSH and ACK. */
           tcp_packRequestIntoIp();
           tcp_setRetry();

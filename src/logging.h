@@ -41,3 +41,4 @@ inline const char* ModuleName(Module module)
 #define DEFAULT_LOGGINGMASK (MOD_HOMEPLUG | MOD_PEV | MOD_SDP | MOD_TCP | MOD_CONNMGR | MOD_CHA)
 
 extern void log(enum Module module, const char* format, ...);
+extern void log_bytes(enum Module module, const char* s, uint8_t* data, uint16_t len);

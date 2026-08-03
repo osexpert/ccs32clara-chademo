@@ -569,7 +569,7 @@ static void stateFunctionWaitForSessionSetupResponse(void)
     {
         memcpy(sessionId, dinDocDec.V2G_Message.Header.SessionID.bytes, SESSIONID_LEN);
         sessionIdLen = dinDocDec.V2G_Message.Header.SessionID.bytesLen; /* store the received SessionID, we will need it later. */
-        addToTrace_bytes(MOD_PEV, "Evse decided for SessionId", sessionId, sessionIdLen);
+        log_bytes(MOD_PEV, "SessionId", sessionId, sessionIdLen);
         setCheckpoint(506);
         log(MOD_PEV, "send ServiceDiscoveryReq");
         setCheckpoint(510);
@@ -675,7 +675,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
 {
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.CableCheckRes_isUsed; }))
     {
-        //addToTrace_bytes(MOD_PEV, "In state WaitForCableCheckResponse, received:", tcp_rxdata, tcp_rxdataLen);
+        //log_bytes(MOD_PEV, "In state WaitForCableCheckResponse, received:", tcp_rxdata, tcp_rxdataLen);
         uint8_t rc = dinDocDec.V2G_Message.Body.CableCheckRes.ResponseCode;
         uint8_t proc = dinDocDec.V2G_Message.Body.CableCheckRes.EVSEProcessing;
         _ccs_params.EvseVoltage = 0;
@@ -740,7 +740,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
 {
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PreChargeRes_isUsed; }))
     {
-        //addToTrace_bytes(MOD_PEV, "In state WaitForPreChargeResponse, received:", tcp_rxdata, tcp_rxdataLen);
+        //log_bytes(MOD_PEV, "In state WaitForPreChargeResponse, received:", tcp_rxdata, tcp_rxdataLen);
         _global.auto_power_off_timer_count_up_ms = 0;
 
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
@@ -802,7 +802,7 @@ static void stateFunctionWaitForPowerDeliveryOnResponse(void)
 {
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
     {
-        //addToTrace_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
+        //log_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
         if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
         {
             log(MOD_PEV, "send CurrentDemandReq");
@@ -830,7 +830,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
 {
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed; }))
     {
-        //addToTrace_bytes(MOD_PEV, "In state WaitForCurrentDemandRes, received:", tcp_rxdata, tcp_rxdataLen);
+        //log_bytes(MOD_PEV, "In state WaitForCurrentDemandRes, received:", tcp_rxdata, tcp_rxdataLen);
         _global.auto_power_off_timer_count_up_ms = 0;
 
         /* as long as the battery is not full and no stop-demand from the user, we continue charging */
@@ -911,7 +911,7 @@ static void stateFunctionWaitForPowerDeliveryOffResponse(void)
 {
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
     {
-        //addToTrace_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
+        //log_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
         /* We requested "OFF". This is while the charging session is ending.
         When we received this response, the charger had up to 1.5s time to ramp down
         the current. On Compleo, there are really 1.5s until we get this response.
@@ -1065,7 +1065,7 @@ static void pev_enterState(pevstates n, bool keepCyclesSinceReq /* = false*/)
     _ccs_params.state = n;
 
     if (not keepCyclesSinceReq)
-        pev_cyclesSinceReq = -1;
+        pev_cyclesSinceReq = -1; // unset
 }
 
 static uint8_t pev_stateIsTooLong(void)

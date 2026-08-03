@@ -11,15 +11,6 @@ void setCheckpoint(uint16_t newcheckpoint) {
     _ccs_params.checkpoint = newcheckpoint;
 }
 
-void addToTrace_bytes(enum Module module, const char * s, uint8_t* data, uint16_t len) {
-   if (_ccs_params.logging & module) {
-      printf("%s ", s);
-      for (uint16_t i = 0; i < len; i++)
-         printf("%02x", data[i]);
-      println();
-   }
-}
-
 void showAsHex(uint8_t* arr, uint16_t len, const char* info)
 {
     printf("%s has %d bytes: ", info, len);

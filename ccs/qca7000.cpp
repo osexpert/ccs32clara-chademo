@@ -205,7 +205,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
             /* we log the ethernet traffic, but we stop logging it, when we entered the
                charging loop, to avoid spamming the log */
             if (checkpointNumber<700) {
-              addToTrace_bytes(MOD_ETHTRAFFIC, "ETH rx HP:", myethreceivebuffer, myethreceivebufferLen);
+              log_bytes(MOD_ETHTRAFFIC, "ETH rx HP:", myethreceivebuffer, myethreceivebufferLen);
             } else {
               /* We are in the charging loop or beyond. Do not log the ethernet traffic. */
             }
@@ -216,7 +216,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
             /* we log the ethernet traffic, but we stop logging it, when we entered the
                charging loop, to avoid spamming the log */
             if (checkpointNumber<700) {
-              addToTrace_bytes(MOD_ETHTRAFFIC, "ETH rx IP:", myethreceivebuffer, myethreceivebufferLen);
+              log_bytes(MOD_ETHTRAFFIC, "ETH rx IP:", myethreceivebuffer, myethreceivebufferLen);
             } else {
               /* We are in the charging loop or beyond. Do not log the ethernet traffic. */
             }
@@ -224,7 +224,7 @@ void QCA7000checkRxDataAndDistribute(int16_t availbytes) {
           } else {
             //Serial.println("Other message.");
             /* We do not log other messages, to avoid too much logging traffic. If needed, enable the logging,
-            by commenting-in this: addToTrace_bytes(MOD_ETHTRAFFIC, "ETH rx other:", myethreceivebuffer, myethreceivebufferLen);
+            by commenting-in this: log_bytes(MOD_ETHTRAFFIC, "ETH rx other:", myethreceivebuffer, myethreceivebufferLen);
             */
           }
           
@@ -363,7 +363,7 @@ void myEthTransmit(void) {
   /* we log the ethernet traffic, but we stop logging it, when we entered the charging loop, to avoid
   spamming the log */
   if (checkpointNumber<700) {
-      addToTrace_bytes(MOD_ETHTRAFFIC, "ETH will transmit:", myethtransmitbuffer, myethtransmitbufferLen);
+      log_bytes(MOD_ETHTRAFFIC, "ETH will transmit:", myethtransmitbuffer, myethtransmitbufferLen);
   } else {
       /* We are in the charging loop or beyond. Do not log the ethernet traffic. */
   }

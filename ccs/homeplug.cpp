@@ -185,7 +185,7 @@ static void evaluateSlacParamCnf(void)
 {
     /* As PEV, we receive the first response from the charger. */
     _global.ccsLifesign = true;
-    log(MOD_HOMEPLUG, "Checkpoint102: received SLAC_PARAM.CNF");
+    log(MOD_HOMEPLUG, "received SLAC_PARAM.CNF");
     setCheckpoint(102);
     if (iAmPev)
     {
@@ -385,7 +385,7 @@ static void evaluateSlacMatchCnf(void)
 
             // use the extracted NMK and NID to set the key in the adaptor:
             composeSetKey();
-            log(MOD_HOMEPLUG, "Checkpoint170: transmitting SET_KEY.REQ");
+            log(MOD_HOMEPLUG, "transmitting SET_KEY.REQ");
             setCheckpoint(170);
             myEthTransmit();
 
@@ -582,7 +582,7 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_SEND_SLAC_PARAM_REQ)
     {
-        log(MOD_HOMEPLUG, "Checkpoint100: Sending SLAC_PARAM.REQ...");
+        log(MOD_HOMEPLUG, "Sending SLAC_PARAM.REQ...");
         setCheckpoint(100);
         composeSlacParamReq();
         myEthTransmit();
@@ -682,7 +682,7 @@ void runSlacSequencer(void)
         else
         {
             composeSlacMatchReq();
-            log(MOD_HOMEPLUG, "Checkpoint150: transmitting SLAC_MATCH.REQ...");
+            log(MOD_HOMEPLUG, "transmitting SLAC_MATCH.REQ...");
             setCheckpoint(150);
             myEthTransmit();
             slac_enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF);
@@ -767,7 +767,7 @@ void runSdpStateMachine(void)
     if (sdp_state == 0)
     {
         // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
-        log(MOD_SDP, "Checkpoint200: Starting SDP.");
+        log(MOD_SDP, "Starting SDP.");
         setCheckpoint(200);
         pevSequenceDelayCycles = 0;
         SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.

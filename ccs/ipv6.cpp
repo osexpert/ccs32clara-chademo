@@ -66,7 +66,7 @@ void evaluateUdpPayload(void) {
                     log(MOD_SDP, "Ignoring SDP response, because high level communication is ongoing.");
                     return;
                }
-               log(MOD_SDP, "Checkpoint203: Received SDP response");
+               log(MOD_SDP, "Received SDP response");
                setCheckpoint(203);
                //# at byte 8 of the UDP payload starts the IPv6 address of the charger.
                for (i=0; i<16; i++) {
