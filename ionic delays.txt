@@ -1,0 +1,29 @@
+spi_ioniq_alpiHYC150_makerspace_landsberg_left_small_2024-04-03_ok.csv.pcap.decoded.txt
+
+delay between states
+SessionSetupRes->ServiceDiscoveryReq 260ms
+ServiceDiscoveryRes -> ServicePaymentSelectionReq 260
+ServicePaymentSelectionRes -> ContractAuthenticationReq 250
+ContractAuthenticationRes -> ChargeParameterDiscoveryReq 250
+ChargeParameterDiscoveryRes -> CableCheckReq 420 // 250 + state c + connector lock
+CableCheckRes -> PreChargeReq 300ms // 250 + enter high voltage mode (isolation testing?)
+PreChargeRes -> PowerDeliveryReq 250
+PowerDeliveryRes -> CurrentDemandReq 430 // 250 + car close contactor
+CurrentDemandRes -> PowerDeliveryReq 250
+PowerDeliveryRes -> WeldingDetectionReq 340 // 250 + car open contactor
+WeldingDetectionRes -> SessionStopReq 250
+
+delay within states
+res -> ChargeParameterDiscoveryReq 80-90ms, 3 cycles
+CableCheckRes -> Req: 80ms
+welding req -> res: 90ms
+
+Summary:
+See this:
+if (pev_cyclesInState < 30)   // The first second in the state just do nothing
+{
+    return;
+}
+But if simulate Ionic, we should add delay between last res and first req, of different message types. Currently the code does not do this, but it seems to work.
+We can add delay to not flood the system with messages, like the 80-90ms delay between res->req of same message type, but this is best done with pev_DelayCycles.
+

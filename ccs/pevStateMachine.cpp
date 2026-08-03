@@ -83,6 +83,10 @@ const char* const pevSttLabels[] = { STATE_LIST };
 
 #define LEN_OF_EVCCID 6 /* The EVCCID is the MAC according to spec. Ioniq uses exactly these 6 byte. */
 
+// artificial time to wait after we recieve a Res until we send next Req (same message type loops)
+// ionic wait 80-90ms between Res and next Req. Round up and use 4*30=120ms
+#define MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES 4
+
 /*
 <supportedAppProtocolReq xmlns="urn:iso:15118:2010:AppProtocol">
   <AppProtocol>
@@ -600,10 +604,6 @@ static void stateFunctionWaitForServicePaymentSelectionResponse(void)
 
 static void stateFunctionWaitForContractAuthenticationResponse(void)
 {
-    //if (pev_cyclesInState < 30)   // The first second in the state just do nothing (simulate Ionic?).
-    //{
-    //    return;
-    //}
     if (pev_DelayCycles > 0)
     {
         pev_DelayCycles -= 1;
@@ -627,7 +627,7 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
             // Not (yet) finished.
             log(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq");
             pev_sendContractAuthenticationReq();
-            pev_DelayCycles = 30; // prevent racing
+            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // Stay in same state
         }
     }
@@ -677,7 +677,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             // Try again.
             log(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq");
             pev_sendChargeParameterDiscoveryReq();
-            pev_DelayCycles = 30; // wait a bit, 900ms, no need to race
+            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
         }
     }
@@ -685,10 +685,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
 
 static void stateFunctionWaitForCableCheckResponse(void)
 {
-    //if (pev_cyclesInState < 30)   // The first second in the state just do nothing (simulate Ionic?)
-    //{
-    //    return;
-    //}
     if (pev_DelayCycles > 0)
     {
         pev_DelayCycles -= 1;
@@ -713,7 +709,7 @@ static void stateFunctionWaitForCableCheckResponse(void)
             // cable check not yet finished -> try again
             log(MOD_PEV, "Will again send CableCheckReq");
             pev_sendCableCheckReq();
-            pev_DelayCycles = 30; // prevent racing
+            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
         }
         else // spec only mention the 2 cases above, assuming all other cases must be errors
@@ -748,8 +744,6 @@ static void stateFunctionWaitForPreChargeStart(void)
         log(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);
         pev_sendPreChargeReq(batVtg);
-        //        connMgr_ApplOk(31); /* PreChargeResponse may need longer. Inform the connection manager to be patient.
-                //                    (This is a takeover from https://github.com/uhi22/pyPLC/commit/08af8306c60d57c4c33221a0dbb25919371197f9 ) */
         pev_enterState(PEV_STATE_WaitForPreChargeResponse, true);
     }
     else if (CONFIG_SX && pos > 0)
@@ -774,7 +768,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
         _ccs_params.EvseVoltage = evsePresentVoltage;
 
-        log(MOD_PEV, "PreCharge response:%dV", evsePresentVoltage);
+        log(MOD_PEV, "PreCharge:%dV", evsePresentVoltage);
         setCheckpoint(571);
 
         uint16_t inletVtg = hardwareInterface_getInletVoltage();
@@ -802,7 +796,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
         {
             pev_sendPreChargeReq(batVtg);
             // prevent racing. in precharge, we have a lot less time (7s) than other states (60s), so delay shorter (15cy) than others (30cy).
-            pev_DelayCycles = 15; // wait with the next evaluation approx half a second (simulate the time the car would need to measure the voltage? TODO NITTY: ideally simluate the delay at the correct place, after recieve the req)
+            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
         }
     }
@@ -867,8 +861,7 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
         {
             /* https://github.com/uhi22/pyPLC#example-flow, checkpoint 790: If the user stops the
                 charging session on the charger, we get a CurrentDemandResponse with
-                DC_EVSEStatus.EVSEStatusCode = 2 "EVSE_Shutdown" (observed on Compleo. To be tested
-                on other chargers. */
+                DC_EVSEStatus.EVSEStatusCode = 2 "EVSE_Shutdown" (observed on Compleo. To be tested on other chargers. */
             log(MOD_PEV, "User requested stop on charger side.");
             setCheckpoint(790);
             currentDemandStopReason = STOP_REASON_CHARGER_SHUTDOWN;
@@ -979,7 +972,6 @@ static void stateFunctionWaitForPowerRelayOff(void)
         /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
         will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
         some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
-        //numberOfWeldingDetectionRounds = 0;
         pev_sendWeldingDetectionReq();
         pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse, true);
     }
@@ -999,28 +991,29 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
             need to repeat the requests, until the voltage is at a non-dangerous level. */
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
         _ccs_params.EvseVoltage = evsePresentVoltage;
-        log(MOD_PEV, "EVSEPresentVoltage %dV", evsePresentVoltage);
+        log(MOD_PEV, "WeldingDetection:%dV", evsePresentVoltage);
         bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
+
         // Charger still says it has the same voltage as when we were last charging.
         // If we were welded, the measured voltage should be battery voltage, and its very unlikely that this would be exactly the same as last charging voltage.
         // It should most certainly be lower, as the charging voltage is always higher than the battery voltage.
         // So it seems the charger is lying to us and just send us its last known voltage.
-        bool voltageIsLastChargingVoltage = evsePresentVoltage == LastCurrentDemandResPresentVoltage;
-        if (voltageIsLow || voltageIsLastChargingVoltage)
-        {
-            if (voltageIsLastChargingVoltage)
-                log(MOD_PEV, "WeldingDetection voltage equals last charging voltage: charger is probably lying.");
+        bool voltageIsLastChargingVoltageAfter2sec = evsePresentVoltage == LastCurrentDemandResPresentVoltage && pev_cyclesInState > 66;
+        if (voltageIsLastChargingVoltageAfter2sec)
+            log(MOD_PEV, "WeldingDetection voltage is last charging voltage after 2s: charger is probably lying.");
 
+        if (voltageIsLow || voltageIsLastChargingVoltageAfter2sec)
+        {
             log(MOD_PEV, "WeldingDetection finished. Sending SessionStopReq");
             pev_sendSessionStopReq();
             setCheckpoint(900);
             pev_enterState(PEV_STATE_WaitForSessionStopResponse, true);
         }
-        /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
-        else {
-            log(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq");
+        else 
+        {
+            /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
             pev_sendWeldingDetectionReq();
-            pev_DelayCycles = 15; // simulate time car uses to measure voltage, allthot at the wrong place:-)
+            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
         }
     }
@@ -1089,11 +1082,11 @@ static void stateFunctionEnd(void)
 
 static void pev_enterState(pevstates n, bool keepCyclesSinceReq /* = false*/)
 {
-    if (n == pev_state)
-        log(MOD_PEV, "Error: set same state %s is undefined", pevSttLabels[n]);
+    if (n == pev_state) // set same state will mess up pev_cyclesInState and also pointless
+        log(MOD_PEV, "Error: set same state %s", pevSttLabels[n]);
 
     log(MOD_PEV, "=> set state %s", pevSttLabels[n]);
-    pev_cyclesInState = 0; // FIXME: this is reset even if we use pev_enterState to set the same state. This is confusing. 
+    pev_cyclesInState = 0;
     pev_DelayCycles = 0; // delayCycles are within a state only
 
     pev_state = n;
