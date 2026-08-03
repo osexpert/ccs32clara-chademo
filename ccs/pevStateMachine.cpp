@@ -84,8 +84,8 @@ const char* const pevSttLabels[] = { STATE_LIST };
 #define LEN_OF_EVCCID 6 /* The EVCCID is the MAC according to spec. Ioniq uses exactly these 6 byte. */
 
 // artificial time to wait after we recieve a Res until we send next Req (same message type loops)
-// ionic wait 80-90ms between Res and next Req. Round up and use 4*30=120ms
-#define MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES 4
+// Ionic seems to wait 80-90ms between Res and send next Req
+#define MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES 3
 
 /*
 <supportedAppProtocolReq xmlns="urn:iso:15118:2010:AppProtocol">
@@ -381,8 +381,6 @@ static void pev_sendCableCheckReq(void)
 
 static void pev_sendPreChargeReq(uint16_t targetVoltage)
 {
-    log(MOD_PEV, "Send PreChargeReq:%dV", targetVoltage);
-
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.PreChargeReq_isUsed = 1u;
     init_dinPreChargeReqType(&dinDocEnc.V2G_Message.Body.PreChargeReq);
@@ -543,7 +541,7 @@ static void stateFunctionConnected(void)
 {
     // We have a freshly established TCP channel. We start the V2GTP/EXI communication now.
     // We just use the initial request message from the Ioniq. It contains one entry: DIN.
-    log(MOD_PEV, "Checkpoint400: Sending the initial SupportedApplicationProtocolReq");
+    log(MOD_PEV, "send SupportedApplicationProtocolReq");
     setCheckpoint(400);
     pev_sendSupportedAppProtocolReq();
     _ccs_params.CurrentDemandStopReason = STOP_REASON_NONE;
@@ -558,7 +556,7 @@ static void stateFunctionWaitForSupportedApplicationProtocolResponse(void)
             aphsDoc.supportedAppProtocolRes.ResponseCode,
             aphsDoc.supportedAppProtocolRes.SchemaID_isUsed,
             aphsDoc.supportedAppProtocolRes.SchemaID);
-        log(MOD_PEV, "Checkpoint403: Schema negotiated. And Checkpoint500: Will send SessionSetupReq");
+        log(MOD_PEV, "Schema negotiated. send SessionSetupReq");
         setCheckpoint(500);
         pev_sendSessionSetupReq();
         pev_enterState(PEV_STATE_WaitForSessionSetupResponse, true);
@@ -571,9 +569,9 @@ static void stateFunctionWaitForSessionSetupResponse(void)
     {
         memcpy(sessionId, dinDocDec.V2G_Message.Header.SessionID.bytes, SESSIONID_LEN);
         sessionIdLen = dinDocDec.V2G_Message.Header.SessionID.bytesLen; /* store the received SessionID, we will need it later. */
-        addToTrace_bytes(MOD_PEV, "Checkpoint506: The Evse decided for SessionId", sessionId, sessionIdLen);
+        addToTrace_bytes(MOD_PEV, "Evse decided for SessionId", sessionId, sessionIdLen);
         setCheckpoint(506);
-        log(MOD_PEV, "Will send ServiceDiscoveryReq");
+        log(MOD_PEV, "send ServiceDiscoveryReq");
         setCheckpoint(510);
         pev_sendServiceDiscoveryReq();
         pev_enterState(PEV_STATE_WaitForServiceDiscoveryResponse, true);
@@ -584,8 +582,8 @@ static void stateFunctionWaitForServiceDiscoveryResponse(void)
 {
     if (pev_decodeResponse([] { return dinDocDec.V2G_Message.Body.ServiceDiscoveryRes_isUsed; }))
     {
-        log(MOD_PEV, "Will send ServicePaymentSelectionReq");
         setCheckpoint(520);
+        log(MOD_PEV, "send ServicePaymentSelectionReq");
         pev_sendServicePaymentSelectionReq();
         pev_enterState(PEV_STATE_WaitForServicePaymentSelectionResponse, true);
     }
@@ -595,8 +593,8 @@ static void stateFunctionWaitForServicePaymentSelectionResponse(void)
 {
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.ServicePaymentSelectionRes_isUsed; }))
     {
-        log(MOD_PEV, "Checkpoint530: Will send ContractAuthenticationReq");
         setCheckpoint(530);
+        log(MOD_PEV, "send ContractAuthenticationReq");
         pev_sendContractAuthenticationReq();
         pev_enterState(PEV_STATE_WaitForContractAuthenticationResponse, true);
     }
@@ -604,11 +602,6 @@ static void stateFunctionWaitForServicePaymentSelectionResponse(void)
 
 static void stateFunctionWaitForContractAuthenticationResponse(void)
 {
-    if (pev_DelayCycles > 0)
-    {
-        pev_DelayCycles -= 1;
-        return;
-    }
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.ContractAuthenticationRes_isUsed; }))
     {
         // In normal case, we can have two results here: either the Authentication is needed (the user
@@ -616,8 +609,8 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
         // Or, the authorization is finished. This is shown by EVSEProcessing=Finished.
         if (dinDocDec.V2G_Message.Body.ContractAuthenticationRes.EVSEProcessing == dinEVSEProcessingType_Finished)
         {
-            log(MOD_PEV, "Checkpoint538 and 540: Auth is Finished. Will send ChargeParameterDiscoveryReq");
             setCheckpoint(540);
+            log(MOD_PEV, "Auth is Finished. send ChargeParameterDiscoveryReq");
             pev_sendChargeParameterDiscoveryReq();
             ChargeParameterDiscoveryCompletedTrigger = false; // reset
             pev_enterState(PEV_STATE_WaitForChargeParameterDiscoveryResponse, true);
@@ -625,7 +618,7 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
         else
         {
             // Not (yet) finished.
-            log(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq");
+            log(MOD_PEV, "send ContractAuthenticationReq");
             pev_sendContractAuthenticationReq();
             pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // Stay in same state
@@ -635,11 +628,6 @@ static void stateFunctionWaitForContractAuthenticationResponse(void)
 
 static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
 {
-    if (pev_DelayCycles > 0)
-    {
-        pev_DelayCycles -= 1;
-        return;
-    }
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes_isUsed; }))
     {
         // We can have two cases here:
@@ -658,24 +646,24 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             _ccs_params.EvseMaxVoltage = evseMaxVoltage;
             _ccs_params.EvseMaxCurrent = evseMaxCurrent;
 
-            log(MOD_PEV, "Checkpoint550: ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
+            log(MOD_PEV, "ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
                 evseMinimumVoltage, evseMaxVoltage, evseMaxCurrent);
 
             setCheckpoint(550);
             // pull the CP line to state C here:
             hardwareInterface_setStateC();
-            log(MOD_PEV, "Checkpoint555: Locking the connector.");
+            log(MOD_PEV, "Locking the connector.");
             hardwareInterface_lockConnector();
 
-            log(MOD_PEV, "Checkpoint560: Send CableCheckReq.");
             setCheckpoint(560);
+            log(MOD_PEV, "send CableCheckReq");
             pev_sendCableCheckReq();
             pev_enterState(PEV_STATE_WaitForCableCheckResponse, true);
         }
         else
         {
             // Try again.
-            log(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq");
+            log(MOD_PEV, "send ChargeParameterDiscoveryReq again");
             pev_sendChargeParameterDiscoveryReq();
             pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
@@ -685,11 +673,6 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
 
 static void stateFunctionWaitForCableCheckResponse(void)
 {
-    if (pev_DelayCycles > 0)
-    {
-        pev_DelayCycles -= 1;
-        return;
-    }
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.CableCheckRes_isUsed; }))
     {
         //addToTrace_bytes(MOD_PEV, "In state WaitForCableCheckResponse, received:", tcp_rxdata, tcp_rxdataLen);
@@ -701,13 +684,13 @@ static void stateFunctionWaitForCableCheckResponse(void)
         // 2) Else: The charger says "need more time or cable not ok". In this case, we just run into timeout and start from the beginning.
         if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Finished)
         {
-            log(MOD_PEV, "The EVSE says that the CableCheck is finished and ok.");
+            log(MOD_PEV, "CableCheck is finished and ok");
             pev_enterState(PEV_STATE_WaitForPreChargeStart);
         }
         else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
         {
             // cable check not yet finished -> try again
-            log(MOD_PEV, "Will again send CableCheckReq");
+            log(MOD_PEV, "send CableCheckReq again");
             pev_sendCableCheckReq();
             pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
@@ -741,8 +724,8 @@ static void stateFunctionWaitForPreChargeStart(void)
 
         PrechargeDifferenceIsSmall = false; // reset
 
-        log(MOD_PEV, "Will send PreChargeReq");
         setCheckpoint(570);
+        log(MOD_PEV, "send PreChargeReq:%dV", batVtg);
         pev_sendPreChargeReq(batVtg);
         pev_enterState(PEV_STATE_WaitForPreChargeResponse, true);
     }
@@ -755,11 +738,6 @@ static void stateFunctionWaitForPreChargeStart(void)
 
 static void stateFunctionWaitForPreChargeResponse(void)
 {
-    if (pev_DelayCycles > 0)
-    {
-        pev_DelayCycles -= 1;
-        return;
-    }
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PreChargeRes_isUsed; }))
     {
         //addToTrace_bytes(MOD_PEV, "In state WaitForPreChargeResponse, received:", tcp_rxdata, tcp_rxdataLen);
@@ -786,7 +764,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
 
         if (PrechargeDifferenceIsSmall && chademoInterface_preChargeCompleted())
         {
-            log(MOD_PEV, "PreCharge completed.");
+            log(MOD_PEV, "PreCharge completed");
             setCheckpoint(573);
             // Turn the power relay on.
             hardwareInterface_setPowerRelayOn();
@@ -794,8 +772,8 @@ static void stateFunctionWaitForPreChargeResponse(void)
         }
         else
         {
+            log(MOD_PEV, "send PreChargeReq:%dV again", batVtg);
             pev_sendPreChargeReq(batVtg);
-            // prevent racing. in precharge, we have a lot less time (7s) than other states (60s), so delay shorter (15cy) than others (30cy).
             pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
         }
@@ -814,7 +792,7 @@ static void stateFunctionWaitForContactorsClosed(void)
            time to close the contactors until the charger really provides current. */
         return;
     }
-    log(MOD_PEV, "Contactors assumingly finished closing. Sending PowerDeliveryReq.");
+    log(MOD_PEV, "Contactors assumingly finished closing. send PowerDeliveryReq.");
     pev_sendPowerDeliveryReq(true); /* true is ON */
     setCheckpoint(600);
     pev_enterState(PEV_STATE_WaitForPowerDeliveryOnResponse, true);
@@ -827,7 +805,7 @@ static void stateFunctionWaitForPowerDeliveryOnResponse(void)
         //addToTrace_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
         if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
         {
-            log(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
+            log(MOD_PEV, "send CurrentDemandReq");
             setCheckpoint(700);
             pev_sendCurrentDemandReq();
             pev_enterState(PEV_STATE_WaitForCurrentDemandResponse, true);
@@ -967,11 +945,10 @@ static void stateFunctionWaitForPowerRelayOff(void)
     // Wait for chademo to ACK _ccs_params.ContactorClosed we sat in hardwareInterface_setPowerRelayOff()
     if (chademoInterface_adapterContactorOpened())
     {
-        log(MOD_PEV, "Starting WeldingDetection");
-
         /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
         will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
         some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
+        log(MOD_PEV, "send WeldingDetectionReq");
         pev_sendWeldingDetectionReq();
         pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse, true);
     }
@@ -979,11 +956,6 @@ static void stateFunctionWaitForPowerRelayOff(void)
 
 static void stateFunctionWaitForWeldingDetectionResponse(void)
 {
-    if (pev_DelayCycles > 0)
-    {
-        pev_DelayCycles -= 1;
-        return;
-    }
     if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.WeldingDetectionRes_isUsed; }))
     {
         /* The charger measured the voltage on the cable, and gives us the value. In the first
@@ -1004,14 +976,14 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
 
         if (voltageIsLow || voltageIsLastChargingVoltageAfter2sec)
         {
-            log(MOD_PEV, "WeldingDetection finished. Sending SessionStopReq");
+            log(MOD_PEV, "WeldingDetection finished. send SessionStopReq");
             pev_sendSessionStopReq();
             setCheckpoint(900);
             pev_enterState(PEV_STATE_WaitForSessionStopResponse, true);
         }
         else 
         {
-            /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
+            log(MOD_PEV, "send WeldingDetectionReq again");
             pev_sendWeldingDetectionReq();
             pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
             // stay in same state
@@ -1124,7 +1096,14 @@ static void pev_runFsm(void)
         connMgr_setLevel(CONNLEVEL_100_APPL_RUNNING);
     }
 
-    stateFunctions[pev_state](); //call state function
+    if (pev_DelayCycles > 0)
+    {
+        pev_DelayCycles -= 1;
+    }
+    else
+    {
+        stateFunctions[pev_state](); //call state function
+    }
 
     if (pev_state != PEV_STATE_WaitForCurrentDemandResponse) //only in currentDemand we have meaningful current values
         _ccs_params.EvseCurrent = 0;
