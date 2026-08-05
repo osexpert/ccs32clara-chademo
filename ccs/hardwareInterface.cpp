@@ -48,25 +48,23 @@ void hardwareInterface_setPowerRelayOff(void)
 
 void hardwareInterface_setStateB(void)
 {
-    log(MOD_PEV, "hardwareInterface_setStateB");
     DigIo::state_c_out_inverted.Set();
 }
 
 void hardwareInterface_setStateC(void)
 {
-    log(MOD_PEV, "hardwareInterface_setStateC");
     DigIo::state_c_out_inverted.Clear();
 }
 
 void hardwareInterface_lockConnector(void)
 {
-    log(MOD_PEV, "Lock charging plug");
+    log(MOD_PEV, "hardwareInterface_lockConnector");
     _ccs_params.ConnectorLocked = true;
 }
 
 void hardwareInterface_unlockConnector(void)
 {
-    log(MOD_PEV, "Unlock charging plug");
+    log(MOD_PEV, "hardwareInterface_unlockConnector");
     _ccs_params.ConnectorLocked = false;
 }
 

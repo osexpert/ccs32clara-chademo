@@ -697,12 +697,12 @@ static void stateFunctionChargeParameterDiscoveryMsg()
             _ccs_params.EvseMaxVoltage = evseMaxVoltage;
             _ccs_params.EvseMaxCurrent = evseMaxCurrent;
 
-            log(MOD_PEV, "ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
-                evseMinimumVoltage, evseMaxVoltage, evseMaxCurrent);
+            log(MOD_PEV, "ChargeParams are discovered: min:%dV max:%dV/%dA", evseMinimumVoltage, evseMaxVoltage, evseMaxCurrent);
 
             // pull the CP line to state C here:
+            log(MOD_PEV, "Set StateC");
             hardwareInterface_setStateC();
-            log(MOD_PEV, "Locking the connector.");
+
             hardwareInterface_lockConnector();
 
             setCheckpoint(550);
@@ -925,8 +925,9 @@ static void stateFunctionPowerDeliveryOffMsg()
         },
         [] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
     {
+
+        log(MOD_PEV, "Set StateB and give charger some time to detect it and ramp down the current");
         hardwareInterface_setStateB(); /* ISO Figure 107: The PEV shall set stateB after receiving PowerDeliveryRes and before WeldingDetectionReq */
-        log(MOD_PEV, "Giving the charger some time to detect StateB and ramp down the current.");
         pev_enterState(PEV_STATE_WaitForCurrentDownAfterStateB); /* We give the charger some time to detect the StateB and fully ramp down the current */
     }
 }
@@ -1008,7 +1009,7 @@ static void stateFunctionSafeShutDown()
 {
     /* Here we end, if we run into a timeout in the state machine (or other error before we reach CurrentDemand). */
     /* Initiate the safe-shutdown-sequence. */
-    log(MOD_PEV, "Safe-shutdown-sequence: setting state B");
+    log(MOD_PEV, "Safe-shutdown-sequence: setting StateB");
     hardwareInterface_setStateB(); /* setting CP line to B disables in the charger the current flow. */
     pev_enterState(PEV_STATE_SafeShutDownWaitForChargerShutdown);
 }
@@ -1020,7 +1021,6 @@ static void stateFunctionSafeShutDownWaitForChargerShutdown(void)
         return;
     }
     /* Now the current flow is stopped by the charger. We can safely open the contactors: */
-    log(MOD_PEV, "Safe-shutdown-sequence: opening contactors");
     hardwareInterface_setPowerRelayOff();
 
     tcp_disconnect(); /* Set StateB is our last communication with the charger during safe shutdown, and after waiting for StateB to be fully processed by charger, close tcp as well. */
