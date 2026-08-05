@@ -795,7 +795,7 @@ public:
         bool _discovery = CONFIG_SX ? false : true;
         bool _discoveryIsDone = false;
 
-        bool _preChargeDoneButStalled = false;
+        bool _ccsPreChargeDone = false;
         bool _dischargeEnabled = false;
         bool _isDischarging = false;
         uint8_t _estimatedOutputVoltageModulation = CHADEMO_VOLTAGE_MODULATION;

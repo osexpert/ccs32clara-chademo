@@ -3,28 +3,34 @@
 
 #include "main.h"
 
+#define MESSAGE_STATE_DELAY_CYCLES 8 // 240ms
+
+// artificial time to wait after we recieve a Res until we send next Req (same message type loops)
+// Ionic seems to wait 80-90ms between Res and send next Req
+#define MESAGE_LOOP_DELAY_CYCLES 3 // 90ms
+
 /* The Charging State Machine for the car */
 //STATE_ENTRY(internalName, friendlyName, response timeout in s, state timeout in s)
 #define STATE_LIST \
    STATE_ENTRY(Start, Start, 0, 0) \
    STATE_ENTRY(Connected, Connected, 0, 0) \
-   STATE_ENTRY(WaitForSupportedApplicationProtocolResponse, NegotiateProtocol, 2, 2) \
-   STATE_ENTRY(WaitForSessionSetupResponse, SessionSetup, 2, 2) \
-   STATE_ENTRY(WaitForServiceDiscoveryResponse, ServiceDiscovery, 2, 2) \
-   STATE_ENTRY(WaitForServicePaymentSelectionResponse, PaymentSelection, 2, 2) \
-   STATE_ENTRY(WaitForContractAuthenticationResponse, ContractAuthentication, 2, 120) /* spec says 60, 120-150 seems to be recomended for slow backend authorization */ \
-   STATE_ENTRY(WaitForChargeParameterDiscoveryResponse, ChargeParameterDiscovery, 2, 30) /* Resp: was 5, but DIN says 2 */ /* State: was 60 but AI thinks 10-20 is more common */ \
-   STATE_ENTRY(WaitForCableCheckResponse, CableCheck, 2, 60) \
-   STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 0, 10) /* wait max 10sec for chademo starting chargingLoop */ \
-   STATE_ENTRY(WaitForPreChargeResponse, PreCharge, 2, 20) /* spec is 7sec, but allow slower */ \
-   STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 0, 0) \
-   STATE_ENTRY(WaitForPowerDeliveryOnResponse, PowerDeliveryOn, 2, 2) /* Resp: DIN: timeout 2sec, ISO: timeout 5sec. But we use DIN. */ \
-   STATE_ENTRY(WaitForCurrentDemandResponse, CurrentDemand, 1, 0) /* Resp: DIN/ISO: timeout 250ms, but use 1sec. */ \
-   STATE_ENTRY(WaitForPowerDeliveryOffResponse, PowerDeliveryOff, 2, 2) /* Resp: DIN: timeout 2sec, ISO: timeout 5sec. But we use DIN. */ \
+   STATE_ENTRY(SupportedApplicationProtocolMsg, NegotiateProtocol, 2, 3) \
+   STATE_ENTRY(SessionSetupMsg, SessionSetup, 2, 3) \
+   STATE_ENTRY(ServiceDiscoveryMsg, ServiceDiscovery, 2, 3) \
+   STATE_ENTRY(ServicePaymentSelectionMsg, PaymentSelection, 2, 3) \
+   STATE_ENTRY(ContractAuthenticationMsg, ContractAuthentication, 2, 121) /* spec says 60, 120-150 seems to be recomended for slow backend authorization */ \
+   STATE_ENTRY(ChargeParameterDiscoveryMsg, ChargeParameterDiscovery, 2, 31) /* Resp: was 5, but DIN says 2 */ /* State: was 60 but AI thinks 10-20 is more common */ \
+   STATE_ENTRY(CableCheckMsg, CableCheck, 2, 61) \
+/*   STATE_ENTRY(WaitForPreChargeStart, PreChargeStart, 0, 10)*/ /* wait max 10sec for chademo starting chargingLoop */ \
+   STATE_ENTRY(PreChargeMsg, PreCharge, 2, 31) /* spec is 7sec, but allow more */ \
+   /*STATE_ENTRY(WaitForContactorsClosed, ContactorsClosed, 0, 0)*/ \
+   STATE_ENTRY(PowerDeliveryOnMsg, PowerDeliveryOn, 2, 3) /* Resp: DIN: timeout 2sec, ISO: timeout 5sec. But we use DIN. */ \
+   STATE_ENTRY(CurrentDemandMsg, CurrentDemand, 1, 0) /* Resp: DIN/ISO: timeout 250ms, but use 1sec. */ \
+   STATE_ENTRY(PowerDeliveryOffMsg, PowerDeliveryOff, 2, 3) /* Resp: DIN: timeout 2sec, ISO: timeout 5sec. But we use DIN. */ \
    STATE_ENTRY(WaitForCurrentDownAfterStateB, CurrentDown, 0, 0) \
    STATE_ENTRY(WaitForPowerRelayOff, RelayOff, 0, 10) /* wait max 10sec for adapterContactorOpened */ \
-   STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2, 10) \
-   STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2, 2) \
+   STATE_ENTRY(WeldingDetectionMsg, WeldingDetection, 2, 10) \
+   STATE_ENTRY(SessionStopMsg, SessionStop, 2, 3) \
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0, 0) \
    STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0, 0) \
    STATE_ENTRY(Stop, Stop, 0, 0) \
@@ -61,8 +67,8 @@ STATE_LIST
 };
 #undef STATE_ENTRY
 
-//Timeout array
-#define STATE_ENTRY(name, fname, response_timeout_sec, state_timeout_sec) SEC_TO_CCS_CYCLES_ROUND_UP(state_timeout_sec),
+//Timeout array. Since we mostly wait until sending next message at the start of the state, add MESSAGE_STATE_DELAY_CYCLES to the state timeout.
+#define STATE_ENTRY(name, fname, response_timeout_sec, state_timeout_sec) (SEC_TO_CCS_CYCLES_ROUND_UP(state_timeout_sec) + (state_timeout_sec > 0 ? MESSAGE_STATE_DELAY_CYCLES : 0)),
 static const uint16_t state_timeouts[] = {
 STATE_LIST
 };
@@ -83,9 +89,7 @@ const char* const pevSttLabels[] = { STATE_LIST };
 
 #define LEN_OF_EVCCID 6 /* The EVCCID is the MAC according to spec. Ioniq uses exactly these 6 byte. */
 
-// artificial time to wait after we recieve a Res until we send next Req (same message type loops)
-// Ionic seems to wait 80-90ms between Res and send next Req
-#define MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES 3
+
 
 /*
 <supportedAppProtocolReq xmlns="urn:iso:15118:2010:AppProtocol">
@@ -105,10 +109,12 @@ static uint32_t pev_cyclesInState;
 static int pev_cyclesSinceReq = -1; // unset
 static uint8_t pev_DelayCycles;
 static pevstates pev_state = PEV_STATE_Start;
+static bool pev_sendMessagePending = false;
 static int LastCurrentDemandResPresentVoltage;
 static int LastTargetVoltage;
 static int LastTargetCurrent;
 static bool PrechargeDifferenceIsSmall;
+static int sentCurrentDemandMsg;
 
 static bool PresentVoltageDifferentFromTarget;
 static bool PresentVoltageDifferentFromTarget_isSet;
@@ -120,7 +126,7 @@ static bool ChargeParameterDiscoveryCompletedTrigger;
 
 /***local function prototypes *****************************************/
 
-static void pev_enterState(pevstates n, bool keepCyclesSinceReq = false);
+static void pev_enterState(pevstates n);
 
 /*** functions ********************************************************/
 
@@ -172,8 +178,6 @@ static void addV2GTPHeaderAndTransmit(const uint8_t* exiBuffer, uint8_t exiBuffe
     {
         log(MOD_PEV, "Error: EXI does not fit into tcpPayload.");
     }
-
-    pev_cyclesSinceReq = 0;
 }
 
 static void encodeAndTransmit(void)
@@ -247,6 +251,47 @@ static bool pev_decodeAppResponse(Pred isUsed)
     if (res) pev_cyclesSinceReq = -1; // unset
     return res;
 }
+
+static void send_message_again(uint8_t delay)
+{
+    pev_sendMessagePending = true;
+    pev_DelayCycles = delay;
+}
+
+// return true when a request is ready
+template<typename Pred1, typename Pred2, typename Pred3>
+static bool messageHandler(uint8_t initialDelayCycles, Pred1 send, Pred2 isUsed, Pred3 decode)
+{
+    if (pev_cyclesInState < initialDelayCycles) return false;
+
+    if (pev_sendMessagePending)
+    {
+        send();
+        pev_sendMessagePending = false;
+        pev_cyclesSinceReq = 0;
+        return false;
+    }
+
+    if (!pev_decodeResponse(decode))//[] {  projectExiConnector_decode_DinExiDocument(); }))
+        return false;
+
+    bool res = isUsed();
+    if (res) pev_cyclesSinceReq = -1; // unset
+    return res;
+}
+
+template<typename Pred1, typename Pred2>
+static bool dinMessageHandler(uint8_t initialDelayCycles, Pred1 send, Pred2 isUsed)
+{
+    return messageHandler(initialDelayCycles, send, isUsed, [] {  projectExiConnector_decode_DinExiDocument(); });
+}
+
+template<typename Pred1, typename Pred2>
+static bool appMessageHandler(uint8_t initialDelayCycles, Pred1 send, Pred2 isUsed)
+{
+    return messageHandler(initialDelayCycles, send, isUsed, [] {  projectExiConnector_decode_appHandExiDocument(); });
+}
+
 
 /********* EXI creation functions ************************/
 static void pev_sendSupportedAppProtocolReq()
@@ -533,6 +578,7 @@ static void pev_sendSessionStopReq()
     encodeAndTransmit();
 }
 
+
 /**** State functions ***************/
 //Empty functions
 static void stateFunctionStart() {}
@@ -541,94 +587,99 @@ static void stateFunctionConnected(void)
 {
     // We have a freshly established TCP channel. We start the V2GTP/EXI communication now.
     // We just use the initial request message from the Ioniq. It contains one entry: DIN.
-    log(MOD_PEV, "send SupportedApplicationProtocolReq");
-    setCheckpoint(400);
-    pev_sendSupportedAppProtocolReq();
     _ccs_params.CurrentDemandStopReason = STOP_REASON_NONE;
-    pev_enterState(PEV_STATE_WaitForSupportedApplicationProtocolResponse, true);
+    setCheckpoint(400);
+    pev_enterState(PEV_STATE_SupportedApplicationProtocolMsg);
 }
 
-static void stateFunctionWaitForSupportedApplicationProtocolResponse(void)
+static void stateFunctionSupportedApplicationProtocolMsg()
 {
-    if (pev_decodeAppResponse([] { return aphsDoc.supportedAppProtocolRes_isUsed; }))
+    if (appMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        log(MOD_PEV, "send SupportedApplicationProtocolReq");
+        pev_sendSupportedAppProtocolReq();
+        },
+        [] { return aphsDoc.supportedAppProtocolRes_isUsed; }))
     {
-        log(MOD_PEV, "supportedAppProtocolRes ResponseCode:%d, SchemaID_isUsed:%d, SchemaID:%d",
+        log(MOD_PEV, "Schema negotiated. ResponseCode:%d, SchemaID_isUsed:%d, SchemaID:%d",
             aphsDoc.supportedAppProtocolRes.ResponseCode,
             aphsDoc.supportedAppProtocolRes.SchemaID_isUsed,
             aphsDoc.supportedAppProtocolRes.SchemaID);
-        log(MOD_PEV, "Schema negotiated. send SessionSetupReq");
         setCheckpoint(500);
-        pev_sendSessionSetupReq();
-        pev_enterState(PEV_STATE_WaitForSessionSetupResponse, true);
+        pev_enterState(PEV_STATE_SessionSetupMsg);
     }
 }
 
-static void stateFunctionWaitForSessionSetupResponse(void)
+static void stateFunctionSessionSetupMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.SessionSetupRes_isUsed; }))
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        log(MOD_PEV, "send SessionSetupReq");
+        pev_sendSessionSetupReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.SessionSetupRes_isUsed; }))
     {
         memcpy(sessionId, dinDocDec.V2G_Message.Header.SessionID.bytes, SESSIONID_LEN);
         sessionIdLen = dinDocDec.V2G_Message.Header.SessionID.bytesLen; /* store the received SessionID, we will need it later. */
         log_bytes(MOD_PEV, "SessionId", sessionId, sessionIdLen);
-        setCheckpoint(506);
-        log(MOD_PEV, "send ServiceDiscoveryReq");
-        setCheckpoint(510);
-        pev_sendServiceDiscoveryReq();
-        pev_enterState(PEV_STATE_WaitForServiceDiscoveryResponse, true);
+        pev_enterState(PEV_STATE_ServiceDiscoveryMsg);
     }
 }
 
-static void stateFunctionWaitForServiceDiscoveryResponse(void)
+static void stateFunctionServiceDiscoveryMsg()
 {
-    if (pev_decodeResponse([] { return dinDocDec.V2G_Message.Body.ServiceDiscoveryRes_isUsed; }))
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        log(MOD_PEV, "send ServiceDiscoveryReq");
+        pev_sendServiceDiscoveryReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.ServiceDiscoveryRes_isUsed; }))
     {
-        setCheckpoint(520);
+        pev_enterState(PEV_STATE_ServicePaymentSelectionMsg);
+    }
+}
+
+static void stateFunctionServicePaymentSelectionMsg()
+{
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
         log(MOD_PEV, "send ServicePaymentSelectionReq");
         pev_sendServicePaymentSelectionReq();
-        pev_enterState(PEV_STATE_WaitForServicePaymentSelectionResponse, true);
+        },
+        [] { return dinDocDec.V2G_Message.Body.ServicePaymentSelectionRes_isUsed; }))
+    {
+        pev_enterState(PEV_STATE_ContractAuthenticationMsg);
     }
 }
 
-static void stateFunctionWaitForServicePaymentSelectionResponse(void)
+static void stateFunctionContractAuthenticationMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.ServicePaymentSelectionRes_isUsed; }))
-    {
-        setCheckpoint(530);
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
         log(MOD_PEV, "send ContractAuthenticationReq");
         pev_sendContractAuthenticationReq();
-        pev_enterState(PEV_STATE_WaitForContractAuthenticationResponse, true);
-    }
-}
-
-static void stateFunctionWaitForContractAuthenticationResponse(void)
-{
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.ContractAuthenticationRes_isUsed; }))
+        },
+        [] { return dinDocDec.V2G_Message.Body.ContractAuthenticationRes_isUsed; }))
     {
         // In normal case, we can have two results here: either the Authentication is needed (the user
         // needs to authorize by RFID card or app, or something like this.
         // Or, the authorization is finished. This is shown by EVSEProcessing=Finished.
         if (dinDocDec.V2G_Message.Body.ContractAuthenticationRes.EVSEProcessing == dinEVSEProcessingType_Finished)
         {
-            setCheckpoint(540);
-            log(MOD_PEV, "Auth is Finished. send ChargeParameterDiscoveryReq");
-            pev_sendChargeParameterDiscoveryReq();
+            log(MOD_PEV, "Auth is Finished");
             ChargeParameterDiscoveryCompletedTrigger = false; // reset
-            pev_enterState(PEV_STATE_WaitForChargeParameterDiscoveryResponse, true);
+            pev_enterState(PEV_STATE_ChargeParameterDiscoveryMsg);
         }
         else
         {
-            // Not (yet) finished.
-            log(MOD_PEV, "send ContractAuthenticationReq");
-            pev_sendContractAuthenticationReq();
-            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
+            send_message_again(MESAGE_LOOP_DELAY_CYCLES);
             // Stay in same state
         }
     }
 }
 
-static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
+static void stateFunctionChargeParameterDiscoveryMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes_isUsed; }))
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        log(MOD_PEV, "send ChargeParameterDiscoveryReq");
+        pev_sendChargeParameterDiscoveryReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes_isUsed; }))
     {
         // We can have two cases here:
         // (A) The charger needs more time to show the charge parameters.
@@ -649,33 +700,30 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse(void)
             log(MOD_PEV, "ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
                 evseMinimumVoltage, evseMaxVoltage, evseMaxCurrent);
 
-            setCheckpoint(550);
             // pull the CP line to state C here:
             hardwareInterface_setStateC();
             log(MOD_PEV, "Locking the connector.");
             hardwareInterface_lockConnector();
 
-            setCheckpoint(560);
-            log(MOD_PEV, "send CableCheckReq");
-            pev_sendCableCheckReq();
-            pev_enterState(PEV_STATE_WaitForCableCheckResponse, true);
+            setCheckpoint(550);
+            pev_enterState(PEV_STATE_CableCheckMsg);
         }
         else
         {
-            // Try again.
-            log(MOD_PEV, "send ChargeParameterDiscoveryReq again");
-            pev_sendChargeParameterDiscoveryReq();
-            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
+            send_message_again(MESAGE_LOOP_DELAY_CYCLES);
             // stay in same state
         }
     }
 }
 
-static void stateFunctionWaitForCableCheckResponse(void)
+static void stateFunctionCableCheckMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.CableCheckRes_isUsed; }))
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] { // Ionic delay is 420ms, 250ms + StateC and locking connector. 240ms is sufficient for us.
+        log(MOD_PEV, "send CableCheckReq");
+        pev_sendCableCheckReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.CableCheckRes_isUsed; }))
     {
-        //log_bytes(MOD_PEV, "In state WaitForCableCheckResponse, received:", tcp_rxdata, tcp_rxdataLen);
         uint8_t rc = dinDocDec.V2G_Message.Body.CableCheckRes.ResponseCode;
         uint8_t proc = dinDocDec.V2G_Message.Body.CableCheckRes.EVSEProcessing;
         _ccs_params.EvseVoltage = 0;
@@ -685,14 +733,13 @@ static void stateFunctionWaitForCableCheckResponse(void)
         if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Finished)
         {
             log(MOD_PEV, "CableCheck is finished and ok");
-            pev_enterState(PEV_STATE_WaitForPreChargeStart);
+            PrechargeDifferenceIsSmall = false; // reset
+            //pev_enterState(PEV_STATE_WaitForPreChargeStart);
+            pev_enterState(PEV_STATE_PreChargeMsg);
         }
         else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
         {
-            // cable check not yet finished -> try again
-            log(MOD_PEV, "send CableCheckReq again");
-            pev_sendCableCheckReq();
-            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
+            send_message_again(MESAGE_LOOP_DELAY_CYCLES);
             // stay in same state
         }
         else // spec only mention the 2 cases above, assuming all other cases must be errors
@@ -703,51 +750,28 @@ static void stateFunctionWaitForCableCheckResponse(void)
     }
 }
 
-static void stateFunctionWaitForPreChargeStart(void)
+static void stateFunctionPreChargeMsg()
 {
-    // wait 2 sec. It is possible some chargers do not like precharge lasting longer than 7 seconds? This at least saves 2 :-)
-    // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
-    // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
-    // How long can we wait before sending the first PreChargeReq? It seems undefined in spec...but Gemini suggests 5 seconds max.
-
-    // there is no need to wait here if CONFIG_SX. clara and pyplc does not wait at all.
-    // But in case ccs finish insanely fast and chademo slow (unlikely), we can wait here for a while (max 10sec) until we time out.
-    int pos = chademoInterface_chargingLoopPos();
-    if (CONFIG_SX ? pos == 0 : pev_cyclesInState > (DX_CCS_WaitForPreChargeStart_MS / 30))
-    {
+    // DX: wait 2 sec. It is possible some chargers do not like precharge lasting longer than 7 seconds? This at least saves 2 :-)
+    // Ionic har 300ms from CableCheck -> PreCharge, and we have 250ms + time in state stateFunctionWaitForPreChargeStart, so we are good:-)
+    uint8_t delay = CONFIG_SX ? MESSAGE_STATE_DELAY_CYCLES : DX_CCS_WaitForPreChargeStart_MS / 30;
+    if (dinMessageHandler(delay, [] {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
-
         if (batVtg < _ccs_params.EvseMinimumVoltage) {
             // Unlikely that this can happen, and if it does, then precharge will never be satisfied and charger will go into timeout, so don't need to handle it specially
             log(MOD_PEV, "Warning: batteryVoltage:%d is less than evseMinimumVoltage:%d", batVtg, _ccs_params.EvseMinimumVoltage);
         }
-
-        PrechargeDifferenceIsSmall = false; // reset
-
-        setCheckpoint(570);
         log(MOD_PEV, "send PreChargeReq:%dV", batVtg);
         pev_sendPreChargeReq(batVtg);
-        pev_enterState(PEV_STATE_WaitForPreChargeResponse, true);
-    }
-    else if (CONFIG_SX && pos > 0)
+        },
+        [] { return dinDocDec.V2G_Message.Body.PreChargeRes_isUsed; }))
     {
-        log(MOD_PEV, "Error: Can not start precharge -> chademo is past ChargingLoop");
-        pev_enterState(PEV_STATE_SafeShutDown);
-    }
-}
-
-static void stateFunctionWaitForPreChargeResponse(void)
-{
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PreChargeRes_isUsed; }))
-    {
-        //log_bytes(MOD_PEV, "In state WaitForPreChargeResponse, received:", tcp_rxdata, tcp_rxdataLen);
         _global.auto_power_off_timer_count_up_ms = 0;
 
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.PreChargeRes.EVSEPresentVoltage);
         _ccs_params.EvseVoltage = evsePresentVoltage;
 
         log(MOD_PEV, "PreCharge:%dV", evsePresentVoltage);
-        setCheckpoint(571);
 
         uint16_t inletVtg = hardwareInterface_getInletVoltage();
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
@@ -757,7 +781,7 @@ static void stateFunctionWaitForPreChargeResponse(void)
             if (ABS(inletVtg - batVtg) < PARAM_U_DELTA_MAX_FOR_END_OF_PRECHARGE)
             {
                 log(MOD_PEV, "PreCharge difference is small (inlet:%dV batt:%dV)", inletVtg, batVtg);
-                setCheckpoint(572);
+                setCheckpoint(573);
                 PrechargeDifferenceIsSmall = true;
             }
         }
@@ -765,59 +789,45 @@ static void stateFunctionWaitForPreChargeResponse(void)
         if (PrechargeDifferenceIsSmall && chademoInterface_preChargeCompleted())
         {
             log(MOD_PEV, "PreCharge completed");
-            setCheckpoint(573);
+
             // Turn the power relay on.
+            //  Ionic timings show...it most likely is not done here, but after PowerDeliveryRes
+            // But currently we only set a flag here, so it does not matter
             hardwareInterface_setPowerRelayOn();
-            pev_enterState(PEV_STATE_WaitForContactorsClosed);
+
+            pev_enterState(PEV_STATE_PowerDeliveryOnMsg);
         }
         else
         {
-            log(MOD_PEV, "send PreChargeReq:%dV again", batVtg);
-            pev_sendPreChargeReq(batVtg);
-            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
+            send_message_again(MESAGE_LOOP_DELAY_CYCLES);
             // stay in same state
         }
     }
 }
 
-static void stateFunctionWaitForContactorsClosed(void)
+// If I understand it correctly, PowerDeliveryReq=true tell the charger to close its contactors, and it must do so before it return PowerDeliveryRes=OK.
+// From Ionic timings, it _seems_ to close its contactors _after_ PowerDeliveryRes=OK, and not after PreCharge completed...
+static void stateFunctionPowerDeliveryOnMsg()
 {
-    if (pev_cyclesInState < 15) // 450ms
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        log(MOD_PEV, "send PowerDeliveryReq:true");
+        pev_sendPowerDeliveryReq(true); /* true is ON */
+        },
+        [] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
     {
-        /* simplified solution for waiting for the contactors: Since the contactors anyway have no feedback whether
-           they are really closed, we just use a time-based approach. In
-           https://github.com/uhi22/ccs32clara/issues/22 we see that it takes ~350ms until both contactors have
-           current, so we wait here 15 cycles * 30ms = 450ms, and additional delay will be caused by the
-           powerDeliveryRequest/Response and the currentDemandRequest/Response. So this should give sufficient
-           time to close the contactors until the charger really provides current. */
-        return;
-    }
-    log(MOD_PEV, "Contactors assumingly finished closing. send PowerDeliveryReq.");
-    pev_sendPowerDeliveryReq(true); /* true is ON */
-    setCheckpoint(600);
-    pev_enterState(PEV_STATE_WaitForPowerDeliveryOnResponse, true);
-}
-
-static void stateFunctionWaitForPowerDeliveryOnResponse(void)
-{
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
-    {
-        //log_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
         if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
         {
-            log(MOD_PEV, "send CurrentDemandReq");
+            // Turn the power relay on (Ionic delays show that it probably happens here and not after PreCharge done, but both probably works)
+            // But currently we only set a flag here, so it does not matter
+            //hardwareInterface_setPowerRelayOn();
+
+            sentCurrentDemandMsg = 0; // reset
             setCheckpoint(700);
-            pev_sendCurrentDemandReq();
-            pev_enterState(PEV_STATE_WaitForCurrentDemandResponse, true);
+            pev_enterState(PEV_STATE_CurrentDemandMsg);
         }
         else
         {
-            // FAILED_PowerDeliveryNotApplied (17) seen in cases where precharge voltage was < 20V less than battery voltage,
-            // even if precharge is continued and the precharge voltage rised to battery voltage. This is strange
-            // (not that it is failing, it may create huge inrush current against the charger, when precharge voltage is lower),
-            // but it is strange that it is not failing during the precharge itself, but during PowerDelivery. This made it harder
-            // to guess why it failed, but after experimenting, this seems to be the most likely cause.
-            // This means: precharge can not be abused to adjust the voltage after closing contactors, the voltage must be adjusted before closing contactors.
+            // FAILED_PowerDeliveryNotApplied (17) seen in cases where precharge voltage was < 20V less than battery voltage.
             // Exception: it seems the charger dislike lower voltage (than battery) more than higher voltage (than battery):
             // Lower: huge current inrush agains charger. Car has no way to limit amps. Higher: inrush agains car, but charger is current limiting, so it will be max 1A (precharge current).
             log(MOD_PEV, "PowerDelivery failed rc:%d", dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode);
@@ -826,22 +836,24 @@ static void stateFunctionWaitForPowerDeliveryOnResponse(void)
     }
 }
 
-static void stateFunctionWaitForCurrentDemandResponse(void)
-{
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed; }))
+static void stateFunctionCurrentDemandMsg()
+{   // SX: Wait for car contactors closing after hardwareInterface_setPowerRelayOn: 15*30=450ms. DX: wait shorter, since car contactors closing after chademoInterface_preChargeCompleted() = true
+    // But currently, SX also close after chademoInterface_preChargeCompleted, so use the same for both.
+    if (dinMessageHandler(/*CONFIG_SX ? 15 :*/ MESSAGE_STATE_DELAY_CYCLES, [] {
+        if (sentCurrentDemandMsg++ < 10) { // only show the 10 first, to get an idea of the timing (no need to spam)
+            log(MOD_PEV, "send CurrentDemandReq");
+        }
+        pev_sendCurrentDemandReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.CurrentDemandRes_isUsed; }))
     {
-        //log_bytes(MOD_PEV, "In state WaitForCurrentDemandRes, received:", tcp_rxdata, tcp_rxdataLen);
         _global.auto_power_off_timer_count_up_ms = 0;
 
         /* as long as the battery is not full and no stop-demand from the user, we continue charging */
         _stopreasons currentDemandStopReason = STOP_REASON_NONE;
         if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Shutdown)
         {
-            /* https://github.com/uhi22/pyPLC#example-flow, checkpoint 790: If the user stops the
-                charging session on the charger, we get a CurrentDemandResponse with
-                DC_EVSEStatus.EVSEStatusCode = 2 "EVSE_Shutdown" (observed on Compleo. To be tested on other chargers. */
             log(MOD_PEV, "User requested stop on charger side.");
-            setCheckpoint(790);
             currentDemandStopReason = STOP_REASON_CHARGER_SHUTDOWN;
         }
         else if (dinDocDec.V2G_Message.Body.CurrentDemandRes.DC_EVSEStatus.EVSEStatusCode == dinDC_EVSEStatusCodeType_EVSE_Malfunction)
@@ -859,22 +871,19 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
         }
         else if (hardwareInterface_stopChargeRequested())
         {
-            log(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
+            log(MOD_PEV, "User requested stop on car side.");
             currentDemandStopReason = STOP_REASON_POWER_OFF_PENDING;
         }
         else if (hardwareInterface_getIsBatteryFull())
         {
-            log(MOD_PEV, "Battery is full. Sending PowerDeliveryReq Stop.");
+            log(MOD_PEV, "Battery is full.");
             currentDemandStopReason = STOP_REASON_BATTERY_FULL;
         }
 
         if (currentDemandStopReason != STOP_REASON_NONE)
         {
             _ccs_params.CurrentDemandStopReason = currentDemandStopReason;
-            setCheckpoint(800);
-            pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
-                                            sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
-            pev_enterState(PEV_STATE_WaitForPowerDeliveryOffResponse, true);
+            pev_enterState(PEV_STATE_PowerDeliveryOffMsg);
         }
         else
         {
@@ -900,24 +909,22 @@ static void stateFunctionWaitForCurrentDemandResponse(void)
             if (evsePresentCurrent != LastTargetCurrent) PresentCurrentDifferentFromTarget = true;
             PresentCurrentDifferentFromTarget_isSet = true;
 
-            setCheckpoint(710);
-            pev_sendCurrentDemandReq();
+            send_message_again(0); // no delay in CurrentDemand loop
             // stay in same state
         }
     }
 }
 
-static void stateFunctionWaitForPowerDeliveryOffResponse(void)
+static void stateFunctionPowerDeliveryOffMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
+           sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
+        log(MOD_PEV, "send PowerDeliveryReq:false");
+        pev_sendPowerDeliveryReq(false); 
+        },
+        [] { return dinDocDec.V2G_Message.Body.PowerDeliveryRes_isUsed; }))
     {
-        //log_bytes(MOD_PEV, "In state WaitForPowerDeliveryRes, received:", tcp_rxdata, tcp_rxdataLen);
-        /* We requested "OFF". This is while the charging session is ending.
-        When we received this response, the charger had up to 1.5s time to ramp down
-        the current. On Compleo, there are really 1.5s until we get this response.
-        See https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
-        setCheckpoint(810);
-        /* set the CP line to B */
         hardwareInterface_setStateB(); /* ISO Figure 107: The PEV shall set stateB after receiving PowerDeliveryRes and before WeldingDetectionReq */
         log(MOD_PEV, "Giving the charger some time to detect StateB and ramp down the current.");
         pev_enterState(PEV_STATE_WaitForCurrentDownAfterStateB); /* We give the charger some time to detect the StateB and fully ramp down the current */
@@ -926,37 +933,33 @@ static void stateFunctionWaitForPowerDeliveryOffResponse(void)
 
 static void stateFunctionWaitForCurrentDownAfterStateB(void)
 {
-    /* During normal end of the charging session, we have set the StateB, and
-       want to give the charger some time to ramp down the current completely,
-       before we are opening the contactors.
-       10*30ms=300ms for charger shutdown should be more than sufficient, because somewhere was a requirement with 20ms between StateB until current is down. The Ioniq uses 300ms. */
+    /* During normal end of the charging session, we have set the StateB, and want to give the charger some time to ramp down the current completely,
+       before we are opening the contactors. 10*30ms=300ms for charger shutdown should be more than sufficient, because somewhere was a requirement with 20ms between StateB until current is down. The Ioniq uses 300ms. */
     if (pev_cyclesInState < 10) { // 300ms
         return;
     }
 
     /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
     hardwareInterface_setPowerRelayOff();
-    setCheckpoint(850);
     pev_enterState(PEV_STATE_WaitForPowerRelayOff);
 }
 
-static void stateFunctionWaitForPowerRelayOff(void)
+static void stateFunctionWaitForPowerRelayOff()
 {
     // Wait for chademo to ACK _ccs_params.ContactorClosed we sat in hardwareInterface_setPowerRelayOff()
     if (chademoInterface_adapterContactorOpened())
     {
-        /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
-        will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
-        some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
-        log(MOD_PEV, "send WeldingDetectionReq");
-        pev_sendWeldingDetectionReq();
-        pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse, true);
+        pev_enterState(PEV_STATE_WeldingDetectionMsg);
     }
 }
 
-static void stateFunctionWaitForWeldingDetectionResponse(void)
+static void stateFunctionWeldingDetectionMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.WeldingDetectionRes_isUsed; }))
+    if (dinMessageHandler(0, [] { // no delay, stateFunctionWaitForCurrentDownAfterStateB already waited 300 + 2 state transitions x 30ms
+        log(MOD_PEV, "send WeldingDetectionReq");
+        pev_sendWeldingDetectionReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.WeldingDetectionRes_isUsed; }))
     {
         /* The charger measured the voltage on the cable, and gives us the value. In the first
             round will show a quite high voltage, because the contactors are just opening. We
@@ -976,24 +979,24 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
 
         if (voltageIsLow || voltageIsLastChargingVoltageAfter2sec)
         {
-            log(MOD_PEV, "WeldingDetection finished. send SessionStopReq");
-            pev_sendSessionStopReq();
-            setCheckpoint(900);
-            pev_enterState(PEV_STATE_WaitForSessionStopResponse, true);
+            log(MOD_PEV, "WeldingDetection finished");
+            pev_enterState(PEV_STATE_SessionStopMsg);
         }
         else 
         {
-            log(MOD_PEV, "send WeldingDetectionReq again");
-            pev_sendWeldingDetectionReq();
-            pev_DelayCycles = MESAGE_LOOP_RES_TO_REQ_DELAY_CYCLES;
+            send_message_again(MESAGE_LOOP_DELAY_CYCLES);
             // stay in same state
         }
     }
 }
 
-static void stateFunctionWaitForSessionStopResponse(void)
+static void stateFunctionSessionStopMsg()
 {
-    if (pev_decodeDinResponse([] { return dinDocDec.V2G_Message.Body.SessionStopRes_isUsed; }))
+    if (dinMessageHandler(MESSAGE_STATE_DELAY_CYCLES, [] {
+        log(MOD_PEV, "send SessionStopReq");
+        pev_sendSessionStopReq();
+        },
+        [] { return dinDocDec.V2G_Message.Body.SessionStopRes_isUsed; }))
     {
         tcp_disconnect();
         log(MOD_PEV, "Charging is finished");
@@ -1001,12 +1004,11 @@ static void stateFunctionWaitForSessionStopResponse(void)
     }
 }
 
-static void stateFunctionSafeShutDown(void)
+static void stateFunctionSafeShutDown()
 {
     /* Here we end, if we run into a timeout in the state machine (or other error before we reach CurrentDemand). */
     /* Initiate the safe-shutdown-sequence. */
     log(MOD_PEV, "Safe-shutdown-sequence: setting state B");
-    setCheckpoint(1100);
     hardwareInterface_setStateB(); /* setting CP line to B disables in the charger the current flow. */
     pev_enterState(PEV_STATE_SafeShutDownWaitForChargerShutdown);
 }
@@ -1019,7 +1021,6 @@ static void stateFunctionSafeShutDownWaitForChargerShutdown(void)
     }
     /* Now the current flow is stopped by the charger. We can safely open the contactors: */
     log(MOD_PEV, "Safe-shutdown-sequence: opening contactors");
-    setCheckpoint(1300);
     hardwareInterface_setPowerRelayOff();
 
     tcp_disconnect(); /* Set StateB is our last communication with the charger during safe shutdown, and after waiting for StateB to be fully processed by charger, close tcp as well. */
@@ -1052,20 +1053,21 @@ static void stateFunctionEnd(void)
     // terminal state. No code should exist here. We can never leave this state
 }
 
-static void pev_enterState(pevstates n, bool keepCyclesSinceReq /* = false*/)
+static void pev_enterState(pevstates n)
 {
     if (n == pev_state) // set same state will mess up pev_cyclesInState and also pointless
         log(MOD_PEV, "Error: set same state %s", pevSttLabels[n]);
 
     log(MOD_PEV, "=> set state %s", pevSttLabels[n]);
+
     pev_cyclesInState = 0;
     pev_DelayCycles = 0; // delayCycles are within a state only
-
+    pev_sendMessagePending = true; // trigger send of Req-message when entering next state
     pev_state = n;
     _ccs_params.state = n;
-
-    if (not keepCyclesSinceReq)
-        pev_cyclesSinceReq = -1; // unset
+    
+    // messages no longer crosses states
+    pev_cyclesSinceReq = -1; // unset
 }
 
 static uint8_t pev_stateIsTooLong(void)
@@ -1105,7 +1107,7 @@ static void pev_runFsm(void)
         stateFunctions[pev_state](); //call state function
     }
 
-    if (pev_state != PEV_STATE_WaitForCurrentDemandResponse) //only in currentDemand we have meaningful current values
+    if (pev_state != PEV_STATE_CurrentDemandMsg) //only in currentDemand we have meaningful current values
         _ccs_params.EvseCurrent = 0;
 
     bool stop = false;
@@ -1128,7 +1130,7 @@ static void pev_runFsm(void)
 
     if (hardwareInterface_stopChargeRequested()
         && hardwareInterface_isConnectorLocked()
-        && pev_state < PEV_STATE_WaitForCurrentDemandResponse
+        && pev_state < PEV_STATE_CurrentDemandMsg
         )
     {
         log(MOD_PEV, "Stop charging requested before CurrentDemand (%s)", pevSttLabels[pev_state]);
@@ -1138,7 +1140,7 @@ static void pev_runFsm(void)
     if (stop)
     {
         // Make sure we set a CurrentDemandStopReason if we pull the rug on CurrentDemand
-        if (pev_state == PEV_STATE_WaitForCurrentDemandResponse && _ccs_params.CurrentDemandStopReason == STOP_REASON_NONE)
+        if (pev_state == PEV_STATE_CurrentDemandMsg && _ccs_params.CurrentDemandStopReason == STOP_REASON_NONE)
             _ccs_params.CurrentDemandStopReason = STOP_REASON_TIMEOUT;
 
         pev_enterState(PEV_STATE_SafeShutDown);
@@ -1179,14 +1181,14 @@ bool chademoInterface_ccsInStateWaitForPreChargeStart() {
     //return pev_state > PEV_STATE_WaitForCableCheckResponse;
 
     // ...while this one should only be true when we are in this state, and should allow ccs statemachine restarts
-    return pev_state == PEV_STATE_WaitForPreChargeStart;
+    return pev_state == PEV_STATE_PreChargeMsg;
 }
 
 int chademoInterface_ccsCurrentDemandPos()
 {
-    if (pev_state < PEV_STATE_WaitForCurrentDemandResponse)
+    if (pev_state < PEV_STATE_CurrentDemandMsg)
         return -1;
-    else if (pev_state == PEV_STATE_WaitForCurrentDemandResponse)
+    else if (pev_state == PEV_STATE_CurrentDemandMsg)
         return 0;
     else
         return 1;

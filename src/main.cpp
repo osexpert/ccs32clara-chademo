@@ -156,7 +156,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForCableCheckStart)
     {
-        if (_ccs_params.checkpoint >= 560) // send cable check req
+        if (_ccs_params.checkpoint >= 550) // start cablecheck
         {
             ledBlinker->setPattern(blink_3);
             _ledState = LedState::WaitForPreChargeStart;
@@ -172,7 +172,7 @@ void RunLedStateMachine()
     }
     else if (_ledState == LedState::WaitForPreChargeDoneButStalled)
     {
-        if (_ccs_params.checkpoint >= 572) // difference is small
+        if (_ccs_params.checkpoint >= 573) // difference is small
         {
             _ledState = LedState::WaitForCurrentDemandLoop;
         }

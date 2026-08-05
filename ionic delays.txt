@@ -7,8 +7,8 @@ ServicePaymentSelectionRes -> ContractAuthenticationReq 250
 ContractAuthenticationRes -> ChargeParameterDiscoveryReq 250
 ChargeParameterDiscoveryRes -> CableCheckReq 420 // 250 + state c + connector lock
 CableCheckRes -> PreChargeReq 300ms // 250 + enter high voltage mode (isolation testing?)
-PreChargeRes -> PowerDeliveryReq 250
-PowerDeliveryRes -> CurrentDemandReq 430 // 250 + car close contactor
+PreChargeRes -> PowerDeliveryReq 250ms
+PowerDeliveryRes -> CurrentDemandReq 430 // 250 + car close contactor. BUT! the car contactor is supposed to be closed right after last PreChargeRes!!!
 CurrentDemandRes -> PowerDeliveryReq 250
 PowerDeliveryRes -> WeldingDetectionReq 340 // 250 + car open contactor
 WeldingDetectionRes -> SessionStopReq 250
