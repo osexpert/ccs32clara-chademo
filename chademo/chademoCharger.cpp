@@ -577,16 +577,15 @@ void ChademoCharger::RunStateMachine()
 
                 if (_sxState == SX_INITIAL)
                 {
-                    _sxState = SX_WAIT_FOR_preChargeDoneButStalled; // _ccsPreChargeDone
+                    _sxState = SX_WAIT_FOR_preChargeDone;
                     log(MOD_CHA, "set sxState:%d", _sxState);
                 }
 
-                if (_sxState == SX_WAIT_FOR_preChargeDoneButStalled) // rename to wait for power relay On
+                if (_sxState == SX_WAIT_FOR_preChargeDone) // ALT MODE: wait for powerRelayOn
                 {
-                    if (_ccsPreChargeDone)
-                    // if (_ccs_params.PowerRelayOn) ALT MODE
+                    if (_ccsPreChargeDone) // ALT MODE: if (_ccs_params.PowerRelayOn)
                     {
-                        CloseAdapterContactor(); // will trigger complete of ccs precharge <- no..comment was for old code
+                        CloseAdapterContactor(); // will trigger complete of ccs precharge
                         _sxState = SX_WAIT_FOR_ccsCurrentDemand;
                         log(MOD_CHA, "set sxState:%d", _sxState);
                     }
@@ -766,19 +765,11 @@ bool ChademoCharger::PreChargeCompleted()
 {
     _ccsPreChargeDone = true;
 
-    //if (CONFIG_SX)
-    //{
-    //    if (not _adapterContactorClosed)
-    //        log(MOD_CHA, "PreCharge stalled until adapter contactor closed");
-    //    return _adapterContactorClosed;
-    //}
-    //else // DX
-    //{
-        // keep it hanging until car contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
-        if (not _carData.CarContactorsClosed)
-            log(MOD_CHA, "PreCharge stalled until car contactors closed");
-        return _carData.CarContactorsClosed;
-    //}
+    bool contactorsClosed = _carData.CarContactorsClosed && _adapterContactorClosed;
+    // keep it hanging until car and adapter contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
+    if (not contactorsClosed)
+        log(MOD_CHA, "PreCharge stalled until car and adapter contactors closed");
+    return contactorsClosed;
 }
 
 bool chademoInterface_preChargeCompleted()

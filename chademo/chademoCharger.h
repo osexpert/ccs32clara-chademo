@@ -641,7 +641,7 @@ enum ProtocolNumber
 static constexpr int FAKE_OUTPUT_CURRENT_INTERVAL = CHA_CYCLES_PER_SEC * 60;
 
 const int SX_INITIAL = 0;
-const int SX_WAIT_FOR_preChargeDoneButStalled = 1;
+const int SX_WAIT_FOR_preChargeDone = 1;
 const int SX_WAIT_FOR_ccsCurrentDemand = 2;
 const int SX_DONE = 3;
 
