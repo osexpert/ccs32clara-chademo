@@ -641,7 +641,7 @@ enum ProtocolNumber
 static constexpr int FAKE_OUTPUT_CURRENT_INTERVAL = CHA_CYCLES_PER_SEC * 60;
 
 const int SX_INITIAL = 0;
-const int SX_WAIT_FOR_preChargeDone = 1;
+const int SX_WAIT_FOR_ccsPreChargeReadyToComplete = 1;
 const int SX_WAIT_FOR_ccsCurrentDemand = 2;
 const int SX_DONE = 3;
 
@@ -701,7 +701,7 @@ class ChademoCharger
 public:
     int GetCyclicOffset(uint8_t offset);
     bool IsPowerOffOk();
-    bool PreChargeCompleted();
+    bool TryCompleteCcsPreCharge();
     bool AdapterContactorOpened();
     int GetChargingLoopPos();
     void UpdateChargerMessages();
@@ -795,7 +795,7 @@ public:
         bool _discovery = CONFIG_SX ? false : true;
         bool _discoveryIsDone = false;
 
-        bool _ccsPreChargeDone = false;
+        bool _ccsPreChargeReadyToComplete = false;
         bool _dischargeEnabled = false;
         bool _isDischarging = false;
         uint8_t _estimatedOutputVoltageModulation = CHADEMO_VOLTAGE_MODULATION;

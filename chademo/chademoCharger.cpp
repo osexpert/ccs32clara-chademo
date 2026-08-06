@@ -459,7 +459,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForPreChargeDone)
     {
-        if (CONFIG_SX || _ccsPreChargeDone)
+        if (CONFIG_SX || _ccsPreChargeReadyToComplete)
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
@@ -577,13 +577,13 @@ void ChademoCharger::RunStateMachine()
 
                 if (_sxState == SX_INITIAL)
                 {
-                    _sxState = SX_WAIT_FOR_preChargeDone;
+                    _sxState = SX_WAIT_FOR_ccsPreChargeReadyToComplete;
                     log(MOD_CHA, "set sxState:%d", _sxState);
                 }
 
-                if (_sxState == SX_WAIT_FOR_preChargeDone) // ALT MODE: wait for powerRelayOn
+                if (_sxState == SX_WAIT_FOR_ccsPreChargeReadyToComplete) // ALT MODE: wait for powerRelayOn
                 {
-                    if (_ccsPreChargeDone) // ALT MODE: if (_ccs_params.PowerRelayOn)
+                    if (_ccsPreChargeReadyToComplete) // ALT MODE: if (_ccs_params.PowerRelayOn)
                     {
                         CloseAdapterContactor(); // will trigger complete of ccs precharge
                         _sxState = SX_WAIT_FOR_ccsCurrentDemand;
@@ -761,20 +761,16 @@ void ChademoCharger::RunStateMachine()
 
 }
 
-bool ChademoCharger::PreChargeCompleted()
+bool ChademoCharger::TryCompleteCcsPreCharge()
 {
-    _ccsPreChargeDone = true;
-
+    _ccsPreChargeReadyToComplete = true;
     bool contactorsClosed = _carData.CarContactorsClosed && _adapterContactorClosed;
-    // keep it hanging until car and adapter contactors closed. The voltage may drop fast after precharge is done, if the charger is "floating", so don't complete precharge to soon.
-    if (not contactorsClosed)
-        log(MOD_CHA, "PreCharge stalled until car and adapter contactors closed");
     return contactorsClosed;
 }
 
-bool chademoInterface_preChargeCompleted()
+bool chademoInterface_tryCompleteCcsPreCharge()
 {
-    return chademoCharger->PreChargeCompleted();
+    return chademoCharger->TryCompleteCcsPreCharge();
 }
 
 bool ChademoCharger::AdapterContactorOpened()
