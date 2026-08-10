@@ -363,7 +363,6 @@ int ChademoCharger::GetCyclicOffset(uint8_t offset)
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
-    if (_cyclesSinceNotCHARGING >= 0) _cyclesSinceNotCHARGING++;
 
     if (_state < ChargerState::ChargingLoop)
     {
@@ -698,17 +697,21 @@ void ChademoCharger::RunStateMachine()
 
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
-            _cyclesSinceNotCHARGING = 0; // start counting
 
-            SetState(ChargerState::Stopping_WaitForSwitchKOff);
+            SetState(ChargerState::Stopping_OpenAdapterContactor);
         }
     }
-    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
+    else if (_state == ChargerState::Stopping_OpenAdapterContactor)
     {
-        // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
-        // Chademo 2.0: clearing ChargerStatus::CHARGING is allowed to perform before Switch_k is cleared. I think 1.0 is the same, and that this is just a clarification.
-        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN, it can make sense to use switch(k) as synchronization point for start of the (4sec fixed duration) welding detection.
-        if (not (_carData.Switch_k) || IsTimeoutSec(4))
+        // Why 1sec?
+        // Spec is insanely bad at explaining where it should be done...so I ended up using a fixed time...
+        // Doing it at clearing of CHARGING, worst case current in 5A. Waiting is a bit is safer.
+        // OCCP: switchK = off = start of welding detection. On leaf switchK = off always take 1.5sec from CHARGING cleared.
+        // Spec APPENDIX 2: Case1: from output current 5A to 25%, Max: 1.0s + t1 = 1.5s
+        // Spec APPENDIX 2: Case2: from Vehicle charging enable 0 to 25%, Max: 1.0s + t2 = 1.5s
+        // In can logs I see voltage dropping 4sec after CHARGING cleared or 2sec after CHARGING cleared.
+        // Summary: 1sec seems safe and a nice round value. But if 1sec is too long, could use 500ms...
+        if (HasElapsedSec(1)) 
         {
             OpenAdapterContactor(); // so car can perform WD (measure low volts in inlet when it open contactor)
 
@@ -718,8 +721,8 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
-            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10, _cyclesSinceNotCHARGING)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false
-            HasElapsedSec(4, _cyclesSinceNotCHARGING) // Keep 4s after ChargerStatus::CHARGING = false
+            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10 - 1)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false, 1s already elapsed
+            HasElapsedSec(4 - 1) // Keep 4s after ChargerStatus::CHARGING = false, 1s already elapsed
             )
         {
             // welding detection done & car contactors open
