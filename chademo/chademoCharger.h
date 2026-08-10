@@ -162,6 +162,7 @@ enum ChargerStatus
     /// 109.5.2
     /// Energizing state. The charger is outputing voltage (OutputVoltage > 10 volt).
     /// Implies the charger has locked the plug.
+    /// In chademo 1.0: connector lock, renamed in chademo 1.1 to enegizing. In reality, this probably tell when charger contactors open and close.
     /// </summary>
     ENERGIZING = 0x4,
 
@@ -216,7 +217,6 @@ enum class StopReason
     CHARGER_STATE(Stopping_Start) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
     CHARGER_STATE(Stopping_WaitForSwitchKOff) \
-    CHARGER_STATE(Stopping_WaitForCcsPowerRelayOff) \
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
     CHARGER_STATE(Stopping_SetSwitchD1Off) \
     CHARGER_STATE(Stopping_UnlockChargingPlug) \
@@ -723,6 +723,8 @@ public:
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
+    bool IsTimeoutSec(uint16_t sec, int cycles);
+    bool HasElapsedSec(uint16_t sec, int cycles);
     bool HasElapsedMs(uint16_t ms);
 
     ChademoAlwaysOnBackup AlwaysOnBackup()
@@ -783,6 +785,7 @@ public:
         int _delayCycles = 0;
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
+        int _cyclesSinceNotCHARGING = -1;
         bool _chargingPlugLocked = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
