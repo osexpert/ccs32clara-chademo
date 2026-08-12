@@ -706,7 +706,8 @@ void ChademoCharger::RunStateMachine()
         if (not _carData.Switch_k)
         {
             // Fake 0V may make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD? At least one produced P101C P101B DTC's:-(
-            // But what if it require a drop _after_ opening contactors? Then I don't know...then probably need to wait additionally, 500ms or 1sec...
+            // But what if it require a drop _after_ opening contactors? Then I don't know...then maybe need to wait additionally, 500ms or 1sec?
+            // Or we could simulate a drop over 10 cycles (from now or from after 500ms)?
             _reportOutputVoltage = false;
             // some also suggest to call OpenAdapterContactor here, but not sure...
         }
