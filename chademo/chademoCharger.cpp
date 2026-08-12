@@ -698,22 +698,10 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
-            SetState(ChargerState::Stopping_OpenAdapterContactor);
-        }
-    }
-    else if (_state == ChargerState::Stopping_OpenAdapterContactor)
-    {
-        // Why 1sec?
-        // Spec is insanely bad at explaining where it should be done...so I ended up using a fixed time...
-        // Doing it at clearing of CHARGING, worst case current in 5A. Waiting is a bit is safer.
-        // OCCP: switchK = off = start of welding detection. On leaf switchK = off always take 1.5sec from CHARGING cleared.
-        // Spec APPENDIX 2: Case1: from output current 5A to 25%, Max: 1.0s + t1 = 1.5s
-        // Spec APPENDIX 2: Case2: from Vehicle charging enable 0 to 25%, Max: 1.0s + t2 = 1.5s
-        // In can logs I see voltage dropping 4sec after CHARGING cleared or 2sec after CHARGING cleared.
-        // Summary: 1sec seems safe and a nice round value. But if 1sec is too long, could use 500ms...
-        if (HasElapsedSec(1)) 
-        {
-            OpenAdapterContactor(); // so car can perform WD (measure low volts in inlet when it open contactor)
+            // Fake 0V may make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD?
+            // But what if it require a drop _after_ opening contactors? Then...maybe simulate drop after 2sec? (or after switchK off + 0.5sec = 2sec on leaf)
+            _reportOutputVoltage = false;
+            // some also suggest to call OpenAdapterContactor here, but not sure...
 
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
@@ -721,15 +709,15 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
-            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10 - 1)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false, 1s already elapsed
-            HasElapsedSec(4 - 1) // Keep 4s after ChargerStatus::CHARGING = false, 1s already elapsed
+            (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false
+            HasElapsedSec(4) // Keep 4s after ChargerStatus::CHARGING = false
             )
         {
-            // welding detection done & car contactors open
+            // Car is done opening contactors/welding detection is done
             _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
 
-            _reportOutputVoltage = false; // report 0V on CAN, regardless of what output voltage the charger (claim) to have
+            _reportOutputVoltage = false; // Car contactor open, so report 0V on CAN, regardless of what output voltage the charger claim to have (it lies)
 
             SetSwitchD2(false);
 
@@ -743,16 +731,25 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD1(false);
 
-            // Spec: OutputVoltage must be <= 10V before clearing ChargerStatus::ENERGIZING
+            OpenAdapterContactor();
+
+            SetState(ChargerState::Stopping_ClearEnergizing);
+        }
+    }
+    else if (_state == ChargerState::Stopping_ClearEnergizing)
+    {
+        // Wait 200ms after OpenAdapterContactor, to make sure voltage drops <= 10V before clear ENERGIZING
+        if (_cyclesInState >= 2)
+        {
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING);
 
-            // stop CAN in later state to make sure we send this message to car before we kill CAN
+            // stop CAN in later state to make sure we send clear ChargerStatus::ENERGIZING message to car before we kill CAN
             SetState(ChargerState::Stopping_UnlockChargingPlug);
         }
     }
     else if (_state == ChargerState::Stopping_UnlockChargingPlug)
     {
-        // Unlock charging plug in own state, to make sure the car get the CAN message before power off (plug unlocked = power off ok)
+        // Unlock charging plug in own state, to make sure the car get the clear ChargerStatus::ENERGIZING CAN message before power off (plug unlocked = power off ok)
         UnlockChargingPlug();
 
         SetState(ChargerState::End);

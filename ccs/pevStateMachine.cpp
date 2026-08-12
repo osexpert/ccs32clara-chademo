@@ -1014,7 +1014,8 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                round will show a quite high voltage, because the contactors are just opening. We
                need to repeat the requests, until the voltage is at a non-dangerous level. */
             int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-            _ccs_params.EvseVoltage = evsePresentVoltage;
+            // Since some chargers and dischargers fake the WD voltage, just ignore it and don't update it. Consistently wrong is better than randomness?
+            //_ccs_params.EvseVoltage = evsePresentVoltage;
             addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", evsePresentVoltage);
             bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
             if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
