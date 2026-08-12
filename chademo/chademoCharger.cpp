@@ -274,7 +274,7 @@ void ChademoCharger::SetCcsParamsFromCarData()
         _ccs_params.TargetCurrent = maxCurrent;
 }
 
-inline bool ChademoCharger::IsTimeoutSec(uint16_t sec)
+bool ChademoCharger::IsTimeoutSec(uint16_t sec)
 {
     if (_cyclesInState > (sec * CHA_CYCLES_PER_SEC))
     {
