@@ -698,7 +698,7 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
-            // Fake 0V may make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD?
+            // Fake 0V may make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD? At least one produced P101C P101B DTC's:-(
             // But what if it require a drop _after_ opening contactors? Then...maybe simulate drop after 2sec? (or after switchK off + 0.5sec = 2sec on leaf)
             _reportOutputVoltage = false;
             // some also suggest to call OpenAdapterContactor here, but not sure...
