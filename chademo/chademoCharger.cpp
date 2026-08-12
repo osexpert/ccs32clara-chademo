@@ -274,9 +274,9 @@ void ChademoCharger::SetCcsParamsFromCarData()
         _ccs_params.TargetCurrent = maxCurrent;
 }
 
-bool ChademoCharger::IsTimeoutSec(uint16_t sec, int cycles)
+inline bool ChademoCharger::IsTimeoutSec(uint16_t sec)
 {
-    if (cycles > (sec * CHA_CYCLES_PER_SEC))
+    if (_cyclesInState > (sec * CHA_CYCLES_PER_SEC))
     {
         println("[cha] Timeout in %s (max:%dsec)", GetStateName(), sec);
         return true;
@@ -284,20 +284,10 @@ bool ChademoCharger::IsTimeoutSec(uint16_t sec, int cycles)
     return false;
 }
 
-inline bool ChademoCharger::IsTimeoutSec(uint16_t sec)
-{
-    return IsTimeoutSec(sec, _cyclesInState);
-}
-
 // same as IsTimeoutSec, but without the logging
-bool ChademoCharger::HasElapsedSec(uint16_t sec, int cycles)
-{
-    return cycles > (sec * CHA_CYCLES_PER_SEC);
-}
-
 bool ChademoCharger::HasElapsedSec(uint16_t sec)
 {
-    return HasElapsedSec(sec, _cyclesInState);
+    return _cyclesInState > (sec * CHA_CYCLES_PER_SEC);
 }
 
 bool ChademoCharger::HasElapsedMs(uint16_t ms)

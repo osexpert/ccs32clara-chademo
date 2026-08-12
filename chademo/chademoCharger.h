@@ -723,8 +723,6 @@ public:
     const char* GetStateName();
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
-    bool IsTimeoutSec(uint16_t sec, int cycles);
-    bool HasElapsedSec(uint16_t sec, int cycles);
     bool HasElapsedMs(uint16_t ms);
 
     ChademoAlwaysOnBackup AlwaysOnBackup()
