@@ -350,6 +350,14 @@ int ChademoCharger::GetCyclicOffset(uint8_t offset)
     return result;
 }
 
+/*
+ * RETAIN_FACTOR calculation:
+ * We want 20% (0.20) voltage left after 1 second (which is exactly 10 steps of 100ms). 25% is max.
+ * Formula: factor = 10th root of 0.20 (0.200000^0.1) = 0.8513399f
+ * This reduces the voltage by about 15% every 100ms.
+ */
+const float RETAIN_FACTOR = 0.8513399f;
+
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
@@ -486,7 +494,7 @@ void ChademoCharger::RunStateMachine()
 
             println("[cha] Car contactors closed");
             _carData.CarContactorsClosed = true;
-            _reportOutputVoltage = true; // let car "see"  the charger voltage
+            _overrideOutputVoltage = -1; // stop override and let car "see" the charger voltage.
 
             if (CONFIG_SX)
             {
@@ -688,17 +696,22 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
+            _overrideOutputVoltage = _chargerData.OutputVoltage; // snapshot
+
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (not _carData.Switch_k)
+        if (not _carData.Switch_k && _cyclesSinceLowAmpsAndSwitchKCleared++ > 5) // 500ms in addition
         {
-            // Fake 0V may make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD? At least one produced P101C P101B DTC's:-(
-            // But what if it require a drop _after_ opening contactors? Then I don't know...then maybe need to wait additionally, 500ms or 1sec?
-            // Or we could simulate a drop over 10 cycles (from now or from after 500ms)?
-            _reportOutputVoltage = false;
+            // Simulate voltage drop on CAN. May make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD? At least one produced P101C P101B DTC's:-(
+            // From CAN logs, Leaf seem to open contactor(s) 2sec after CHARGING cleared, so assuming this is switchK off (1.5sec) + 500ms.
+            // TODO: we could simulate a drop with 40-50V per cycle, instead of dropping as a stone.
+            // But if the car uses the 11 steps on page 83, and only rely on CAN voltage, this won't help.
+            // So: ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
+            // The next step may be to use chademo 0.9, that allows not doing WD.
+            _overrideOutputVoltage = _overrideOutputVoltage * RETAIN_FACTOR;
             // some also suggest to call OpenAdapterContactor here, but not sure...
         }
 
@@ -711,7 +724,7 @@ void ChademoCharger::RunStateMachine()
             _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
 
-            _reportOutputVoltage = false; // Car contactor open, so report 0V on CAN, regardless of what output voltage the charger claim to have (it lies)
+            _overrideOutputVoltage = 1; // Car contactor open, report 1V on CAN, regardless of what output voltage the charger claim to have (it lies)
 
             SetSwitchD2(false);
 
@@ -726,6 +739,7 @@ void ChademoCharger::RunStateMachine()
             SetSwitchD1(false);
 
             OpenAdapterContactor();
+            _overrideOutputVoltage = 0; // Report 0V on CAN
 
             SetState(ChargerState::Stopping_ClearEnergizing);
         }
@@ -780,16 +794,6 @@ bool chademoInterface_preChargeCompleted()
     return chademoCharger->PreChargeCompleted();
 }
 
-bool ChademoCharger::AdapterContactorOpened()
-{
-    return not _adapterContactorClosed;
-}
-
-bool chademoInterface_adapterContactorOpened()
-{
-    return chademoCharger->AdapterContactorOpened();
-}
-
 int ChademoCharger::GetChargingLoopPos()
 {
     if (chademoCharger->_state < ChargerState::ChargingLoop)
@@ -803,6 +807,16 @@ int ChademoCharger::GetChargingLoopPos()
 int chademoInterface_chargingLoopPos()
 {
     return chademoCharger->GetChargingLoopPos();
+}
+
+bool ChademoCharger::CarContactorsClosed()
+{
+    return _carData.CarContactorsClosed;
+}
+
+bool chademoInterface_carContactorsClosed()
+{
+    return chademoCharger->CarContactorsClosed();
 }
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
@@ -1070,7 +1084,7 @@ void ChademoCharger::UpdateChargerMessages()
     // ZE0 seems to hangs the second time, if discharge is enabled during discovery
     COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && not _discovery, "109.DischargeCompatible %d -> %d");
 
-    uint16_t outputVolt = _reportOutputVoltage ? _chargerData.OutputVoltage : 0;
+    uint16_t outputVolt = _overrideOutputVoltage >= 0 ? _overrideOutputVoltage : _chargerData.OutputVoltage;
     COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "109.OutputVoltage %d -> %d");
 
     uint8_t remainingChargingTime10s = 0;

@@ -22,7 +22,6 @@
    STATE_ENTRY(WaitForCurrentDemandResponse, CurrentDemand, 5) /* Test with 5s timeout. Just experimental. The specified performance time is 25ms (ISO), the specified timeout 250ms. */\
    STATE_ENTRY(WaitForPowerDeliveryOffResponse, PowerDeliveryOff, 6) /* PowerDelivery may need some time. Wait at least 6s. On Compleo charger, observed more than 1s until response. specified performance time is 4.5s (ISO) */\
    STATE_ENTRY(WaitForCurrentDownAfterStateB, CurrentDown, 60) \
-   STATE_ENTRY(WaitForPowerRelayOff, RelayOff, 60) \
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
@@ -981,23 +980,15 @@ static void stateFunctionWaitForCurrentDownAfterStateB(void)
     /* Time is over. Current flow should have been stopped by the charger. Let's open the contactors and send a weldingDetectionRequest, to find out whether the voltage drops. */
     hardwareInterface_setPowerRelayOff();
     setCheckpoint(850);
-    pev_enterState(PEV_STATE_WaitForPowerRelayOff);
-}
 
-static void stateFunctionWaitForPowerRelayOff(void)
-{
-    // Wait for chademo to ACK _ccs_params.ContactorClosed we sat in hardwareInterface_setPowerRelayOff()
-    if (chademoInterface_adapterContactorOpened())
-    {
-        addToTrace(MOD_PEV, "Starting WeldingDetection");
+    addToTrace(MOD_PEV, "Starting WeldingDetection");
 
-        /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
-        will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
-        some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
-        numberOfWeldingDetectionRounds = 0;
-        pev_sendWeldingDetectionReq();
-        pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
-    }
+    /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
+    will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
+    some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
+    numberOfWeldingDetectionRounds = 0;
+    pev_sendWeldingDetectionReq();
+    pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
 }
 
 static void stateFunctionWaitForWeldingDetectionResponse(void)
@@ -1018,8 +1009,8 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
             //_ccs_params.EvseVoltage = evsePresentVoltage;
             addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", evsePresentVoltage);
             bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
-            if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) {
-
+            if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) 
+            {
                 if (not voltageIsLow) {
                     if (evsePresentVoltage == LastCurrentDemandResPresentVoltage) {
                         // Charger still says it has the same voltage as when we were last charging.
@@ -1044,13 +1035,21 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                 encodeAndTransmit();
                 pev_enterState(PEV_STATE_WaitForSessionStopResponse);
             }
-            /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
-            else {
+            else 
+            {
+                /* The voltage on the cable is still high, so we make another round with the WeldingDetection. */
                 /* max number of rounds not yet reached */
-                numberOfWeldingDetectionRounds++; /* https://github.com/uhi22/ccs32clara/issues/55
-                                                     Count the number of welding detection rounds. To be clarified, whether
-                                                     a certain time or number of rounds make sense to cover all use cases with
-                                                     different chargers etc */
+
+                // Wait until car contactors opens, and the start counting. TODO: add a 15-20sec timeout.
+                if (not chademoInterface_carContactorsClosed())
+                {
+                    /* https://github.com/uhi22/ccs32clara/issues/55
+                    Count the number of welding detection rounds. To be clarified, whether
+                    a certain time or number of rounds make sense to cover all use cases with
+                    different chargers etc */
+                    numberOfWeldingDetectionRounds++;
+                }
+
                 addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
                 pev_sendWeldingDetectionReq();
                 pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
