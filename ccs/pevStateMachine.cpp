@@ -995,7 +995,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
 {
     if (tcp_rxdataLen > V2GTP_HEADER_SIZE)
     {
-        addToTrace(MOD_PEV, "In state WaitForWeldingDetectionRes");
+        //addToTrace(MOD_PEV, "In state WaitForWeldingDetectionRes");
         routeDecoderInputData();
         projectExiConnector_decode_DinExiDocument();
         tcp_rxdataLen = 0; /* mark the input data as "consumed" */
@@ -1007,7 +1007,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
             int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
             // Since some chargers and dischargers fake the WD voltage, just ignore it and don't update it. Consistently wrong is better than randomness?
             //_ccs_params.EvseVoltage = evsePresentVoltage;
-            addToTrace(MOD_PEV, "EVSEPresentVoltage %dV", evsePresentVoltage);
+            addToTrace(MOD_PEV, "WeldingDetection %dV round #%d", evsePresentVoltage, numberOfWeldingDetectionRounds);
             bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
             if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) 
             {
@@ -1050,7 +1050,7 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                     numberOfWeldingDetectionRounds++;
                 }
 
-                addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
+                //addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
                 pev_sendWeldingDetectionReq();
                 pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
             }
