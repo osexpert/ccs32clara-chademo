@@ -162,6 +162,7 @@ enum ChargerStatus
     /// 109.5.2
     /// Energizing state. The charger is outputing voltage (OutputVoltage > 10 volt).
     /// Implies the charger has locked the plug.
+    /// In chademo 1.0: connector lock, renamed in chademo 1.1 to enegizing. In reality, this probably tell when charger contactors open and close.
     /// </summary>
     ENERGIZING = 0x4,
 
@@ -215,10 +216,9 @@ enum class StopReason
     CHARGER_STATE(ChargingLoop) \
     CHARGER_STATE(Stopping_Start) \
     CHARGER_STATE(Stopping_WaitForLowAmps) \
-    CHARGER_STATE(Stopping_WaitForSwitchKOff) \
-    CHARGER_STATE(Stopping_WaitForCcsPowerRelayOff) \
     CHARGER_STATE(Stopping_WaitForCarContactorsOpen) \
     CHARGER_STATE(Stopping_SetSwitchD1Off) \
+    CHARGER_STATE(Stopping_ClearEnergizing) \
     CHARGER_STATE(Stopping_UnlockChargingPlug) \
     CHARGER_STATE(End)
 
@@ -646,7 +646,7 @@ const int SX_DONE = 3;
 
 struct ChargerData
 {
-    uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
+    uint8_t ProtocolNumber = CONFIG_CHADEMO_PRE1 ? ProtocolNumber::Chademo_0_9 : ProtocolNumber::Chademo_1_0;
 
     uint8_t DischargeProtocolNumber = 2;
 
@@ -663,8 +663,11 @@ struct ChargerData
     /// This helps the car to use its inlet voltage detector to check it if measure the battery voltage when it closes the contactors,
     /// and that it measure no voltage when it opens the contactors.
     /// If the charger did not drop its voltage, the car inlet voltage detector would always measure voltage, and welding detection would not be possible.
+    /// 
+    /// Chademo 1.X: welding detection is required, must be true:-/
+    /// Chademo < 1.X: optional
     /// </summary>
-    bool SupportWeldingDetection = true;
+    bool SupportWeldingDetection = CONFIG_CHADEMO_PRE1 ? false : true;
 
     uint8_t MaxAvailableOutputCurrent;
     uint8_t DynAvailableOutputCurrent;
@@ -701,7 +704,6 @@ public:
     int GetCyclicOffset(uint8_t offset);
     bool IsPowerOffOk();
     bool PreChargeCompleted();
-    bool AdapterContactorOpened();
     int GetChargingLoopPos();
     void UpdateChargerMessages();
     void HandlePendingCarMessages();
@@ -724,6 +726,7 @@ public:
     bool IsTimeoutSec(uint16_t sec);
     bool HasElapsedSec(uint16_t sec);
     bool HasElapsedMs(uint16_t ms);
+    bool CarContactorsClosed();
 
     ChademoAlwaysOnBackup AlwaysOnBackup()
     {
@@ -783,10 +786,14 @@ public:
         int _delayCycles = 0;
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
+        int _cyclesSinceLowAmpsAndSwitchKCleared = 0;
         bool _chargingPlugLocked = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
-        bool _reportOutputVoltage = false;
+
+        // Initially ovveride to 0v. Set to -1 to not override
+        int _overrideOutputVoltage = 0;
+
         bool _d1 = false;
         bool _d2 = false;
         bool _adapterContactorClosed = false;

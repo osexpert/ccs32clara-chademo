@@ -350,6 +350,14 @@ int ChademoCharger::GetCyclicOffset(uint8_t offset)
     return result;
 }
 
+/*
+ * RETAIN_FACTOR calculation:
+ * We want 20% (0.20) voltage left after 1 second (which is exactly 10 steps of 100ms). 25% is max.
+ * Formula: factor = 10th root of 0.20 (0.200000^0.1) = 0.8513399f
+ * This reduces the voltage by about 15% every 100ms.
+ */
+const float RETAIN_FACTOR = 0.8513399f;
+
 void ChademoCharger::RunStateMachine()
 {
     _cyclesInState++;
@@ -486,7 +494,7 @@ void ChademoCharger::RunStateMachine()
 
             println("[cha] Car contactors closed");
             _carData.CarContactorsClosed = true;
-            _reportOutputVoltage = true; // let car "see"  the charger voltage
+            _overrideOutputVoltage = -1; // stop override and let car "see" the charger voltage.
 
             if (CONFIG_SX)
             {
@@ -674,8 +682,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
     {
         // For charger: C-time: 0.5 seconds from Switch_k cleared to OutputCurrent <= 5. But what is the timeout time?
-        // For car: timeout after switch(k) is cleared and waiting for ChargerStatus::CHARGING cleared: 2.5 seconds.
-        // For charger, I guess failure to drop amps is not an option, so maybe thats why I can't see any, but lets use 10 sec...
+        // For car: timeout after switch(k) is cleared and waiting for amps <= 5 && ChargerStatus::CHARGING cleared: 2.5 seconds.
         if (_chargerData.OutputCurrent <= 5 || IsTimeoutSec(10))
         {
             _chargerData.RemainingChargeTimeCycles = 0;
@@ -689,41 +696,35 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
-            SetState(ChargerState::Stopping_WaitForSwitchKOff);
-        }
-    }
-    else if (_state == ChargerState::Stopping_WaitForSwitchKOff)
-    {
-        // Chademo 1.0: car should clear switch_k within 2 seconds after 109.5.5 is set. Timeout: 4 seconds
-        // Chademo 2.0: clearing ChargerStatus::CHARGING is allowed to perform before Switch_k is cleared. I think 1.0 is the same, and that this is just a clarification.
-        // Chademo 0.9 does not have CarStatus::CONTACTOR_OPEN, it can make sense to use switch(k) as synchronization point for start of the (4sec fixed duration) welding detection.
-        if (not(_carData.Switch_k) || IsTimeoutSec(4))
-        {
-            SetState(ChargerState::Stopping_WaitForCcsPowerRelayOff);
-        }
-    }
-    else if (_state == ChargerState::Stopping_WaitForCcsPowerRelayOff)
-    {
-        // Wait for hardwareInterface_setPowerRelayOff() being called, we mirror its state, but we can't wait for too long...
-        if (not _ccs_params.PowerRelayOn || IsTimeoutSec(4))
-        {
-            // Charger should drop volts during the car's welding detection.
-            OpenAdapterContactor();
-            _reportOutputVoltage = false; // show 0 volt on CAN as well, regardless of chargers real output voltage
+            _overrideOutputVoltage = _chargerData.OutputVoltage; // snapshot
 
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
+        if (not _carData.Switch_k && _cyclesSinceLowAmpsAndSwitchKCleared++ > 5) // 500ms in addition
+        {
+            // Simulate voltage drop on CAN. May make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD? At least one produced P101C P101B DTC's:-(
+            // From CAN logs, Leaf seem to open contactor(s) 2sec after CHARGING cleared, so assuming this is switchK off (1.5sec) + 500ms.
+            // TODO: we could simulate a drop with 40-50V per cycle, instead of dropping as a stone.
+            // But if the car uses the 11 steps on page 83, and only rely on CAN voltage, this won't help.
+            // So: ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
+            // The next step may be to use chademo 0.9, that allows not doing WD.
+            _overrideOutputVoltage = _overrideOutputVoltage * RETAIN_FACTOR;
+            // some also suggest to call OpenAdapterContactor here, but not sure...
+        }
+
         if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
             (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false
             HasElapsedSec(4) // Keep 4s after ChargerStatus::CHARGING = false
             )
         {
-            // welding detection done & car contactors open
+            // Car is done opening contactors/welding detection is done
             _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
+
+            _overrideOutputVoltage = 1; // Car contactor open, report 1V on CAN, regardless of what output voltage the charger claim to have (it lies)
 
             SetSwitchD2(false);
 
@@ -737,16 +738,27 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD1(false);
 
-            // stop CAN in later state to make sure we send this message to car before we kill CAN
+            OpenAdapterContactor();
+            _overrideOutputVoltage = 0; // Report 0V on CAN
+
+            SetState(ChargerState::Stopping_ClearEnergizing);
+        }
+    }
+    else if (_state == ChargerState::Stopping_ClearEnergizing)
+    {
+        // Wait 200ms after OpenAdapterContactor, to make sure voltage drops <= 10V before clear ENERGIZING
+        if (_cyclesInState >= 2)
+        {
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING);
 
+            // stop CAN in later state to make sure we send clear ChargerStatus::ENERGIZING message to car before we kill CAN
             SetState(ChargerState::Stopping_UnlockChargingPlug);
         }
     }
     else if (_state == ChargerState::Stopping_UnlockChargingPlug)
     {
-        // Unlock charging plug in own state, to make sure the car get the CAN message before power off (plug unlocked = power off ok)
-    	UnlockChargingPlug();
+        // Unlock charging plug in own state, to make sure the car get the clear ChargerStatus::ENERGIZING CAN message before power off (plug unlocked = power off ok)
+        UnlockChargingPlug();
 
         SetState(ChargerState::End);
     }
@@ -756,7 +768,6 @@ void ChademoCharger::RunStateMachine()
 
         _send_can = false;
     }
-
 }
 
 bool ChademoCharger::PreChargeCompleted()
@@ -783,16 +794,6 @@ bool chademoInterface_preChargeCompleted()
     return chademoCharger->PreChargeCompleted();
 }
 
-bool ChademoCharger::AdapterContactorOpened()
-{
-    return not _adapterContactorClosed;
-}
-
-bool chademoInterface_adapterContactorOpened()
-{
-    return chademoCharger->AdapterContactorOpened();
-}
-
 int ChademoCharger::GetChargingLoopPos()
 {
     if (chademoCharger->_state < ChargerState::ChargingLoop)
@@ -806,6 +807,16 @@ int ChademoCharger::GetChargingLoopPos()
 int chademoInterface_chargingLoopPos()
 {
     return chademoCharger->GetChargingLoopPos();
+}
+
+bool ChademoCharger::CarContactorsClosed()
+{
+    return _carData.CarContactorsClosed;
+}
+
+bool chademoInterface_carContactorsClosed()
+{
+    return chademoCharger->CarContactorsClosed();
 }
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
@@ -1073,7 +1084,7 @@ void ChademoCharger::UpdateChargerMessages()
     // ZE0 seems to hangs the second time, if discharge is enabled during discovery
     COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && not _discovery, "109.DischargeCompatible %d -> %d");
 
-    uint16_t outputVolt = _reportOutputVoltage ? _chargerData.OutputVoltage : 0;
+    uint16_t outputVolt = _overrideOutputVoltage >= 0 ? _overrideOutputVoltage : _chargerData.OutputVoltage;
     COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "109.OutputVoltage %d -> %d");
 
     uint8_t remainingChargingTime10s = 0;
