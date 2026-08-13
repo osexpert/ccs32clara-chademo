@@ -522,7 +522,7 @@ static void stateFunctionConnected()
 {
     // We have a freshly established TCP channel. We start the V2GTP/EXI communication now.
     // We just use the initial request message from the Ioniq. It contains one entry: DIN.
-    addToTrace(MOD_PEV, "Checkpoint400: Sending the initial SupportedApplicationProtocolReq");
+    addToTrace(MOD_PEV, "Sending the initial SupportedApplicationProtocolReq");
     setCheckpoint(400);
 
     /*
@@ -549,13 +549,12 @@ static void stateFunctionWaitForSupportedApplicationProtocolResponse()
 {
     if (CONSUME_APP_MESSAGE(aphsDoc.supportedAppProtocolRes))
     {
-        addToTrace(MOD_PEV, "In state WaitForSupportedApplicationProtocolResponse");
         /* it is the correct response */
-        addToTrace(MOD_PEV, "supportedAppProtocolRes ResponseCode:%d, SchemaID_isUsed:%d, SchemaID:%d",
+        addToTrace(MOD_PEV, "SupportedAppProtocolRes ResponseCode:%d, SchemaID_isUsed:%d, SchemaID:%d",
             aphsDoc.supportedAppProtocolRes.ResponseCode,
             aphsDoc.supportedAppProtocolRes.SchemaID_isUsed,
             aphsDoc.supportedAppProtocolRes.SchemaID);
-        addToTrace(MOD_PEV, "Checkpoint403: Schema negotiated. And Checkpoint500: Will send SessionSetupReq");
+        addToTrace(MOD_PEV, "Schema negotiated. Will send SessionSetupReq");
         setCheckpoint(500);
         pev_sendSessionSetupReq();
         pev_enterState(PEV_STATE_WaitForSessionSetupResponse);
@@ -566,10 +565,9 @@ static void stateFunctionWaitForSessionSetupResponse()
 {
     if (CONSUME_DIN_MESSAGE(dinDocDec.V2G_Message.Body.SessionSetupRes))
     {
-        addToTrace(MOD_PEV, "In state WaitForSessionSetupResponse");
         memcpy(sessionId, dinDocDec.V2G_Message.Header.SessionID.bytes, SESSIONID_LEN);
         sessionIdLen = dinDocDec.V2G_Message.Header.SessionID.bytesLen; /* store the received SessionID, we will need it later. */
-        addToTrace_bytes(MOD_PEV, "Checkpoint506: The Evse decided for SessionId", sessionId, sessionIdLen);
+        addToTrace_bytes(MOD_PEV, "Charger decided for SessionId", sessionId, sessionIdLen);
         setCheckpoint(506);
         addToTrace(MOD_PEV, "Will send ServiceDiscoveryReq");
         setCheckpoint(510);
@@ -582,7 +580,6 @@ static void stateFunctionWaitForServiceDiscoveryResponse()
 {
     if (CONSUME_DIN_MESSAGE(dinDocDec.V2G_Message.Body.ServiceDiscoveryRes))
     {
-        addToTrace(MOD_PEV, "In state WaitForServiceDiscoveryResponse");
         addToTrace(MOD_PEV, "Will send ServicePaymentSelectionReq");
         setCheckpoint(520);
         pev_sendServicePaymentSelectionReq();
@@ -594,8 +591,7 @@ static void stateFunctionWaitForServicePaymentSelectionResponse()
 {
     if (CONSUME_DIN_MESSAGE(dinDocDec.V2G_Message.Body.ServicePaymentSelectionRes))
     {
-        addToTrace(MOD_PEV, "In state WaitForServicePaymentSelectionResponse");
-        addToTrace(MOD_PEV, "Checkpoint530: Will send ContractAuthenticationReq");
+        addToTrace(MOD_PEV, "Will send ContractAuthenticationReq");
         setCheckpoint(530);
         pev_SendContractAuthenticationReq();
         pev_numberOfContractAuthenticationReq = 1; // This is the first request.
@@ -611,13 +607,13 @@ static void stateFunctionWaitForContractAuthenticationResponse()
     }
     if (CONSUME_DIN_MESSAGE(dinDocDec.V2G_Message.Body.ContractAuthenticationRes))
     {
-        addToTrace(MOD_PEV, "In state WaitForContractAuthenticationResponse");
+        //addToTrace(MOD_PEV, "In state WaitForContractAuthenticationResponse");
         // In normal case, we can have two results here: either the Authentication is needed (the user
         // needs to authorize by RFID card or app, or something like this.
         // Or, the authorization is finished. This is shown by EVSEProcessing=Finished.
         if (dinDocDec.V2G_Message.Body.ContractAuthenticationRes.EVSEProcessing == dinEVSEProcessingType_Finished)
         {
-            addToTrace(MOD_PEV, "Checkpoint538 and 540: Auth is Finished. Will send ChargeParameterDiscoveryReq");
+            addToTrace(MOD_PEV, "Auth is Finished. Will send ChargeParameterDiscoveryReq");
             setCheckpoint(540);
             pev_sendChargeParameterDiscoveryReq();
             pev_numberOfChargeParameterDiscoveryReq = 1; // first message
@@ -653,7 +649,7 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse()
     }
     if (CONSUME_DIN_MESSAGE(dinDocDec.V2G_Message.Body.ChargeParameterDiscoveryRes))
     {
-        addToTrace(MOD_PEV, "In state WaitForChargeParameterDiscoveryResponse");
+        //addToTrace(MOD_PEV, "In state WaitForChargeParameterDiscoveryResponse");
         // We can have two cases here:
         // (A) The charger needs more time to show the charge parameters.
         // (B) The charger finished to tell the charge parameters.
@@ -670,16 +666,16 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse()
             _ccs_params.EvseMaxVoltage = evseMaxVoltage;
             _ccs_params.EvseMaxCurrent = evseMaxCurrent;
 
-            addToTrace(MOD_PEV, "Checkpoint550: ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
+            addToTrace(MOD_PEV, "ChargeParams are discovered: min:%dV max:%dV/%dA. Will change to state C.",
                 evseMinimumVoltage, evseMaxVoltage, evseMaxCurrent);
 
             setCheckpoint(550);
             // pull the CP line to state C here:
             hardwareInterface_setStateC();
-            addToTrace(MOD_PEV, "Checkpoint555: Locking the connector.");
+            addToTrace(MOD_PEV, "Locking the connector.");
             hardwareInterface_lockConnector();
 
-            addToTrace(MOD_PEV, "Checkpoint560: Send CableCheckReq.");
+            addToTrace(MOD_PEV, "Send CableCheckReq.");
             setCheckpoint(560);
             pev_sendCableCheckReq();
             pev_numberOfCableCheckReq = 1; // This is the first request.
@@ -858,7 +854,7 @@ static void stateFunctionWaitForPowerDeliveryOnResponse()
     {
         if (dinDocDec.V2G_Message.Body.PowerDeliveryRes.ResponseCode == dinresponseCodeType_OK)
         {
-            addToTrace(MOD_PEV, "Checkpoint700: Starting the charging loop with CurrentDemandReq");
+            addToTrace(MOD_PEV, "Starting the charging loop with CurrentDemandReq");
             setCheckpoint(700);
             pev_sendCurrentDemandReq();
             pev_enterState(PEV_STATE_WaitForCurrentDemandResponse);
@@ -912,12 +908,12 @@ static void stateFunctionWaitForCurrentDemandResponse()
         }
         else if (hardwareInterface_stopChargeRequested())
         {
-            addToTrace(MOD_PEV, "User requested stop on car side. Sending PowerDeliveryReq Stop.");
+            addToTrace(MOD_PEV, "User requested stop on car side.");
             currentDemandStopReason = STOP_REASON_POWER_OFF_PENDING;
         }
         else if (hardwareInterface_getIsBatteryFull())
         {
-            addToTrace(MOD_PEV, "Battery is full. Sending PowerDeliveryReq Stop.");
+            addToTrace(MOD_PEV, "Battery is full.");
             currentDemandStopReason = STOP_REASON_BATTERY_FULL;
         }
 
@@ -925,6 +921,7 @@ static void stateFunctionWaitForCurrentDemandResponse()
         {
             _ccs_params.CurrentDemandStopReason = currentDemandStopReason;
             setCheckpoint(800);
+            addToTrace(MOD_PEV, "Sending PowerDeliveryReq Stop.");
             pev_sendPowerDeliveryReq(false); /* we can immediately send the powerDeliveryStopRequest, while we are under full current.
                                             sequence explained here: https://github.com/uhi22/pyPLC#detailled-investigation-about-the-normal-end-of-the-charging-session */
             pev_enterState(PEV_STATE_WaitForPowerDeliveryOffResponse);
@@ -1013,7 +1010,7 @@ static void stateFunctionWaitForWeldingDetectionResponse()
         bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
         if (voltageIsLow
             || numberOfWeldingDetectionRoundsAfterCarContactorsClosed > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS
-            || pev_cyclesInState > SEC_TO_CCS_CYCLES(20)
+            || pev_cyclesInState > SEC_TO_CCS_CYCLES(20) // chademo WD timeout is 10sec + slack
             )
         {
             if (not voltageIsLow)
