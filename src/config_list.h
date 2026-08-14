@@ -41,6 +41,7 @@ CONFIG_ITEM(DX_CCS_WaitForPreChargeStart_MS, "wait-for-precharge-start-ms", uint
 
 CONFIG_ITEM(CHADEMO_MAX_UNDERSUPPLY_AMPS, "max-undersupply-amps", uint8_t, 10);
 
-// chademo 0.9 without welding detection. may be better for Outlander PHEV 2020?
-// Because chademo 1.* require welding detection, while in 0.9 it is optional, so the only reason for using 0.9 is, then it is allowed to turn off the welding detection flag
-CONFIG_ITEM(CONFIG_CHADEMO_PRE1, "chademo-legacy-mode", bool, false);
+// chademo 1.* require welding detection, while in 0.9 it is optional, but maybe some cars allow it?
+// Tested with false on Leaf 2018, it does not complain, but I don't see any difference. Maybe it has no effect.
+// Hard to say how other cars will behave.
+CONFIG_ITEM(CONFIG_WELDING_DETECTION, "welding-detection", bool, true);

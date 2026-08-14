@@ -352,11 +352,14 @@ int ChademoCharger::GetCyclicOffset(uint8_t offset)
 
 /*
  * RETAIN_FACTOR calculation:
- * We want 20% (0.20) voltage left after 1 second (which is exactly 10 steps of 100ms). 25% is max.
- * Formula: factor = 10th root of 0.20 (0.200000^0.1) = 0.8513399f
- * This reduces the voltage by about 15% every 100ms.
+ * Optimized to 0.83f to satisfy both safety criteria:
+ * - Drops below 25% (100V) after 1.0 second (~62V)
+ * - Drops below 10V after 2.0 seconds (~9V due to int truncation)
+ * Formula: factor = 10th root of 0.155 (0.155000^0.1) = 0.8300000f
+ * This reduces the voltage by exactly 17% every 100ms.
  */
-const float RETAIN_FACTOR = 0.8513399f;
+const float VOLTAGE_BLEED_RETAIN_FACTOR = 0.83f;
+
 
 void ChademoCharger::RunStateMachine()
 {
@@ -675,6 +678,8 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::Stopping_Start)
     {
+        _overrideOutputVoltage = _chargerData.OutputVoltage; // snapshot last charging voltage
+
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
 
         SetState(ChargerState::Stopping_WaitForLowAmps);
@@ -696,22 +701,18 @@ void ChademoCharger::RunStateMachine()
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
 
-            _overrideOutputVoltage = _chargerData.OutputVoltage; // snapshot
-
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
     else if (_state == ChargerState::Stopping_WaitForCarContactorsOpen)
     {
-        if (not _carData.Switch_k && _cyclesSinceLowAmpsAndSwitchKCleared++ > 5) // 500ms in addition
+        if (not _carData.Switch_k)
         {
             // Simulate voltage drop on CAN. May make Outlander PHEV 2020 happy, in case it uses CAN voltage drop to perform WD? At least one produced P101C P101B DTC's:-(
-            // From CAN logs, Leaf seem to open contactor(s) 2sec after CHARGING cleared, so assuming this is switchK off (1.5sec) + 500ms.
-            // TODO: we could simulate a drop with 40-50V per cycle, instead of dropping as a stone.
             // But if the car uses the 11 steps on page 83, and only rely on CAN voltage, this won't help.
-            // So: ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
-            // The next step may be to use chademo 0.9, that allows not doing WD.
-            _overrideOutputVoltage = _overrideOutputVoltage * RETAIN_FACTOR;
+            // Some ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
+            // Could use chademo 0.9, that allows not doing WD...
+            _overrideOutputVoltage = _overrideOutputVoltage * VOLTAGE_BLEED_RETAIN_FACTOR;
             // some also suggest to call OpenAdapterContactor here, but not sure...
         }
 

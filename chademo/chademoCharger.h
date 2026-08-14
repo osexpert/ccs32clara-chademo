@@ -646,7 +646,7 @@ const int SX_DONE = 3;
 
 struct ChargerData
 {
-    uint8_t ProtocolNumber = CONFIG_CHADEMO_PRE1 ? ProtocolNumber::Chademo_0_9 : ProtocolNumber::Chademo_1_0;
+    uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
 
     uint8_t DischargeProtocolNumber = 2;
 
@@ -667,7 +667,7 @@ struct ChargerData
     /// Chademo 1.X: welding detection is required, must be true:-/
     /// Chademo < 1.X: optional
     /// </summary>
-    bool SupportWeldingDetection = CONFIG_CHADEMO_PRE1 ? false : true;
+    bool SupportWeldingDetection = CONFIG_WELDING_DETECTION;
 
     uint8_t MaxAvailableOutputCurrent;
     uint8_t DynAvailableOutputCurrent;
@@ -786,7 +786,6 @@ public:
         int _delayCycles = 0;
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
-        int _cyclesSinceLowAmpsAndSwitchKCleared = 0;
         bool _chargingPlugLocked = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
