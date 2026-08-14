@@ -84,7 +84,7 @@ static int LastCurrentDemandResPresentVoltage;
 static int LastTargetVoltage;
 static int LastTargetCurrent;
 static bool PrechargeDifferenceIsSmall;
-static uint8_t numberOfWeldingDetectionRounds;
+static uint8_t numberOfWeldingDetectionRoundsAfterCarContactorsClosed;
 
 static bool PresentVoltageDifferentFromTarget;
 static bool PresentVoltageDifferentFromTarget_isSet;
@@ -986,7 +986,7 @@ static void stateFunctionWaitForCurrentDownAfterStateB(void)
     /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
     will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
     some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
-    numberOfWeldingDetectionRounds = 0;
+    numberOfWeldingDetectionRoundsAfterCarContactorsClosed = 0;
     pev_sendWeldingDetectionReq();
     pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
 }
@@ -1005,11 +1005,10 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                round will show a quite high voltage, because the contactors are just opening. We
                need to repeat the requests, until the voltage is at a non-dangerous level. */
             int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-            // Since some chargers and dischargers fake the WD voltage, just ignore it and don't update it. Consistently wrong is better than randomness?
-            //_ccs_params.EvseVoltage = evsePresentVoltage;
-            addToTrace(MOD_PEV, "WeldingDetection %dV round #%d", evsePresentVoltage, numberOfWeldingDetectionRounds);
+            _ccs_params.EvseVoltage = evsePresentVoltage;
+            addToTrace(MOD_PEV, "WeldingDetection %dV rounds accc #%d", evsePresentVoltage, numberOfWeldingDetectionRoundsAfterCarContactorsClosed);
             bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
-            if (voltageIsLow || numberOfWeldingDetectionRounds > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS) 
+            if (voltageIsLow || numberOfWeldingDetectionRoundsAfterCarContactorsClosed > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS)
             {
                 if (not voltageIsLow) {
                     if (evsePresentVoltage == LastCurrentDemandResPresentVoltage) {
@@ -1047,10 +1046,10 @@ static void stateFunctionWaitForWeldingDetectionResponse(void)
                     Count the number of welding detection rounds. To be clarified, whether
                     a certain time or number of rounds make sense to cover all use cases with
                     different chargers etc */
-                    numberOfWeldingDetectionRounds++;
+                    numberOfWeldingDetectionRoundsAfterCarContactorsClosed++;
                 }
 
-                //addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
+                //addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRoundsAfterCarContactorsClosed);
                 pev_sendWeldingDetectionReq();
                 pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
             }

@@ -786,7 +786,6 @@ public:
         int _delayCycles = 0;
         int _logCycleCounter = 0;
         int _cyclesInState = 0;
-        int _cyclesSinceLowAmpsAndSwitchKCleared = 0;
         bool _chargingPlugLocked = false;
         bool _msg102_recieved = false;
         bool _send_can = false;
