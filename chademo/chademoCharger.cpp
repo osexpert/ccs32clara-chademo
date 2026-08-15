@@ -713,8 +713,8 @@ void ChademoCharger::RunStateMachine()
             // Some ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
             // Could use chademo 0.9, that allows not doing WD...
             _overrideOutputVoltage = _overrideOutputVoltage * VOLTAGE_BLEED_RETAIN_FACTOR;
-            // some also suggest to call OpenAdapterContactor here, but not sure...
-            if (CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION)
+            // Some also suggest to call OpenAdapterContactor here, but not sure. At least now its configurable.
+            if (CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION && _adapterContactorClosed)
                 OpenAdapterContactor();
         }
 
@@ -741,7 +741,7 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD1(false);
 
-            if (not CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION)
+            if (_adapterContactorClosed)
                 OpenAdapterContactor();
 
             SetState(ChargerState::Stopping_ClearEnergizing);
