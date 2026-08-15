@@ -485,10 +485,10 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
+        if (min(_carData.ProtocolNumber, _chargerData.ProtocolNumber) >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
             // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
-            ((_carData.MaxRequestCurrentBeforeD2 == 0 && _carData.RequestCurrent > 0) || HasElapsedMs(CHADEMO_PRE1_WaitForCarContactorsClosed_MS)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
+            ((_carData.MaxRequestCurrentBeforeD2 == 0 && _carData.RequestCurrent > 0) || HasElapsedMs(CHADEMO_09_WaitForCarContactorsClosed_MS)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
             )
         {
             // Car seems to demand 0 volt at the inlet when D2=true, else it won't close contactors.
@@ -714,9 +714,11 @@ void ChademoCharger::RunStateMachine()
             // Could use chademo 0.9, that allows not doing WD...
             _overrideOutputVoltage = _overrideOutputVoltage * VOLTAGE_BLEED_RETAIN_FACTOR;
             // some also suggest to call OpenAdapterContactor here, but not sure...
+            if (CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION)
+                OpenAdapterContactor();
         }
 
-        if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
+        if (min(_carData.ProtocolNumber, _chargerData.ProtocolNumber) >= ProtocolNumber::Chademo_1_0 ?
             (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false
             HasElapsedSec(4) // Keep 4s after ChargerStatus::CHARGING = false
             )
@@ -725,7 +727,7 @@ void ChademoCharger::RunStateMachine()
             _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
 
-            _overrideOutputVoltage = 1; // Car contactor open, report 1V on CAN, regardless of what output voltage the charger claim to have (it lies)
+            _overrideOutputVoltage = 0; // Car contactor open, report 0V on CAN, regardless of what output voltage the charger claim to have (it lies)
 
             SetSwitchD2(false);
 
@@ -739,8 +741,8 @@ void ChademoCharger::RunStateMachine()
         {
             SetSwitchD1(false);
 
-            OpenAdapterContactor();
-            _overrideOutputVoltage = 0; // Report 0V on CAN
+            if (not CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION)
+                OpenAdapterContactor();
 
             SetState(ChargerState::Stopping_ClearEnergizing);
         }

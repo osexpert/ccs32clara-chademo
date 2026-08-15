@@ -646,7 +646,7 @@ const int SX_DONE = 3;
 
 struct ChargerData
 {
-    uint8_t ProtocolNumber = ProtocolNumber::Chademo_1_0;
+    uint8_t ProtocolNumber = CONFIG_CHADEMO_09 ? ProtocolNumber::Chademo_0_9 : ProtocolNumber::Chademo_1_0;
 
     uint8_t DischargeProtocolNumber = 2;
 

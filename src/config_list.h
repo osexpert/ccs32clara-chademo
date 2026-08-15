@@ -29,7 +29,7 @@ CONFIG_ITEM(CONFIG_ALWAYS_ON, "always-on", bool, false);
 CONFIG_ITEM(CONFIG_ALT_ESTIMATED_VOLTAGE, "alt-estimated-voltage", uint8_t, 0);
 
 // Based on logs, worst case is 1600ms before asking for amps, but use 2000 for now.
-CONFIG_ITEM(CHADEMO_PRE1_WaitForCarContactorsClosed_MS, "wait-for-contactors-closed-ms", uint16_t, 2000);
+CONFIG_ITEM(CHADEMO_09_WaitForCarContactorsClosed_MS, "wait-for-car-contactors-closed-ms", uint16_t, 2000);
 
 // Fake output current towards the car. May need to use 2 or 5 to make it work on all cars?
 CONFIG_ITEM(CHADEMO_FAKE_IDLE_AMPS, "fake-idle-amps", uint8_t, 1);
@@ -41,7 +41,14 @@ CONFIG_ITEM(DX_CCS_WaitForPreChargeStart_MS, "wait-for-precharge-start-ms", uint
 
 CONFIG_ITEM(CHADEMO_MAX_UNDERSUPPLY_AMPS, "max-undersupply-amps", uint8_t, 10);
 
-// chademo 1.* require welding detection, while in 0.9 it is optional, but maybe some cars allow it?
-// Tested with false on Leaf 2018, it does not complain, but I don't see any difference. Maybe it has no effect.
+// chademo 1.* require welding detection, while in 0.9 it is optional, but maybe some cars still allow it?
+// Tested with false on Leaf 2018, it does not complain, but I don't see any difference. Maybe it is just ignore and has no effect?
 // Hard to say how other cars will behave.
-CONFIG_ITEM(CONFIG_WELDING_DETECTION, "welding-detection", bool, true);
+CONFIG_ITEM(CONFIG_WELDING_DETECTION, "chademo-welding-detection", bool, true);
+
+// Simulate chademo 0.9 instead of 1.0. In Chademo 0.9, setting welding detection was optional.
+CONFIG_ITEM(CONFIG_CHADEMO_09, "chademo-0.9", bool, false);
+
+// Pro: voltage will drop consistently and hopefully faster? Won't rely on every chargers bleed-down speed?
+// Con: inlet wont bleed-down at all? But spec demand less than 1uF, but still...charge could be "trapped" inside the inlet and voltage never drop?
+CONFIG_ITEM(CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION, "open-adapter-contactor-before-welding-detection", bool, false);
