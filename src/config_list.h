@@ -29,7 +29,7 @@ CONFIG_ITEM(CONFIG_ALWAYS_ON, "always-on", bool, false);
 CONFIG_ITEM(CONFIG_ALT_ESTIMATED_VOLTAGE, "alt-estimated-voltage", uint8_t, 0);
 
 // Based on logs, worst case is 1600ms before asking for amps, but use 2000 for now.
-CONFIG_ITEM(CHADEMO_09_WaitForCarContactorsClosed_MS, "wait-for-car-contactors-closed-ms", uint16_t, 2000);
+CONFIG_ITEM(CHADEMO_09_AssumeCarContactorsClosed_MS, "assume-car-contactors-closed-after-ms", uint16_t, 2000);
 
 // Fake output current towards the car. May need to use 2 or 5 to make it work on all cars?
 CONFIG_ITEM(CHADEMO_FAKE_IDLE_AMPS, "fake-idle-amps", uint8_t, 1);
