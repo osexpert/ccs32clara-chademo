@@ -184,18 +184,6 @@
   <h1>ccs32clara-chademo config editor</h1>
   <p class="sub">Loads a firmware binary, finds every <code>&lt;config&gt;...&lt;/config&gt;</code> block and lets you patch config values directly in the file.</p>
 
-  <div class="panel">
-    <h2>Firmware</h2>
-    <div class="drop" id="drop">
-      <input type="file" id="file"/>
-      <div id="dropLabel">Drop a firmware file here, or click to choose one</div>
-    </div>
-    <div class="meta" id="fwVersion"></div>
-    <div class="row" style="margin-top:.8rem;">
-      <div class="status" id="status"></div>
-    </div>
-  </div>
-
   <div class="panel" id="configPanel">
     <h2>Configuration</h2>
     <div class="config-row">
@@ -207,6 +195,18 @@
     </div>
     <div class="hint">Auto-loads <code>configs.json</code> from next to this page. Or drag a configs JSON file onto this panel.</div>
     <div class="note" id="configNote"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Firmware</h2>
+    <div class="drop" id="drop">
+      <input type="file" id="file"/>
+      <div id="dropLabel">Drop a firmware file here, or click to choose one</div>
+    </div>
+    <div class="meta" id="fwVersion"></div>
+    <div class="row" style="margin-top:.8rem;">
+      <div class="status" id="status"></div>
+    </div>
   </div>
 
   <div class="panel" id="tablePanel" style="display:none;">
