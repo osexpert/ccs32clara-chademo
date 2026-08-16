@@ -98,6 +98,7 @@ static int LastCurrentDemandResPresentVoltage;
 static int LastTargetVoltage;
 static int LastTargetCurrent;
 static bool PrechargeDifferenceIsSmall;
+static uint16_t numberOfWeldingDetectionRounds;
 static uint8_t numberOfWeldingDetectionRoundsAfterCarContactorsClosed;
 
 static bool PresentVoltageDifferentFromTarget;
@@ -990,6 +991,7 @@ static void stateFunctionWaitForCurrentDownAfterStateB()
     /* We do not need a waiting time before sending the weldingDetectionRequest, because the weldingDetection
     will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
     some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
+    numberOfWeldingDetectionRounds = 1;
     numberOfWeldingDetectionRoundsAfterCarContactorsClosed = 0;
     pev_sendWeldingDetectionReq();
     pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
@@ -1005,7 +1007,7 @@ static void stateFunctionWaitForWeldingDetectionResponse()
            need to repeat the requests, until the voltage is at a non-dangerous level. */
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
         _ccs_params.EvseVoltage = evsePresentVoltage;
-        addToTrace(MOD_PEV, "WeldingDetection %dV rounds accc #%d", evsePresentVoltage, numberOfWeldingDetectionRoundsAfterCarContactorsClosed);
+        addToTrace(MOD_PEV, "WeldingDetection %dV rounds #%d accc #%d", evsePresentVoltage, numberOfWeldingDetectionRounds, numberOfWeldingDetectionRoundsAfterCarContactorsClosed);
         bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
         if (voltageIsLow
             || numberOfWeldingDetectionRoundsAfterCarContactorsClosed > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS
@@ -1048,7 +1050,8 @@ static void stateFunctionWaitForWeldingDetectionResponse()
                 numberOfWeldingDetectionRoundsAfterCarContactorsClosed++;
             }
 
-            //addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRoundsAfterCarContactorsClosed);
+            //addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
+            numberOfWeldingDetectionRounds++;
             pev_sendWeldingDetectionReq();
             pev_loopState();
         }
