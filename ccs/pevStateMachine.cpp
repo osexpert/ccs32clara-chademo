@@ -621,23 +621,19 @@ static void stateFunctionWaitForContractAuthenticationResponse()
             ChargeParameterDiscoveryCompletedTrigger = false; // reset
             pev_enterState(PEV_STATE_WaitForChargeParameterDiscoveryResponse);
         }
+        else if (pev_cyclesInState > SEC_TO_CCS_CYCLES(120)) // maybe the user searches two minutes for his RFID card...
+        {
+            addToTrace(MOD_PEV, "Authentication lasted too long. Giving up.");
+            pev_enterState(PEV_STATE_SafeShutDown);
+        }
         else
         {
-            // Not (yet) finished.
-            if (pev_cyclesInState > SEC_TO_CCS_CYCLES(120))//  pev_numberOfContractAuthenticationReq >= 120)   // approx 120 seconds, maybe the user searches two minutes for his RFID card...
-            {
-                addToTrace(MOD_PEV, "Authentication lasted too long. Giving up.");
-                pev_enterState(PEV_STATE_SafeShutDown);
-            }
-            else
-            {
-                // Try again.
-                pev_numberOfContractAuthenticationReq += 1; // count the number of tries.
-                addToTrace(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq #%d", pev_numberOfContractAuthenticationReq);
-                pev_SendContractAuthenticationReq();                //was encodeAndTransmit();
-                // We just stay in the same state, until the timeout elapses.
-                pev_loopState();
-            }
+            // Try again.
+            pev_numberOfContractAuthenticationReq += 1; // count the number of tries.
+            addToTrace(MOD_PEV, "Not (yet) finished. Will again send ContractAuthenticationReq #%d", pev_numberOfContractAuthenticationReq);
+            pev_SendContractAuthenticationReq();                //was encodeAndTransmit();
+            // We just stay in the same state, until the timeout elapses.
+            pev_loopState();
         }
     }
 }
@@ -682,26 +678,22 @@ static void stateFunctionWaitForChargeParameterDiscoveryResponse()
             pev_numberOfCableCheckReq = 1; // This is the first request.
             pev_enterState(PEV_STATE_WaitForCableCheckResponse);
         }
+        else if (pev_cyclesInState > SEC_TO_CCS_CYCLES(60))
+        {
+            /* 60 seconds, should be sufficient for the charger to find its parameters.
+                ... The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from
+                    https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
+            addToTrace(MOD_PEV, "ChargeParameterDiscovery lasted too long:%d Giving up.", pev_numberOfChargeParameterDiscoveryReq);
+            pev_enterState(PEV_STATE_SafeShutDown);
+        }
         else
         {
-            // Not (yet) finished.
-            if (pev_cyclesInState > SEC_TO_CCS_CYCLES(60))// pev_numberOfChargeParameterDiscoveryReq >= 60)
-            {
-                /* approx 60 seconds, should be sufficient for the charger to find its parameters.
-                    ... The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from
-                        https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
-                addToTrace(MOD_PEV, "ChargeParameterDiscovery lasted too long:%d Giving up.", pev_numberOfChargeParameterDiscoveryReq);
-                pev_enterState(PEV_STATE_SafeShutDown);
-            }
-            else
-            {
-                // Try again.
-                pev_numberOfChargeParameterDiscoveryReq += 1; // count the number of tries.
-                addToTrace(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq #%d", pev_numberOfChargeParameterDiscoveryReq);
-                pev_sendChargeParameterDiscoveryReq();
-                // we stay in the same state
-                pev_loopState();
-            }
+            // Try again.
+            pev_numberOfChargeParameterDiscoveryReq += 1; // count the number of tries.
+            addToTrace(MOD_PEV, "Not (yet) finished. Will again send ChargeParameterDiscoveryReq #%d", pev_numberOfChargeParameterDiscoveryReq);
+            pev_sendChargeParameterDiscoveryReq();
+            // we stay in the same state
+            pev_loopState();
         }
     }
 }
@@ -728,7 +720,7 @@ static void stateFunctionWaitForCableCheckResponse()
         }
         else if (rc == dinresponseCodeType_OK && proc == dinEVSEProcessingType_Ongoing)
         {
-            if (pev_cyclesInState > SEC_TO_CCS_CYCLES(60))// pev_numberOfCableCheckReq > 60)   /* approx 60s should be sufficient for cable check. The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
+            if (pev_cyclesInState > SEC_TO_CCS_CYCLES(60)) /* 60s should be sufficient for cable check. The ISO allows up to 55s reaction time and 60s timeout for "ongoing". Taken over from https://github.com/uhi22/pyPLC/commit/01c7c069fd4e7b500aba544ae4cfce6774f7344a */
             {
                 addToTrace(MOD_PEV, "CableCheck lasted too long:%d Giving up.", pev_numberOfCableCheckReq);
                 pev_enterState(PEV_STATE_SafeShutDown);
@@ -757,7 +749,7 @@ static void stateFunctionWaitForPreChargeStart()
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
     // How long can we wait before sending the first PreChargeReq? It seems undefined in spec.
-    if (CONFIG_SX ? true : pev_cyclesInState > (DX_CCS_WaitForPreChargeStart_MS / 30))
+    if (CONFIG_SX ? true : pev_cyclesInState > (DX_CCS_PreChargeStartDelay_MS / 30))
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 
@@ -802,6 +794,7 @@ static void stateFunctionWaitForPreChargeResponse()
             }
         }
 
+        bool sendAgain = false;
         if (PrechargeDifferenceIsSmall)
         {
             // This check may be random. pev_runFsm already handle stop. But I guess it does not hurt with an extra check.
@@ -810,24 +803,39 @@ static void stateFunctionWaitForPreChargeResponse()
                 // Not sure if this can happen, but in case, chademo must have ended/failed already
                 addToTrace(MOD_PEV, "Error: Can not complete precharge -> chademo is past ChargingLoop");
                 pev_enterState(PEV_STATE_SafeShutDown);
-                return;
             }
-            
-            if (chademoInterface_preChargeCompleted())
+            else if (chademoInterface_preChargeCompleted())
             {
                 addToTrace(MOD_PEV, "PreCharge completed.");
                 setCheckpoint(573);
                 // Turn the power relay on.
                 hardwareInterface_setPowerRelayOn();
                 pev_enterState(PEV_STATE_WaitForContactorsClosed);
-                return;
+            }
+            else
+            {
+                sendAgain = true;
             }
         }
+        else
+        {
+            sendAgain = true;
+        }
 
-        // send again
-        pev_sendPreChargeReq(batVtg);
-        pev_DelayCycles = 15; // wait with the next evaluation approx half a second
-        pev_loopState();
+        if (sendAgain)
+        {
+            if (pev_cyclesInState > SEC_TO_CCS_CYCLES(30))
+            {
+                addToTrace(MOD_PEV, "PreCharge lasted too long. Giving up.");
+                pev_enterState(PEV_STATE_SafeShutDown);
+            }
+            else
+            {
+                pev_sendPreChargeReq(batVtg);
+                pev_DelayCycles = 15; // wait with the next evaluation approx half a second
+                pev_loopState();
+            }
+        }
     }
 }
 
@@ -1178,14 +1186,14 @@ static void pev_runFsm(void)
         stop = true;
     }
 
-    if (loop_timeouts[pev_state] > 0 && not tcp_isConnected())
+    if (not tcp_isConnected() && pev_state > PEV_STATE_Connected && pev_state < PEV_STATE_SafeShutDown)
     {
-        addToTrace(MOD_PEV, "Tcp connection lost in timeoutable state %s", pevSttLabels[pev_state]);
+        addToTrace(MOD_PEV, "Tcp connection lost in connected state %s", pevSttLabels[pev_state]);
         stop = true;
     }
 
-    if (hardwareInterface_stopChargeRequested() // powerOffPending?
-        && hardwareInterface_isConnectorLocked() // why check for connector lock? old logic related to late plug insertion?
+    if (hardwareInterface_stopChargeRequested() // powerOffPending
+        // && hardwareInterface_isConnectorLocked() // why check for connector lock? old logic related to late plug insertion? Seems useless...
         && pev_state < PEV_STATE_WaitForCurrentDemandResponse
         )
     {

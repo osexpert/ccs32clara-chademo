@@ -37,7 +37,7 @@ CONFIG_ITEM(CHADEMO_FAKE_IDLE_AMPS, "fake-idle-amps", uint8_t, 1);
 // car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-) But 0 is default (no modulation).
 CONFIG_ITEM(CHADEMO_VOLTAGE_MODULATION, "voltage-modulation", uint8_t, 0);
 
-CONFIG_ITEM(DX_CCS_WaitForPreChargeStart_MS, "precharge-start-delay-ms", uint16_t, 2000);
+CONFIG_ITEM(DX_CCS_PreChargeStartDelay_MS, "precharge-start-delay-ms", uint16_t, 2000);
 
 CONFIG_ITEM(CHADEMO_MAX_UNDERSUPPLY_AMPS, "max-undersupply-amps", uint8_t, 10);
 
