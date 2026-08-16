@@ -679,9 +679,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_Start)
     {
         _overrideOutputVoltage = _chargerData.OutputVoltage; // snapshot last charging voltage
-
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
-
         SetState(ChargerState::Stopping_WaitForLowAmps);
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
@@ -700,7 +698,6 @@ void ChademoCharger::RunStateMachine()
 
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
-
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
@@ -727,10 +724,10 @@ void ChademoCharger::RunStateMachine()
             _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
 
-            _overrideOutputVoltage = 0; // Car contactor open, report 0V on CAN, regardless of what output voltage the charger claim to have (it lies)
+            _overrideOutputVoltage = 0; // Car contactor open, report 0V on CAN, regardless of what output voltage the charger (claim to) have
+            if (_adapterContactorClosed) OpenAdapterContactor();
 
             SetSwitchD2(false);
-
             SetState(ChargerState::Stopping_SetSwitchD1Off);
         }
     }
@@ -740,35 +737,18 @@ void ChademoCharger::RunStateMachine()
         if (_cyclesInState >= 5)
         {
             SetSwitchD1(false);
-
-            if (_adapterContactorClosed)
-                OpenAdapterContactor();
-
-            SetState(ChargerState::Stopping_ClearEnergizing);
-        }
-    }
-    else if (_state == ChargerState::Stopping_ClearEnergizing)
-    {
-        // Wait 200ms after OpenAdapterContactor, to make sure voltage drops <= 10V before clear ENERGIZING
-        if (_cyclesInState >= 2)
-        {
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING);
-
-            // stop CAN in later state to make sure we send clear ChargerStatus::ENERGIZING message to car before we kill CAN
-            SetState(ChargerState::Stopping_UnlockChargingPlug);
+            SetState(ChargerState::Stopping_UnlockChargingPlug); // Unlock charging plug in own state, to make sure the car get the clear ChargerStatus::ENERGIZING CAN message before power off
         }
     }
     else if (_state == ChargerState::Stopping_UnlockChargingPlug)
     {
-        // Unlock charging plug in own state, to make sure the car get the clear ChargerStatus::ENERGIZING CAN message before power off (plug unlocked = power off ok)
-        UnlockChargingPlug();
-
+        UnlockChargingPlug(); // plug unlocked => power off ok
         SetState(ChargerState::End);
     }
     else if (_state == ChargerState::End)
     {
         // terminal state. We can never leave.
-
         _send_can = false;
     }
 }
