@@ -18,7 +18,7 @@ CONFIG_ITEM(MAX_DISCHARGE_AMPS_FALLBACK, "max-discharge-amps-fallback", uint8_t,
 // - If AvailableOutputCurrent is changed/lowered so that RequestCurrent reack AvailableOutputCurrent, the charging just stops (at least for lower values as 10).
 // - It will/can increase RequestCurrent until it reaches AvailableOutputCurrent - 10 (so for a 200A charger, it will/can ask for 190A until it backs down). The kits were sold as 125A kits, but some were delivered with 200A cables.
 // - It is possible that CHADEMO_MAX_UNDERSUPPLY_AMPS = 20 would work...since it has this weird 10A thing...but also never changing AvailableOutputCurrent seems to work (dynamic-control-fallback = false).
-CONFIG_ITEM(DYNAMIC_CONTROL_FALLBACK, "dynamic-control-fallback", bool, true);
+CONFIG_ITEM(DYNAMIC_CONTROL_FALLBACK, "dynamic-current-fallback", bool, true);
 
 CONFIG_ITEM(CONFIG_SX, "sx", bool, false);
 

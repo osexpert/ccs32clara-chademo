@@ -23,8 +23,8 @@
     },
     {
       "name": "JDEMO",
-      "description": "Jdemo quirk: prevent dynamic control.",
-      "values": { "dynamic-control-fallback": false }
+      "description": "Jdemo quirk: prevent dynamic current.",
+      "values": { "dynamic-current-fallback": false }
     },
     {
       "name": "JDEMO125A",
