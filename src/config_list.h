@@ -37,12 +37,18 @@ CONFIG_ITEM(CHADEMO_FAKE_IDLE_AMPS, "fake-idle-amps", uint8_t, 1);
 // car seems to allows 20V deviation. Adding +- 20V in addition should allow 40V deviation. +-30V also worked, but if +-20V works, lets keep +-30 as backup:-) But 0 is default (no modulation).
 CONFIG_ITEM(CHADEMO_VOLTAGE_MODULATION, "voltage-modulation", uint8_t, 0);
 
-CONFIG_ITEM(DX_CCS_WaitForPreChargeStart_MS, "wait-for-precharge-start-ms", uint16_t, 2000);
+CONFIG_ITEM(DX_CCS_PreChargeStartDelay_MS, "precharge-start-delay-ms", uint16_t, 2000);
 
 CONFIG_ITEM(CHADEMO_MAX_UNDERSUPPLY_AMPS, "max-undersupply-amps", uint8_t, 10);
 
-// chademo 1.* require welding detection, while in 0.9 it is optional, but maybe some cars allow it?
-// Tested with false on Leaf 2018, it does not complain, and I can see it behave differently and uses longer time to set the contactors opened flag.
-// Probably since it can not trust the charger voltage to drop, it just uses longer time, to compensate, and hope if waiting longer, the voltage drops sufficient.
+// chademo 1.* require welding detection, while in 0.9 it is optional, but maybe some cars still allow it?
+// Tested with false on Leaf 2018, it does not complain, but I don't see any difference. Maybe it is just ignore and has no effect?
 // Hard to say how other cars will behave.
-CONFIG_ITEM(CONFIG_WELDING_DETECTION, "chademo-welding-detection", bool, true);
+CONFIG_ITEM(CONFIG_WELDING_DETECTION, "chademo-wd", bool, true);
+
+// Simulate chademo 0.9 instead of 1.0. In Chademo 0.9, setting welding detection was optional.
+CONFIG_ITEM(CONFIG_CHADEMO_09, "chademo-0.9", bool, false);
+
+// Pro: voltage will drop consistently and hopefully faster? Won't rely on every chargers bleed-down speed?
+// Con: inlet wont bleed-down at all? But spec demand less than 1uF, but still...charge could be "trapped" inside the inlet and voltage never drop?
+CONFIG_ITEM(CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION, "open-adapter-contactor-before-wd", bool, false);

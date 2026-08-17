@@ -485,7 +485,7 @@ void ChademoCharger::RunStateMachine()
     }
     else if (_state == ChargerState::WaitForCarContactorsClosed)
     {
-        if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
+        if (min(_carData.ProtocolNumber, _chargerData.ProtocolNumber) >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
             // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
             ((_carData.MaxRequestCurrentBeforeD2 == 0 && _carData.RequestCurrent > 0) || HasElapsedMs(CHADEMO_09_AssumeCarContactorsClosed_MS)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
@@ -679,9 +679,7 @@ void ChademoCharger::RunStateMachine()
     else if (_state == ChargerState::Stopping_Start)
     {
         _overrideOutputVoltage = _chargerData.OutputVoltage; // snapshot last charging voltage
-
         set_flag(&_chargerData.Status, ChargerStatus::STOPPED);
-
         SetState(ChargerState::Stopping_WaitForLowAmps);
     }
     else if (_state == ChargerState::Stopping_WaitForLowAmps)
@@ -700,7 +698,6 @@ void ChademoCharger::RunStateMachine()
 
             // When car sees this flag cleared and OutputCurrent <= 5, car will start welding detection (but probably not before it has also cleared switch(k)?)
             clear_flag(&_chargerData.Status, ChargerStatus::CHARGING);
-
             SetState(ChargerState::Stopping_WaitForCarContactorsOpen);
         }
     }
@@ -713,10 +710,12 @@ void ChademoCharger::RunStateMachine()
             // Some ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
             // Could use chademo 0.9, that allows not doing WD...
             _overrideOutputVoltage = _overrideOutputVoltage * VOLTAGE_BLEED_RETAIN_FACTOR;
-            // some also suggest to call OpenAdapterContactor here, but not sure...
+            // Some also suggest to call OpenAdapterContactor here, but not sure. At least now its configurable.
+            if (CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION && _adapterContactorClosed)
+                OpenAdapterContactor();
         }
 
-        if (_carData.ProtocolNumber >= ProtocolNumber::Chademo_1_0 ?
+        if (min(_carData.ProtocolNumber, _chargerData.ProtocolNumber) >= ProtocolNumber::Chademo_1_0 ?
             (has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) || IsTimeoutSec(10)) : // C-time <= 4.0s / T-time 10.0s after ChargerStatus::CHARGING = false
             HasElapsedSec(4) // Keep 4s after ChargerStatus::CHARGING = false
             )
@@ -725,10 +724,10 @@ void ChademoCharger::RunStateMachine()
             _carData.CarContactorsClosed = false;
             println("[cha] Car contactors opened");
 
-            _overrideOutputVoltage = 0; // Car contactor open, report 0V on CAN, regardless of what output voltage the charger claim to have (it lies)
+            _overrideOutputVoltage = 0; // Car contactor open, report 0V on CAN, regardless of what output voltage the charger (claim to) have
+            if (_adapterContactorClosed) OpenAdapterContactor();
 
             SetSwitchD2(false);
-
             SetState(ChargerState::Stopping_SetSwitchD1Off);
         }
     }
@@ -738,34 +737,18 @@ void ChademoCharger::RunStateMachine()
         if (_cyclesInState >= 5)
         {
             SetSwitchD1(false);
-
-            OpenAdapterContactor();
-
-            SetState(ChargerState::Stopping_ClearEnergizing);
-        }
-    }
-    else if (_state == ChargerState::Stopping_ClearEnergizing)
-    {
-        // Wait 200ms after OpenAdapterContactor, to make sure voltage drops <= 10V before clear ENERGIZING
-        if (_cyclesInState >= 2)
-        {
             clear_flag(&_chargerData.Status, ChargerStatus::ENERGIZING);
-
-            // stop CAN in later state to make sure we send clear ChargerStatus::ENERGIZING message to car before we kill CAN
-            SetState(ChargerState::Stopping_UnlockChargingPlug);
+            SetState(ChargerState::Stopping_UnlockChargingPlug); // Unlock charging plug in own state, to make sure the car get the clear ChargerStatus::ENERGIZING CAN message before power off
         }
     }
     else if (_state == ChargerState::Stopping_UnlockChargingPlug)
     {
-        // Unlock charging plug in own state, to make sure the car get the clear ChargerStatus::ENERGIZING CAN message before power off (plug unlocked = power off ok)
-        UnlockChargingPlug();
-
+        UnlockChargingPlug(); // plug unlocked => power off ok
         SetState(ChargerState::End);
     }
     else if (_state == ChargerState::End)
     {
         // terminal state. We can never leave.
-
         _send_can = false;
     }
 }
