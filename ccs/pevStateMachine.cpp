@@ -27,7 +27,7 @@
    STATE_ENTRY(WaitForWeldingDetectionResponse, WeldingDetection, 2) \
    STATE_ENTRY(WaitForSessionStopResponse, SessionStop, 2) \
    STATE_ENTRY(SafeShutDown, SafeShutDown, 0) \
-   STATE_ENTRY(SafeShutDownWaitForChargerShutdown, WaitForChargerShutdown, 0) \
+   STATE_ENTRY(SafeShutDownWaitForChargerShutdown, ChargerShutdown, 0) \
    STATE_ENTRY(Stop, Stop, 0) \
    STATE_ENTRY(End, End, 0)
 
@@ -111,7 +111,7 @@ static bool ChargeParameterDiscoveryCompletedTrigger;
 
 /***local function prototypes *****************************************/
 
-static uint8_t pev_isTooLong(void);
+static uint8_t pev_isTooLong();
 static void pev_enterState(pevstates n);
 static void pev_loopState();
 
@@ -167,7 +167,7 @@ static void addV2GTPHeaderAndTransmit(const uint8_t* exiBuffer, uint8_t exiBuffe
     }
 }
 
-static void encodeAndTransmit(void)
+static void encodeAndTransmit()
 {
     /* calls the EXI encoder, adds the V2GTP header and sends the result to ethernet */
     //addToTrace("before: g_errn=%d", g_errn);
@@ -184,7 +184,7 @@ static void encodeAndTransmit(void)
     addV2GTPHeaderAndTransmit(global_streamEnc.data, global_streamEncPos);
 }
 
-static void routeDecoderInputData(void)
+static void routeDecoderInputData()
 {
     /* connect the data from the TCP to the exiDecoder */
     /* The TCP receive data consists of two parts: 1. The V2GTP header and 2. the EXI stream.
@@ -291,7 +291,7 @@ static void pev_SendContractAuthenticationReq()
     encodeAndTransmit();
 }
 
-static void pev_sendChargeParameterDiscoveryReq(void)
+static void pev_sendChargeParameterDiscoveryReq()
 {
     struct dinDC_EVChargeParameterType* cp;
     projectExiConnector_prepare_DinExiDocument();
@@ -340,7 +340,7 @@ static void pev_sendChargeParameterDiscoveryReq(void)
     encodeAndTransmit();
 }
 
-static void pev_sendCableCheckReq(void)
+static void pev_sendCableCheckReq()
 {
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.CableCheckReq_isUsed = 1u;
@@ -418,7 +418,7 @@ static void pev_sendPowerDeliveryReq(bool isOn)
     encodeAndTransmit();
 }
 
-static void pev_sendCurrentDemandReq(void)
+static void pev_sendCurrentDemandReq()
 {
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.CurrentDemandReq_isUsed = 1u;
@@ -492,7 +492,7 @@ static void pev_sendCurrentDemandReq(void)
     encodeAndTransmit();
 }
 
-static void pev_sendWeldingDetectionReq(void)
+static void pev_sendWeldingDetectionReq()
 {
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.WeldingDetectionReq_isUsed = 1u;
@@ -939,7 +939,7 @@ static void stateFunctionWaitForCurrentDemandResponse()
         {
             /* continue charging loop */
             int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentVoltage);
-            uint16_t evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
+            int evsePresentCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEPresentCurrent);
 
             if (dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed) {
                 int evseMaxCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit);
@@ -1152,7 +1152,7 @@ static uint8_t pev_isTooLong(void)
 }
 
 /******* The statemachine dispatcher *******************/
-static void pev_runFsm(void)
+static void pev_runFsm()
 {
     if (connMgr_getLevel() < CONNLEVEL_80_TCP_CONNECTED && pev_state == PEV_STATE_Start)
     {
@@ -1220,7 +1220,7 @@ void pevStateMachine_reset()
 
 /* The cyclic main function of the PEV charging state machine.
    Called each 30ms. */
-void pevStateMachine_Mainfunction(void)
+void pevStateMachine_Mainfunction()
 {
     // run the state machine:
     pev_cyclesInState += 1; // for timeout handling, count how long we are in a state
