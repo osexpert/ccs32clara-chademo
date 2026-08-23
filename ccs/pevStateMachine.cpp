@@ -67,7 +67,7 @@ const char* pevSttString = STRINGIFY(STATE_LIST);
 const char* const pevSttLabels[] = { STATE_LIST };
 #undef STATE_ENTRY
 
-#define MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS 10 /* The process time is specified with 1.5s. Ten loops should be fine. */
+//#define MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS 10 /* The process time is specified with 1.5s. Ten loops should be fine. */
 #define MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION 40 /* 40V is considered to be sufficiently low to not harm. The Ioniq already finishes at 65V. */
 
 #define LEN_OF_EVCCID 6 /* The EVCCID is the MAC according to spec. Ioniq uses exactly these 6 byte. */
@@ -99,7 +99,8 @@ static int LastTargetVoltage;
 static int LastTargetCurrent;
 static bool PrechargeDifferenceIsSmall;
 static uint16_t numberOfWeldingDetectionRounds;
-static uint8_t numberOfWeldingDetectionRoundsAfterCarContactorsClosed;
+static uint8_t numberOfWeldingDetectionRoundsAfterCarContactorsOpened;
+static uint16_t cyclesAfterCarContactorsOpened;
 
 static bool PresentVoltageDifferentFromTarget;
 static bool PresentVoltageDifferentFromTarget_isSet;
@@ -1000,7 +1001,8 @@ static void stateFunctionWaitForCurrentDownAfterStateB()
     will be anyway in a loop. So the first round will see a high voltage (because the contactor mechanically needed
     some time to open, but this is no problem, the next samples will see decreasing voltage in normal case. */
     numberOfWeldingDetectionRounds = 1;
-    numberOfWeldingDetectionRoundsAfterCarContactorsClosed = 0;
+    numberOfWeldingDetectionRoundsAfterCarContactorsOpened = 0;
+    cyclesAfterCarContactorsOpened = 0;
     pev_sendWeldingDetectionReq();
     pev_enterState(PEV_STATE_WaitForWeldingDetectionResponse);
 }
@@ -1015,10 +1017,10 @@ static void stateFunctionWaitForWeldingDetectionResponse()
            need to repeat the requests, until the voltage is at a non-dangerous level. */
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
         _ccs_params.EvseVoltage = evsePresentVoltage;
-        addToTrace(MOD_PEV, "WeldingDetection %dV rounds #%d accc #%d", evsePresentVoltage, numberOfWeldingDetectionRounds, numberOfWeldingDetectionRoundsAfterCarContactorsClosed);
+        addToTrace(MOD_PEV, "WeldingDetection %dV rounds #%d acco:#%d/%dcyc", evsePresentVoltage, numberOfWeldingDetectionRounds, numberOfWeldingDetectionRoundsAfterCarContactorsOpened, cyclesAfterCarContactorsOpened);
         bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
         if (voltageIsLow
-            || numberOfWeldingDetectionRoundsAfterCarContactorsClosed > MAX_NUMBER_OF_WELDING_DETECTION_ROUNDS
+            || cyclesAfterCarContactorsOpened > SEC_TO_CCS_CYCLES(1) // 1 sec should be plenty
             || pev_cyclesInState > SEC_TO_CCS_CYCLES(20) // chademo WD timeout is 10sec + slack
             )
         {
@@ -1055,7 +1057,8 @@ static void stateFunctionWaitForWeldingDetectionResponse()
                 Count the number of welding detection rounds. To be clarified, whether
                 a certain time or number of rounds make sense to cover all use cases with
                 different chargers etc */
-                numberOfWeldingDetectionRoundsAfterCarContactorsClosed++;
+                numberOfWeldingDetectionRoundsAfterCarContactorsOpened++;
+                cyclesAfterCarContactorsOpened += pev_cyclesInLoop;
             }
 
             //addToTrace(MOD_PEV, "WeldingDetection: voltage still too high. Sending again WeldingDetectionReq:%d", numberOfWeldingDetectionRounds);
