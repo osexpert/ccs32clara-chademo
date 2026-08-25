@@ -19,7 +19,7 @@
     {
       "name": "AV1",
       "description": "For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery.",
-      "values": { "alt-estimated-voltage": 1 }
+      "values": { "voltage-estimation-mode": 1 }
     },
     {
       "name": "JDEMO",

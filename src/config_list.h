@@ -26,7 +26,7 @@ CONFIG_ITEM(CONFIG_V2X, "v2x", bool, false);
 
 CONFIG_ITEM(CONFIG_ALWAYS_ON, "always-on", bool, false);
 
-CONFIG_ITEM(CONFIG_ALT_ESTIMATED_VOLTAGE, "alt-estimated-voltage", uint8_t, 0);
+CONFIG_ITEM(CONFIG_ALT_ESTIMATED_VOLTAGE, "voltage-estimation-mode", uint8_t, 0);
 
 // Based on logs, worst case is 1600ms before asking for amps, but use 2000 for now.
 CONFIG_ITEM(CHADEMO_09_AssumeCarContactorsClosed_MS, "assume-car-contactors-closed-after-ms", uint16_t, 2000);
