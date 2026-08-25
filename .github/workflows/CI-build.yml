@@ -106,12 +106,13 @@ jobs:
         run: |
           cat << 'EOF' >> $GITHUB_STEP_SUMMARY
           ### Build tags
+          - **<NONE>**: Standard version — no build tag. Emulate chademo 1.0 with welding detection. Start chademo briefly to detect voltage and soc, then start ccs. When ccs cable check is done, restart chademo to join.
           - **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery.
           - **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
           - **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual.
           - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
           - **JDEMO**: Jdemo quirk: disable dynamic current.
-          - **C09**: Emulate chademo 0.9 without welding detection (default: chademo 1.0 with welding detection). Probably better for sensitive cars like Mitsubishi Outlander PHEV that produce DTC's (P101B, P101C) after charging is done.
+          - **C09**: Emulate chademo 0.9 without welding detection. Probably better for sensitive cars like Mitsubishi Outlander PHEV that produce DTC's (P101B, P101C) after charging is done.
 
           ### Config editor
           - If you need something special, eg. reduce max amps, you can use this [Config editor](https://osexpert.github.io/ccs32clara-chademo/config.html) to customize the downloaded firmware.

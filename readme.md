@@ -244,10 +244,7 @@ Every commit is built automatically and can be downloaded here, as artifact of a
 Releases are made less often and the difference is, a release has been tested in minimum one charging session on a Leaf 40kwh.
 
 ### Build tags
-- **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
-- **AV1**: For target voltage 410v, use nominal voltage 380v instead of 355v. AV1 should be a better match for Leaf/e-NV200 with 20-30kwh battery.
-- **V2X**: V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).
-- **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual.
+The releases and the actions has updated info.
 
 ## Building
 If you want to compile the software from scratch, you can follow these instructions
