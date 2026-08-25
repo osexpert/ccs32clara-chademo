@@ -31,6 +31,11 @@
       "extends": "JDEMO",
       "description": "Jdemo quirk: limit to 125A.",
       "values": { "max-amps": 125 }
+    },
+    {
+      "name": "C09",
+      "description": "Emulate chademo 0.9 without welding detection (default: chademo 1.0 with welding detection). Probably better for sensitive cars like Mitsubishi Outlander PHEV that produce DTC's (P101B, P101C) after charging is done.",
+      "values": { "chademo-0.9": true, "chademo-wd": false }
     }
   ]
 }

@@ -94,6 +94,13 @@ jobs:
         with:
           name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-JDEMO
           path: jdemo/My407ccs2chademo.bin
+          
+      - name: Patch C09 variant
+        run: node config.js My407ccs2chademo.bin configs.json C09 c09/My407ccs2chademo.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ccs32clara-chademo-${{ steps.set_date.outputs.date }}-${{ github.run_number }}-C09
+          path: c09/My407ccs2chademo.bin
 
       - name: Add info to summary
         run: |
@@ -104,6 +111,7 @@ jobs:
           - **AO**: Always on. After inactivity or charging ended, do a soft restart instead of shutting down. When battery drops below 3.3V, it will power off instead. Errors and stop buttons will power off, as usual.
           - **SX**: Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.
           - **JDEMO**: Jdemo quirk: disable dynamic current.
+          - **C09**: Emulate chademo 0.9 without welding detection (default: chademo 1.0 with welding detection). Probably better for sensitive cars like Mitsubishi Outlander PHEV that produce DTC's (P101B, P101C) after charging is done.
 
           ### Config editor
           - If you need something special, eg. reduce max amps, you can use this [Config editor](https://osexpert.github.io/ccs32clara-chademo/config.html) to customize the downloaded firmware.
