@@ -1016,13 +1016,19 @@ static void stateFunctionWaitForWeldingDetectionResponse()
            round will show a quite high voltage, because the contactors are just opening. We
            need to repeat the requests, until the voltage is at a non-dangerous level. */
         int evsePresentVoltage = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.WeldingDetectionRes.EVSEPresentVoltage);
-        _ccs_params.EvseVoltage = evsePresentVoltage;
-        addToTrace(MOD_PEV, "WeldingDetection %dV rounds #%d acco:#%d/%dcyc", evsePresentVoltage, numberOfWeldingDetectionRounds, numberOfWeldingDetectionRoundsAfterCarContactorsOpened, cyclesAfterCarContactorsOpened);
+
         bool voltageIsLow = evsePresentVoltage < MAX_VOLTAGE_TO_FINISH_WELDING_DETECTION;
-        if (voltageIsLow
+        bool weldingDetectionDone = voltageIsLow
             || cyclesAfterCarContactorsOpened > SEC_TO_CCS_CYCLES(1) // 1 sec should be plenty
             || pev_cyclesInState > SEC_TO_CCS_CYCLES(20) // chademo WD timeout is 10sec + slack
-            )
+            ;
+
+        if (weldingDetectionDone || evsePresentVoltage != _ccs_params.EvseVoltage)
+            addToTrace(MOD_PEV, "WeldingDetection %dV rounds #%d acco:#%d/%dcyc", evsePresentVoltage, numberOfWeldingDetectionRounds, numberOfWeldingDetectionRoundsAfterCarContactorsOpened, cyclesAfterCarContactorsOpened);
+
+        _ccs_params.EvseVoltage = evsePresentVoltage;
+
+        if (weldingDetectionDone)
         {
             if (not voltageIsLow)
             {
