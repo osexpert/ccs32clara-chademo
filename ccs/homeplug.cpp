@@ -64,13 +64,14 @@ static uint8_t NMK[16];
 static uint8_t pevSequenceState;
 static uint16_t pevSequenceCyclesInState;
 static uint16_t pevTotalCycles;
+static uint16_t cyclesSinceStartAttenCharInd;
+static bool countCyclesSinceStartAttenCharInd;
 static uint16_t pevSequenceDelayCycles;
 static uint8_t nRemainingStartAttenChar;
 static uint8_t remainingNumberOfSounds;
-static uint8_t AttenCharIndNumberOfSounds;
+static uint8_t LowestAvgAtten;
 static uint8_t SdpRepetitionCounter;
 static uint8_t sdp_state;
-//static uint8_t nEvseModemMissingCounter;
 
 /********** local prototypes *****************************************/
 static void composeAttenCharRsp(void);
@@ -266,21 +267,45 @@ static void evaluateAttenCharInd(void)
         //addToTrace("[PEVSLAC] received AttenCharInd in state %d", pevSequenceState);
         if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // we were waiting for the AttenCharInd
         {
-            //todo: Handle the case when we receive multiple responses from different chargers.
-            //      Wait a certain time, and compare the attenuation profiles. Decide for the nearest charger.
-            //Take the MAC of the charger from the frame, and store it for later use.
-            for (i = 0; i < 6; i++)
-            {
-                evseMac[i] = myethreceivebuffer[6 + i]; // source MAC starts at offset 6
+            // check runId (8 bytes). Ignore the 2 last bytes (set to 0).
+            if (memcmp(&myethreceivebuffer[27], myMAC, 6) != 0) {
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] runId mismatch. Not our session (crosstalk?), ignore.");
+                return; // Not our session, ignore crosstalk
             }
-            AttenCharIndNumberOfSounds = myethreceivebuffer[69];
-            //addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): %d", AttenCharIndNumberOfSounds);
-            composeAttenCharRsp();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
-            setCheckpoint(140);
-            myEthTransmit();
 
-            slac_enterState(STATE_ATTEN_CHAR_IND_RECEIVED); // enter next state. Will be handled in the cyclic runSlacSequencer
+            // Handle the case when we receive multiple responses from different chargers.
+            //Wait a certain time, and compare the attenuation profiles. Decide for the nearest charger.
+
+            uint8_t thisEvseMac[6];
+            memcpy(thisEvseMac, &myethreceivebuffer[6], 6); // source MAC starts at offset 6
+
+            uint8_t numberOfSounds = myethreceivebuffer[69];
+
+            uint16_t sumAtten = 0;
+            uint8_t validGroups = 0;
+            uint8_t numGroups = myethreceivebuffer[70];
+
+            for (i = 0; i < numGroups; i++)
+            {
+                uint8_t val = myethreceivebuffer[71 + i];
+                if (val != 0xFF)  // 0xFF = gruppe ikke målt, ekskluder
+                {
+                    sumAtten += val;
+                    validGroups++;
+                }
+            }
+
+            uint8_t avgAtten = (validGroups > 0) ? (sumAtten / validGroups) : 0xFE; // 1 less than 0xFF (something is better than nothing:-)
+            bool chargerIsClosest = avgAtten < LowestAvgAtten;
+            if (chargerIsClosest)
+            {
+                LowestAvgAtten = avgAtten;
+                memcpy(evseMac, thisEvseMac, 6);
+            }
+
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] charger MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d avgAtten:%d closest:%d",
+                thisEvseMac[0], thisEvseMac[1], thisEvseMac[2], thisEvseMac[3], thisEvseMac[4], thisEvseMac[5],
+                numberOfSounds, avgAtten, chargerIsClosest);
         }
     }
 }
@@ -567,6 +592,8 @@ void runSlacSequencer(void)
 
     pevSequenceCyclesInState++;
     pevTotalCycles++;
+    if (countCyclesSinceStartAttenCharInd)
+        cyclesSinceStartAttenCharInd++;
 
     // 15s timeout for SLAC in total.
     if (pevSequenceCyclesInState > 500)
@@ -606,7 +633,10 @@ void runSlacSequencer(void)
         //  Alpitronic and ABB chargers are more tolerant, they worked with a delay of approx
         //  250ms. In contrast, Supercharger and Compleo do not respond anymore if we
         //  wait so long.
+        LowestAvgAtten = 0xFF; // reset to max
         nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
+        countCyclesSinceStartAttenCharInd = false;
+        cyclesSinceStartAttenCharInd = 0;
         slac_enterState(STATE_BEFORE_START_ATTEN_CHAR);
     }
     else if (pevSequenceState == STATE_BEFORE_START_ATTEN_CHAR)   // received SLAC_PARAM.CNF. Multiple transmissions of START_ATTEN_CHAR.
@@ -623,6 +653,7 @@ void runSlacSequencer(void)
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting START_ATTEN_CHAR.IND...");
             myEthTransmit();
             pevSequenceDelayCycles = 0; // original from ioniq is 20ms between the START_ATTEN_CHAR. Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
+            countCyclesSinceStartAttenCharInd = true;
         }
         else
         {
@@ -656,15 +687,23 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // waiting for ATTEN_CHAR.IND
     {
-        // TODO: it is possible that we receive this message from multiple chargers. We need
-        // to select the charger with the loudest reported signals.
-
         // TT_EV_atten_results: Time EV should wait for ATTEN_CHAR.IND, from first START_ATTEN_CHAR.IND is sent: 1200ms
-        // Since TT_EV_atten_results include 2 more START_ATTEN_CHAR.IND and 10 x NMBC_SOUND.IND, waiting additional 1s should be plenty.
-        if (pevSequenceCyclesInState > 33) // 1s
+        if (cyclesSinceStartAttenCharInd > 40) // 1.2 sec
         {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for ATTEN_CHAR.IND");
-            slac_enterState(STATE_INITIAL);
+            if (LowestAvgAtten < 0xFF)
+            {
+                composeAttenCharRsp();
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
+                setCheckpoint(140);
+                myEthTransmit();
+
+                slac_enterState(STATE_ATTEN_CHAR_IND_RECEIVED); // enter next state. Will be handled in the cyclic runSlacSequencer
+            }
+            else
+            {
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for ATTEN_CHAR.IND");
+                slac_enterState(STATE_INITIAL);
+            }
         }
         // (the normal state transition is done in the reception handler)
     }
