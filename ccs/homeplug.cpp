@@ -286,7 +286,7 @@ static void evaluateAttenCharInd(void)
 
             uint16_t sumAtten = 0;
             uint8_t validGroups = 0;
-            uint8_t numGroups = myethreceivebuffer[70]; // spec says 6 something?
+            uint8_t numGroups = myethreceivebuffer[70];
 
             for (i = 0; i < numGroups; i++)
             {
