@@ -37,17 +37,16 @@
 #define MMTYPE_IND  0x0002
 #define MMTYPE_RSP  0x0003
 
-#define STATE_INITIAL  0
-#define STATE_SEND_SLAC_PARAM_REQ        1
+#define STATE_INITIAL                      0
+#define STATE_SEND_SLAC_PARAM_REQ          1
 #define STATE_WAITING_FOR_SLAC_PARAM_CNF   2
 #define STATE_SLAC_PARAM_CNF_RECEIVED      3
 #define STATE_BEFORE_START_ATTEN_CHAR      4
 #define STATE_SOUNDING                     5
 #define STATE_WAIT_FOR_ATTEN_CHAR_IND      6
-//#define STATE_ATTEN_CHAR_IND_RECEIVED      7
-#define STATE_SEND_SLAC_MATCH           7
+#define STATE_SEND_SLAC_MATCH              7
 #define STATE_WAITING_FOR_SLAC_MATCH_CNF   8
-#define STATE_WAITING_FOR_SET_KEY_CNF   9
+#define STATE_WAITING_FOR_SET_KEY_CNF      9
 
 #define iAmPev 1 /* This project is intended only for PEV mode at the moment. */
 #define iAmEvse 0
@@ -64,8 +63,6 @@ static uint8_t NMK[16];
 static uint8_t pevSequenceState;
 static uint16_t pevSequenceCyclesInState;
 static uint16_t pevTotalCycles;
-static uint16_t cyclesSinceFirstAttenCharInd;
-static bool countCyclesSinceFirstAttenCharInd;
 static uint16_t cyclesSinceStartAttenCharInd;
 static bool countCyclesSinceStartAttenCharInd;
 static uint16_t pevSequenceDelayCycles;
@@ -302,23 +299,21 @@ static void evaluateAttenCharInd(void)
             }
 
             uint8_t avgAtten = (validGroups > 0) ? (sumAtten / validGroups) : 0xFE; // 1 less than 0xFF (something is better than nothing:-)
-            bool chargerIsClosest = avgAtten < LowestAvgAtten;
-            if (chargerIsClosest)
+            bool avgAttenIsLowest = avgAtten < LowestAvgAtten;
+            if (avgAttenIsLowest)
             {
                 LowestAvgAtten = avgAtten;
                 memcpy(evseMac, thisEvseMac, 6);
             }
 
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] charger MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d groups:%d avgAtten:%d closest:%d",
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] charger MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d groups:%d avgAtten:%d lowest:%d",
                 thisEvseMac[0], thisEvseMac[1], thisEvseMac[2], thisEvseMac[3], thisEvseMac[4], thisEvseMac[5],
-                numberOfSounds, numGroups, avgAtten, chargerIsClosest);
+                numberOfSounds, numGroups, avgAtten, avgAttenIsLowest);
 
             composeAttenCharRsp(thisEvseMac);
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
             setCheckpoint(140);
             myEthTransmit();
-
-            countCyclesSinceFirstAttenCharInd = true;
         }
     }
 }
@@ -607,8 +602,6 @@ void runSlacSequencer(void)
     pevTotalCycles++;
     if (countCyclesSinceStartAttenCharInd)
         cyclesSinceStartAttenCharInd++;
-    if (countCyclesSinceFirstAttenCharInd)
-        cyclesSinceFirstAttenCharInd++;
 
     // 15s timeout for SLAC in total.
     if (pevSequenceCyclesInState > 500)
@@ -651,8 +644,6 @@ void runSlacSequencer(void)
         LowestAvgAtten = 0xFF; // reset to max
         countCyclesSinceStartAttenCharInd = false;
         cyclesSinceStartAttenCharInd = 0;
-        countCyclesSinceFirstAttenCharInd = false;
-        cyclesSinceFirstAttenCharInd = 0;
 
         nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
         slac_enterState(STATE_BEFORE_START_ATTEN_CHAR);
@@ -705,13 +696,12 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // waiting for ATTEN_CHAR.IND
     {
-        // TT_EV_atten_results: Time EV should wait for ATTEN_CHAR.IND, from first START_ATTEN_CHAR.IND is sent: 1200ms
-        bool haveCandidate = (LowestAvgAtten < 0xFF);
-        //bool settleWindowElapsed = cyclesSinceFirstAttenCharInd > 2; // 90ms
-        bool hardDeadlineReached = cyclesSinceStartAttenCharInd > 40; // 1.2sec. maybe reduce to 1sec?
-        if (hardDeadlineReached)
+        // TT_EV_atten_results: Time EV should wait for all ATTEN_CHAR.IND, from first START_ATTEN_CHAR.IND is sent: 1200ms
+        // ioniq uses 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ, and time from START_ATTEN_CHAR.IND to ATTEN_CHAR.RSP is example 640ms,
+        // so seems ionic uses a little more than 1.2sec (1.6-1.7s), but it may be due to slowness and state transition delays.
+        if (cyclesSinceStartAttenCharInd > 40) // 1.2sec.
         {
-            if (haveCandidate)
+            if (LowestAvgAtten < 0xFF)
             {
                 slac_enterState(STATE_SEND_SLAC_MATCH);
             }
@@ -721,10 +711,6 @@ void runSlacSequencer(void)
                 slac_enterState(STATE_INITIAL);
             }
         }
-        // (the normal state transition is done in the reception handler)
-        // ATTEN_CHAR.IND was received and the nearest charger decided and the ATTEN_CHAR.RSP was sent.
-        // original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
-           // Waiting time before SLAC_MATCH.REQ
     }
     else if (pevSequenceState == STATE_SEND_SLAC_MATCH)
     {
@@ -736,7 +722,7 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_MATCH_CNF)
     {
-        if (pevSequenceCyclesInState > 66) // 2s
+        if (pevSequenceCyclesInState > 33) // TT_match_response: 200ms, but just use 1 second.
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SLAC_MATCH.CNF");
             slac_enterState(STATE_INITIAL);
@@ -745,12 +731,12 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SET_KEY_CNF)
     {
-        if (pevSequenceCyclesInState > 33) // 1s
+        if (pevSequenceCyclesInState > 33) // 1s (spec does not say how long to wait for SET_KEY_CNF)
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SET_KEY.CNF");
             slac_enterState(STATE_INITIAL);
         }
-        // evaluateSefKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP....or stay until ConnMgr timeout:-)
+        // evaluateSetKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP....or stay until ConnMgr timeout:-)
     }
     else
     {
