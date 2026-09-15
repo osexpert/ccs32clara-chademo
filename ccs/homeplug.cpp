@@ -654,7 +654,7 @@ void runSlacSequencer(void)
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_MATCH_CNF)
     {
-        if (pevSequenceCyclesInState > 66) // 2s
+        if (pevSequenceCyclesInState > 33) // 1s
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SLAC_MATCH.CNF");
             slac_enterState(STATE_INITIAL);
