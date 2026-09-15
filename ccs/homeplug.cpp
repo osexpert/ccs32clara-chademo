@@ -179,7 +179,9 @@ static void evaluateSlacParamCnf(void)
     {
         if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF)   //  we were waiting for the SlacParamCnf
         {
-            pevSequenceDelayCycles = 4; // original Ioniq is waiting 200ms
+            pevSequenceDelayCycles = 4; // original Ioniq is waiting 200ms.
+            // [V2G3-A09-07] wait TT_match_response:200ms until all chargers answer with SLAC_PARAM_CNF.
+            // In theory, neighbour chargers could listen and send as well (crosstalk). In reality, I only seen one answer (from the charger we are connected to).
             slac_enterState(STATE_SLAC_PARAM_CNF_RECEIVED); // enter next state. Will be handled in the cyclic runSlacSequencer
         }
     }
