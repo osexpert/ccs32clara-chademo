@@ -67,13 +67,11 @@ static uint16_t pevTotalCycles;
 static uint16_t pevSequenceDelayCycles;
 static uint8_t nRemainingStartAttenChar;
 static uint8_t remainingNumberOfSounds;
-static uint8_t AttenCharIndNumberOfSounds;
 static uint8_t SdpRepetitionCounter;
 static uint8_t sdp_state;
-//static uint8_t nEvseModemMissingCounter;
 
 /********** local prototypes *****************************************/
-static void composeAttenCharRsp(void);
+static void composeAttenCharRsp(const uint8_t* destMac);
 static void slac_enterState(int n);
 static void composeSetKey(void);
 
@@ -248,16 +246,42 @@ static void evaluateAttenCharInd(void)
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received ATTEN_CHAR.IND");
     if (iAmPev == 1)
     {
-        //addToTrace("[PEVSLAC] received AttenCharInd in state %d", pevSequenceState);
         if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // we were waiting for the AttenCharInd
         {
-            //todo: Handle the case when we receive multiple responses from different chargers.
-            //      Wait a certain time, and compare the attenuation profiles. Decide for the nearest charger.
-            //Take the MAC of the charger from the frame, and store it for later use.
-            memcpy(evseMac, &myethreceivebuffer[6], 6); // source MAC starts at offset 6
-            AttenCharIndNumberOfSounds = myethreceivebuffer[69];
-            //addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): %d", AttenCharIndNumberOfSounds);
-            composeAttenCharRsp();
+            // TODO: Handle the case when we receive multiple responses from different chargers.
+            // Wait a certain time, and compare the attenuation profiles. Decide for the nearest charger.
+
+            uint8_t numberOfSounds = myethreceivebuffer[69];
+            if (numberOfSounds == 0) {
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] numberOfSounds is 0. Ignore."); // [V2G3-A09-36]
+                return;
+            }
+
+            uint8_t numGroups = myethreceivebuffer[70];
+
+            uint16_t sumAtten = 0;
+            uint8_t validGroups = 0;
+            for (uint8_t i = 0; i < numGroups; i++)
+            {
+                uint8_t val = myethreceivebuffer[71 + i];
+                if (val != 0xFF)  // 0xFF = group not measured, exclude
+                {
+                    sumAtten += val;
+                    validGroups++;
+                }
+            }
+
+            uint8_t avgAtten = (validGroups > 0) ? (sumAtten / validGroups) : 0xFF;
+
+            uint8_t* sourceMac = &myethreceivebuffer[6]; // source MAC starts at offset 6
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d groups:%d avgAtten:%d",
+                sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
+                numberOfSounds, numGroups, avgAtten);
+
+            // Take the MAC of the charger from the frame, and store it for later use. We do not wait for multiple ATTEN_CHAR.IND, so only take the first we got.
+            memcpy(evseMac, sourceMac, 6);
+
+            composeAttenCharRsp(sourceMac);
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting ATTEN_CHAR.RSP...");
             setCheckpoint(140);
             myEthTransmit();
@@ -267,13 +291,13 @@ static void evaluateAttenCharInd(void)
     }
 }
 
-static void composeAttenCharRsp(void)
+static void composeAttenCharRsp(const uint8_t* destMac)
 {
     /* reference: see wireshark interpreted frame from Ioniq */
     myethtransmitbufferLen = 70;
     cleanTransmitBuffer();
     // Destination MAC
-    fillDestinationMac(evseMac, 0);
+    fillDestinationMac(destMac, 0);
     // Source MAC
     fillSourceMac(myMAC, 6);
     // Protocol
@@ -638,6 +662,14 @@ void runSlacSequencer(void)
     {
         slac_enterState(STATE_DELAY_BEFORE_MATCH);
         pevSequenceDelayCycles = 30; // original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
+
+        // [V2G3-A09-31]
+        // Ionic probably wait for more ATTEN_CHAR.IND (up to 1.2 seconds, TT_EV_atten_results).
+        // All chargers that sent SLAC_PARAM.CNF will normally report their ATTEN_CHAR.IND as well, but also allowed for a previosly "silent" charger
+        // to report its ATTEN_CHAR.IND. The one with the lowest avgAtten should win. If a tie, there may be a complicated selection process that may include BCB-toggle.
+        // The car may wait the full 1.2sec if it want, to be sure it collect ATTEN_CHAR.IND from all chargers.
+        // But we just pick the first ATTEN_CHAR.IND so the artificial waiting here is probably pontless.
+        // In theory, neighbour chargers could listen and send as well (crosstalk). In reality, I only seen one answer (from the charger we are connected to).
     }
     else if (pevSequenceState == STATE_DELAY_BEFORE_MATCH)   // Waiting time before SLAC_MATCH.REQ
     {
