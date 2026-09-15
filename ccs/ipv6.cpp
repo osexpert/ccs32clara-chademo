@@ -259,7 +259,7 @@ void evaluateNeighborSolicitation(void) {
               We can do this always, because this does not hurt for case A, address
               is (hopefully) not changing. */
    /* More general approach: In the network there may be more participants than only the charger,
-      e.g. a notebook for sniffing. Eeach of it may send a NeighborSolicitation, and we should NOT use the addresses from the
+      e.g. a notebook for sniffing. Each of it may send a NeighborSolicitation, and we should NOT use the addresses from the
       NeighborSolicitation as addresses of the charger. The chargers address is only determined
       by the SDP. */
 

@@ -37,16 +37,16 @@
 #define MMTYPE_IND  0x0002
 #define MMTYPE_RSP  0x0003
 
-#define STATE_INITIAL  0
-#define STATE_SEND_SLAC_PARAM_REQ        1
+#define STATE_INITIAL                      0
+#define STATE_SEND_SLAC_PARAM_REQ          1
 #define STATE_WAITING_FOR_SLAC_PARAM_CNF   2
 #define STATE_SLAC_PARAM_CNF_RECEIVED      3
-#define STATE_START_ATTEN_CHAR      4
+#define STATE_START_ATTEN_CHAR             4
 #define STATE_SOUNDING                     5
 #define STATE_WAIT_FOR_ATTEN_CHAR_IND      6
 #define STATE_SEND_SLAC_MATCH_REQ          7
 #define STATE_WAITING_FOR_SLAC_MATCH_CNF   8
-#define STATE_WAITING_FOR_SET_KEY_CNF   9
+#define STATE_WAITING_FOR_SET_KEY_CNF      9
 
 #define iAmPev 1 /* This project is intended only for PEV mode at the moment. */
 #define iAmEvse 0
@@ -62,20 +62,22 @@ static uint8_t NMK[16];
 static uint8_t pevSequenceState;
 static uint16_t pevSequenceCyclesInState;
 static uint16_t cyclesSinceStartAttenChar;
+static bool countCyclesSinceStartAttenChar;
 static uint16_t pevTotalCycles;
-static uint16_t sdpSequenceDelayCycles;
+static uint8_t sdpDelayCycles;
+static uint8_t slacDelayCycles;
 static uint8_t nRemainingStartAttenChar;
 static uint8_t remainingNumberOfSounds;
 static uint8_t SdpRepetitionCounter;
 static uint8_t sdp_state;
-static uint16_t SlacParamCnfCount;
 static uint16_t AttenCharIndCount;
 static uint8_t LowestAvgAtten;
 
 /********** local prototypes *****************************************/
 static void composeAttenCharRsp(const uint8_t* destMac);
 static void slac_enterState(int n);
-static void composeSetKey(void);
+static void composeSetKey();
+static void runSlacStateMachine();
 
 /*********************************************************************************/
 /* Extracting the EtherType from a received message. */
@@ -182,7 +184,7 @@ static void evaluateSlacParamCnf(void)
             //pevSequenceDelayCycles = 4; // original Ioniq is waiting 200ms.
             // [V2G3-A09-07] wait TT_match_response:200ms until all chargers answer with SLAC_PARAM_CNF.
             // In theory, neighbour chargers could listen and send as well (crosstalk). In reality, I only seen one answer (from the charger we are connected to).
-            SlacParamCnfCount++;
+            slac_enterState(STATE_SLAC_PARAM_CNF_RECEIVED);
         }
     }
 }
@@ -549,7 +551,7 @@ void slac_enterState(int n)
     if (n == STATE_INITIAL) pevTotalCycles = 0;
 }
 
-void runSlacSequencer(void)
+void runSlacSequencer()
 {
     if (connMgr_getLevel() != CONNLEVEL_10_START_SLAC)
     {
@@ -559,11 +561,8 @@ void runSlacSequencer(void)
 
     pevSequenceCyclesInState++;
     pevTotalCycles++;
-
-    if (pevSequenceState >= STATE_START_ATTEN_CHAR)
+    if (countCyclesSinceStartAttenChar)
         cyclesSinceStartAttenChar++;
-    else 
-        cyclesSinceStartAttenChar = 0;
 
     if (pevTotalCycles > 500) // 15s timeout for SLAC in total.
     {
@@ -571,6 +570,18 @@ void runSlacSequencer(void)
         slac_enterState(STATE_INITIAL);
     }
 
+    if (slacDelayCycles > 0)
+    {
+        slacDelayCycles--;
+    }
+    else
+    {
+        runSlacStateMachine();
+    }
+}
+
+void runSlacStateMachine()
+{
     // state machine
     if (pevSequenceState == STATE_INITIAL)
     {
@@ -582,35 +593,24 @@ void runSlacSequencer(void)
         setCheckpoint(100);
         composeSlacParamReq();
         myEthTransmit();
-
-        SlacParamCnfCount = 0;
         slac_enterState(STATE_WAITING_FOR_SLAC_PARAM_CNF);
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF) // Waiting for slac_param confirmation.
     {
         if (pevSequenceCyclesInState > 7) // wait for 200ms
         {
-            if (SlacParamCnfCount > 0)
-            {
-                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Recieved %d SLAC_PARAM.CNF", SlacParamCnfCount);
-                slac_enterState(STATE_SLAC_PARAM_CNF_RECEIVED);
-            }
-            else
-            {
-                // No response for 200ms, this is an error.
-                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
-                slac_enterState(STATE_INITIAL);
-            }
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
+            slacDelayCycles = 33 - 7; // delay before retry, no need to flood
+            slac_enterState(STATE_INITIAL);
         }
+        // evaluateSlacParamCnf() calls slac_enterState(STATE_SLAC_PARAM_CNF_RECEIVED)
     }
-    else if (pevSequenceState == STATE_SLAC_PARAM_CNF_RECEIVED)   // slac_param confirmation was received.
+    else if (pevSequenceState == STATE_SLAC_PARAM_CNF_RECEIVED) // slac_param confirmation was received.
     {
-        //pevSequenceDelayCycles = 0;// 1; //  1*30=30ms as preparation for the next state.
-        //  Between the SLAC_PARAM.CNF and the first START_ATTEN_CHAR.IND the Ioniq waits 100ms.
-        //  The allowed time TP_match_sequence is 0 to 100ms.
-        //  Alpitronic and ABB chargers are more tolerant, they worked with a delay of approx
-        //  250ms. In contrast, Supercharger and Compleo do not respond anymore if we
-        //  wait so long.
+        countCyclesSinceStartAttenChar = false; // reset
+        cyclesSinceStartAttenChar = 0; // reset
+
+        slacDelayCycles = 3; // [V2G3-A09-25] wait TP_match_sequence:100ms from SLAC_PARAM.CNF to START_ATTEN_CHAR. delay 3 + one state change. 
         nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
         slac_enterState(STATE_START_ATTEN_CHAR);
     }
@@ -622,6 +622,7 @@ void runSlacSequencer(void)
             composeStartAttenCharInd();
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting START_ATTEN_CHAR.IND...");
             myEthTransmit();
+            countCyclesSinceStartAttenChar = true;
         }
         else
         {
@@ -649,26 +650,20 @@ void runSlacSequencer(void)
             // Shall be 20ms to 50ms. So we set to 0 and the normal 30ms call cycle is perfect.
         }
     }
-    else if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND)   // waiting for ATTEN_CHAR.IND
+    else if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND) // waiting for ATTEN_CHAR.IND
     {
-        // TODO: it is possible that we receive this message from multiple chargers. We need
-        // to select the charger with the loudest reported signals.
-
-        // TT_EV_atten_results: Time EV should wait for ATTEN_CHAR.IND, from first START_ATTEN_CHAR.IND is sent: 1200ms
-        // Since TT_EV_atten_results include 2 more START_ATTEN_CHAR.IND and 10 x NMBC_SOUND.IND, waiting additional 1s should be plenty.
         // [V2G3-A09-31]
-        // Ionic probably wait for more ATTEN_CHAR.IND (up to 1.2 seconds, TT_EV_atten_results).
+        // TT_EV_atten_results: Time EV should wait for all ATTEN_CHAR.IND, from first START_ATTEN_CHAR.IND is sent: 1200ms
         // All chargers that sent SLAC_PARAM.CNF will normally report their ATTEN_CHAR.IND as well, but also allowed for a previosly "silent" charger
         // to report its ATTEN_CHAR.IND. The one with the lowest avgAtten should win. If a tie, there may be a complicated selection process that may include BCB-toggle.
         // The car may wait the full 1.2sec if it want, to be sure it collect ATTEN_CHAR.IND from all chargers.
-        // But we just pick the first ATTEN_CHAR.IND so the artificial waiting here is probably pontless.
         // In theory, neighbour chargers could listen and send as well (crosstalk). In reality, I only seen one answer (from the charger we are connected to).
-        //if (pevSequenceCyclesInState > 7) // 200ms
+        // original from ioniq is 860ms to 980ms from ATTEN_CHAR.RSP to SLAC_MATCH.REQ
         if (cyclesSinceStartAttenChar > 40) // 1.2sec
         {
             if (AttenCharIndCount > 0)
             {
-                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Recieved %d ATTEN_CHAR.IND", AttenCharIndCount);
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Received %d ATTEN_CHAR.IND", AttenCharIndCount);
                 slac_enterState(STATE_SEND_SLAC_MATCH_REQ);
             }
             else
@@ -702,7 +697,7 @@ void runSlacSequencer(void)
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SET_KEY.CNF");
             slac_enterState(STATE_INITIAL);
         }
-        // evaluateSefKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP....or stay until ConnMgr timeout:-)
+        // evaluateSetKeyCnf() will call connMgr_SlacOk() and get us out of here and into SDP....or stay until ConnMgr timeout:-)
     }
     else
     {
@@ -767,7 +762,7 @@ void runSdpStateMachine(void)
         // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
         addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
         setCheckpoint(200);
-        sdpSequenceDelayCycles = 0;
+        sdpDelayCycles = 0;
         SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.
         sdp_state = 1;
     }
@@ -776,10 +771,10 @@ void runSdpStateMachine(void)
         /* The normal state transition in case of received SDP response is done in
            the IPv6 receive handler. This will inform the ConnectionManager, and we will stop here
            because of the increased ConnectionLevel. */
-        if (sdpSequenceDelayCycles > 0)
+        if (sdpDelayCycles > 0)
         {
             // just waiting until next action
-            sdpSequenceDelayCycles -= 1;
+            sdpDelayCycles -= 1;
         }
         else if (SdpRepetitionCounter > 0)
         {
@@ -787,7 +782,7 @@ void runSdpStateMachine(void)
             // Here we send the SdpRequest. Maybe too early, but we will retry if there is no response.
             ipv6_initiateSdpRequest();
             SdpRepetitionCounter -= 1;
-            sdpSequenceDelayCycles = 15; // e.g. half-a-second delay until re-try of the SDP
+            sdpDelayCycles = 15; // e.g. half-a-second delay until re-try of the SDP
         }
         else
         {
