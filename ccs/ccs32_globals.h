@@ -1,7 +1,7 @@
 #pragma once
 /* global include file, which includes all other include files */
 
-#include <string.h> /* memcpy */
+#include <string.h> /* memcpy, memset, memcmp */
 //#include <stdio.h>
 //#include <stdlib.h> /* abs */
 //#include "main.h"

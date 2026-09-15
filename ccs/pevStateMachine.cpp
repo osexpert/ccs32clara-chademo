@@ -235,7 +235,6 @@ static inline bool consume_app()
 /********* EXI creation functions ************************/
 static void pev_sendSessionSetupReq()
 {
-    uint8_t i;
     projectExiConnector_prepare_DinExiDocument();
     dinDocEnc.V2G_Message.Body.SessionSetupReq_isUsed = 1u;
     init_dinSessionSetupReqType(&dinDocEnc.V2G_Message.Body.SessionSetupReq);
@@ -255,10 +254,7 @@ static void pev_sendSessionSetupReq()
        reserves 8 bytes (dinSessionSetupReqType_EVCCID_BYTES_SIZE is 8). This does not match.
        The Ioniq (DIN) sets the bytesLen=6 and fills the 6 bytes with its own MAC. Let's assume this
        is the best way. */
-    for (i = 0; i < LEN_OF_EVCCID; i++)
-    {
-        dinDocEnc.V2G_Message.Body.SessionSetupReq.EVCCID.bytes[i] = getOurMac()[i];
-    }
+    memcpy(dinDocEnc.V2G_Message.Body.SessionSetupReq.EVCCID.bytes, getOurMac(), LEN_OF_EVCCID);
     dinDocEnc.V2G_Message.Body.SessionSetupReq.EVCCID.bytesLen = LEN_OF_EVCCID;
     encodeAndTransmit();
 }

@@ -27,14 +27,11 @@ uint16_t calculateUdpAndTcpChecksumForIPv6(uint8_t *UdpOrTcpframe, uint16_t UdpO
 		evenFrameLen++;
 		UdpOrTcpframe[evenFrameLen-1] = 0; /* Fill the padding byte with zero. */
 	}
-    for (i=0; i<PSEUDO_HEADER_LEN; i++) {
-		pseudoHeader[i]=0; 
-	}
+    memset(pseudoHeader, 0, PSEUDO_HEADER_LEN);
     /* fill the pseudo-ipv6-header */
-    for (i=0; i<16; i++) { /* copy 16 bytes IPv6 addresses */
-        pseudoHeader[i] = ipv6source[i]; /* IPv6 source address */
-        pseudoHeader[16+i] = ipv6dest[i]; /* IPv6 destination address */
-	}
+    /* copy 16 bytes IPv6 addresses */
+    memcpy(pseudoHeader, ipv6source, 16); /* IPv6 source address */
+    memcpy(&pseudoHeader[16], ipv6dest, 16); /* IPv6 destination address */
     pseudoHeader[32] = 0; // # high byte of the FOUR byte length is always 0
     pseudoHeader[33] = 0; // # 2nd byte of the FOUR byte length is always 0
     pseudoHeader[34] = UdpOrTcpframeLen >> 8; // # 3rd

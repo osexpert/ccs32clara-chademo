@@ -103,31 +103,19 @@ void fillDestinationMac(const uint8_t* mac, uint8_t offset)
 static void cleanTransmitBuffer(void)
 {
     /* fill the complete ethernet transmit buffer with 0x00 */
-    int i;
-    for (i = 0; i < MY_ETH_TRANSMIT_BUFFER_LEN; i++)
-    {
-        myethtransmitbuffer[i] = 0;
-    }
+    memset(myethtransmitbuffer, 0, MY_ETH_TRANSMIT_BUFFER_LEN);
 }
 
 static void setNmkAt(uint8_t index)
 {
     /* sets the Network Membership Key (NMK) at a certain position in the transmit buffer */
-    uint8_t i;
-    for (i = 0; i < 16; i++)
-    {
-        myethtransmitbuffer[index + i] = NMK[i]; // NMK
-    }
+    memcpy(&myethtransmitbuffer[index], NMK, 16); // NMK
 }
 
 static void setNidAt(uint8_t index)
 {
     /* copies the network ID (NID, 7 bytes) into the wished position in the transmit buffer */
-    uint8_t i;
-    for (i = 0; i < 7; i++)
-    {
-        myethtransmitbuffer[index + i] = NID[i];
-    }
+    memcpy(&myethtransmitbuffer[index], NID, 7);
 }
 
 static uint16_t getManagementMessageType(void)
@@ -229,7 +217,6 @@ static void composeStartAttenCharInd(void)
 static void composeNmbcSoundInd(void)
 {
     /* reference: see wireshark interpreted frame from Ioniq */
-    uint8_t i;
     myethtransmitbufferLen = 71;
     cleanTransmitBuffer();
     //Destination MAC
@@ -251,15 +238,11 @@ static void composeNmbcSoundInd(void)
     fillSourceMac(myMAC, 39); // 39 to 46: runid, filled with MAC of PEV and two bytes 00 00
     myethtransmitbuffer[47] = 0x00; // 47 to 54: reserved, all 00
     //55 to 70: random number. All 0xff in the ioniq message.
-    for (i = 55; i < 71; i++)   // i in range(55, 71):
-    {
-        myethtransmitbuffer[i] = 0xFF;
-    }
+    memset(&myethtransmitbuffer[55], 0xFF, 16);   // i in range(55, 71):
 }
 
 static void evaluateAttenCharInd(void)
 {
-    uint8_t i;
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received ATTEN_CHAR.IND");
     if (iAmPev == 1)
     {
@@ -269,10 +252,7 @@ static void evaluateAttenCharInd(void)
             //todo: Handle the case when we receive multiple responses from different chargers.
             //      Wait a certain time, and compare the attenuation profiles. Decide for the nearest charger.
             //Take the MAC of the charger from the frame, and store it for later use.
-            for (i = 0; i < 6; i++)
-            {
-                evseMac[i] = myethreceivebuffer[6 + i]; // source MAC starts at offset 6
-            }
+            memcpy(evseMac, &myethreceivebuffer[6], 6); // source MAC starts at offset 6
             AttenCharIndNumberOfSounds = myethreceivebuffer[69];
             //addToTrace("[PEVSLAC] number of sounds reported by the EVSE (should be 10): %d", AttenCharIndNumberOfSounds);
             composeAttenCharRsp();
@@ -348,12 +328,10 @@ static void evaluateSlacMatchCnf(void)
         return;
     }
 
-    uint8_t i;
-    uint8_t blIsDestinationMacForMe;
     // The SLAC_MATCH.CNF contains the NMK and the NID.
     // We extract this information, so that we can use it for the CM_SET_KEY afterwards.
     // References: https://github.com/qca/open-plc-utils/blob/master/slac/evse_cm_slac_match.c
-    // 2021-12-16_HPC_säule1_full_slac.pcapng
+    // 2021-12-16_HPC_sÃ¤ule1_full_slac.pcapng
     if (iAmEvse == 1)
     {
         // If we are EVSE, nothing to do. We have sent the match.CNF by our own.
@@ -361,26 +339,15 @@ static void evaluateSlacMatchCnf(void)
     }
     else
     {
-        blIsDestinationMacForMe = 1;
-        for (i = 0; i < 6; i++) {
-            /* compare all 6 bytes of the destination MAC with our own MAC */
-            if (myethreceivebuffer[i] != myMAC[i]) {
-                blIsDestinationMacForMe = 0; /* any mismatch -> it is not for me */
-            }
-        }
+        /* compare all 6 bytes of the destination MAC with our own MAC */
+        bool blIsDestinationMacForMe = (memcmp(myethreceivebuffer, myMAC, 6) == 0); /* any mismatch -> it is not for me */
         if (!blIsDestinationMacForMe) {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF but with foreign destination MAC. Ignoring.");
         }
         else {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF");
-            for (i = 0; i < 7; i++)   // NID has 7 bytes
-            {
-                NID[i] = myethreceivebuffer[85 + i];
-            }
-            for (i = 0; i < 16; i++)
-            {
-                NMK[i] = myethreceivebuffer[93 + i];
-            }
+            memcpy(NID, &myethreceivebuffer[85], 7);   // NID has 7 bytes
+            memcpy(NMK, &myethreceivebuffer[93], 16);
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SlacMatchCnf, got network membership key (NMK) and NID.");
 
             // use the extracted NMK and NID to set the key in the adaptor:
@@ -523,10 +490,7 @@ void evaluateGetSwCnf(void)
     uint8_t i, x;
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received GET_SW.CNF");
     numberOfSoftwareVersionResponses += 1;
-    for (i = 0; i < 6; i++)
-    {
-        sourceMac[i] = myethreceivebuffer[6 + i];
-    }
+    memcpy(sourceMac, &myethreceivebuffer[6], 6);
 
     verLen = myethreceivebuffer[22];
     if ((verLen > 0) && (verLen < 0x30))
@@ -837,8 +801,7 @@ void evaluateReceivedHomeplugPacket(void)
 
 void setOurMac(uint8_t* newMac)
 {
-    for (int i = 0; i < 6; i++)
-        myMAC[i] = newMac[i];
+    memcpy(myMAC, newMac, 6);
 }
 
 const uint8_t* getOurMac()

@@ -277,7 +277,6 @@ static void tcp_prepareTcpHeader(uint8_t tcpFlag)
 static void tcp_packRequestIntoIp(void)
 {
    // # embeds the TCP into the lower-layer-protocol: IP, Ethernet
-   uint8_t i;
    uint16_t plen;
    TcpIpRequestLen = TcpTransmitPacketLen + 8 + 16 + 16; // # IP6 header needs 40 bytes:
    //  #   4 bytes traffic class, flow
@@ -295,14 +294,8 @@ static void tcp_packRequestIntoIp(void)
    TcpIpRequest[7] = 0x0A; // hop limit
    // We are the PEV. So the EvccIp is our own link-local IP address.
    //EvccIp = addressManager_getLinkLocalIpv6Address("bytearray");
-   for (i=0; i<16; i++)
-   {
-      TcpIpRequest[8+i] = EvccIp[i]; // source IP address
-   }
-   for (i=0; i<16; i++)
-   {
-      TcpIpRequest[24+i] = SeccIp[i]; // destination IP address
-   }
+   memcpy(&TcpIpRequest[8], EvccIp, 16); // source IP address
+   memcpy(&TcpIpRequest[24], SeccIp, 16); // destination IP address
    //showAsHex(TcpIpRequest, TcpIpRequestLen, "TcpIpRequest");
    tcp_packRequestIntoEthernet();
 }

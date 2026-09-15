@@ -41,7 +41,6 @@ void evaluateNeighborSolicitation(void);
 void evaluateUdpPayload(void) {
    uint16_t v2gptPayloadType;
    uint32_t v2gptPayloadLen;
-   uint8_t i;
    if ((destinationport == 15118) || (sourceport == 15118)) { // port for the SECC
       if ((udpPayload[0]==0x01) && (udpPayload[1]==0xFE)) { //# protocol version 1 and inverted
          //# it is a V2GTP message
@@ -69,9 +68,7 @@ void evaluateUdpPayload(void) {
                addToTrace(MOD_SDP, "[SDP] Checkpoint203: Received SDP response");
                setCheckpoint(203);
                //# at byte 8 of the UDP payload starts the IPv6 address of the charger.
-               for (i=0; i<16; i++) {
-                  SeccIp[i] = udpPayload[8+i]; // 16 bytes IP address of the charger
-               }
+               memcpy(SeccIp, &udpPayload[8], 16); // 16 bytes IP address of the charger
                //# Extract the TCP port, on which the charger will listen:
                seccTcpPort = (((uint16_t)(udpPayload[8+16]))<<8) + udpPayload[8+16+1];
 
@@ -194,7 +191,6 @@ void ipv6_packRequestIntoUdp(void) {
 
 void ipv6_packRequestIntoIp(void) {
    // # embeds the (SDP) request into the lower-layer-protocol: IP, Ethernet
-   uint8_t i;
    uint16_t plen;
    IpRequestLen = UdpRequestLen + 8 + 16 + 16; // # IP6 header needs 40 bytes:
    //  #   4 bytes traffic class, flow
@@ -211,12 +207,8 @@ void ipv6_packRequestIntoIp(void) {
    IpRequest[6] = 0x11; // next level protocol, 0x11 = UDP in this case
    IpRequest[7] = 0x0A; // hop limit
    // We are the PEV. So the EvccIp is our own link-local IP address.
-   for (i=0; i<16; i++) {
-      IpRequest[8+i] = EvccIp[i]; // source IP address
-   }
-   for (i=0; i<16; i++) {
-      IpRequest[24+i] = broadcastIPv6[i]; // destination IP address
-   }
+   memcpy(&IpRequest[8], EvccIp, 16); // source IP address
+   memcpy(&IpRequest[24], broadcastIPv6, 16); // destination IP address
    ipv6_packRequestIntoEthernet();
 }
 
@@ -241,7 +233,6 @@ void ipv6_packRequestIntoEthernet(void) {
 
 void evaluateNeighborSolicitation(void) {
    uint16_t checksum;
-   uint8_t i;
    /* The neighbor discovery protocol is used by the charger to find out the
       relation between MAC and IP. */
 
@@ -296,12 +287,8 @@ void evaluateNeighborSolicitation(void) {
    myethtransmitbuffer[20] = NEXT_ICMPv6;
    myethtransmitbuffer[21] = 0xff;
    // We are the PEV. So the EvccIp is our own link-local IP address.
-   for (i=0; i<16; i++) {
-      myethtransmitbuffer[22+i] = EvccIp[i]; // source IP address
-   }
-   for (i=0; i<16; i++) {
-      myethtransmitbuffer[38+i] = NeighborsIp[i]; // destination IP address
-   }
+   memcpy(&myethtransmitbuffer[22], EvccIp, 16); // source IP address
+   memcpy(&myethtransmitbuffer[38], NeighborsIp, 16); // destination IP address
    /* here starts the ICMPv6 */
    myethtransmitbuffer[54] = 0x88; /* Neighbor Advertisement */
    myethtransmitbuffer[55] = 0;
