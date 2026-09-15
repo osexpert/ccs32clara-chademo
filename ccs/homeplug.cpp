@@ -350,7 +350,7 @@ static void evaluateSlacMatchCnf(void)
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF");
             memcpy(NID, &myethreceivebuffer[85], 7);   // NID has 7 bytes
             memcpy(NMK, &myethreceivebuffer[93], 16);
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SlacMatchCnf, got network membership key (NMK) and NID.");
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SLAC_MATCH.CNF, got network membership key (NMK) and NID.");
 
             // use the extracted NMK and NID to set the key in the adaptor:
             composeSetKey();
@@ -433,11 +433,11 @@ static void evaluateSetKeyCnf(void)
     if (result == 0)
     {
         //this would be a bad sign for local modem, but normal for remote
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says 0: Device refused request.");
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SET_KEY.CNF says 0: Device refused request.");
     }
     else
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SetKeyCnf says %d: Success.", result);
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SET_KEY.CNF says %d: Success.", result);
         slac_enterState(STATE_INITIAL); // this would have happened anyways, but for readability
         connMgr_setLevel(CONNLEVEL_15_SLAC_DONE_SDP_NEXT);
     }
