@@ -273,9 +273,7 @@ void power_off_no_return()
 
 void soft_reset()
 {
-    bool moreLogging = _global.moreLogging; // backup
     _global = {}; // reinit
-    _global.moreLogging = moreLogging; // restore
 
     _ccs_params = {}; // reinit
 
@@ -488,9 +486,17 @@ void special_mode_selected(enum SpecialMode mode)
     println("Special mode selected:%d", mode);
 
     if (mode == SpecialMode::Discharge)
-        chademoCharger->EnableDischarge();
-    else if (mode == SpecialMode::MoreLogging)
-        _global.moreLogging = true;
+    {
+        CONFIG_V2X = true;
+    }
+    else if (mode == SpecialMode::ExiLogging)
+    {
+        EXI_LOGGING = true;
+    }
+    else if (mode == SpecialMode::Max100Amps)
+    {
+        ADAPTER_MAX_AMPS = 100;
+    }
 }
 
 static void Ms100Task(void)

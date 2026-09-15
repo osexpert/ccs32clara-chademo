@@ -60,7 +60,6 @@ struct global_data
     bool powerOffPending = false;
     bool powerOffPendingViaButton = false;
     bool ccsEnded = false;
-    bool moreLogging = false;
 
     uint32_t auto_power_off_timer_count_up_ms = 0;
 

@@ -178,7 +178,7 @@ static void encodeAndTransmit()
     //addToTrace("after: g_errn=%d", g_errn);
     //addToTrace("global_streamEncPos=%d", global_streamEncPos);
  //#ifdef VERBOSE_EXI_DECODER
-    if (_global.moreLogging) {
+    if (EXI_LOGGING) {
         showAsHex(global_streamEnc.data, global_streamEncPos, "encoded exi");
     }
     //#endif
@@ -195,7 +195,7 @@ static void routeDecoderInputData()
     global_streamDec.data = &tcp_rxdata[V2GTP_HEADER_SIZE];
     global_streamDec.size = tcp_rxdataLen - V2GTP_HEADER_SIZE;
     //#ifdef VERBOSE_EXI_DECODER
-    if (_global.moreLogging) {
+    if (EXI_LOGGING) {
         showAsHex(global_streamDec.data, global_streamDec.size, "decoder will see");
     }
     //#endif

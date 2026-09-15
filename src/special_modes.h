@@ -16,9 +16,9 @@ enum SpecialMode
 {
 	None = 0,
 	Discharge = 1,
-	//LongerPrecharge = 2,
+	Max100Amps = 2,
 	Unwelding = 3,
-	MoreLogging = 4,
+	ExiLogging = 4,
 };
 
 // Returns the selected mode number (press count), or 0 if none yet.
