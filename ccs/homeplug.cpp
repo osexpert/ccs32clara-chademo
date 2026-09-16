@@ -62,7 +62,6 @@ static uint8_t NMK[16];
 static uint8_t pevSequenceState;
 static uint16_t pevSequenceCyclesInState;
 static uint16_t cyclesSinceStartAttenChar;
-static bool countCyclesSinceStartAttenChar;
 static uint16_t pevTotalCycles;
 static uint8_t sdpDelayCycles;
 static uint8_t slacDelayCycles;
@@ -561,8 +560,10 @@ void runSlacSequencer()
 
     pevSequenceCyclesInState++;
     pevTotalCycles++;
-    if (countCyclesSinceStartAttenChar)
+    if (pevSequenceState >= STATE_START_ATTEN_CHAR)
         cyclesSinceStartAttenChar++;
+    else
+        cyclesSinceStartAttenChar = 0;
 
     if (pevTotalCycles > 500) // 15s timeout for SLAC in total.
     {
@@ -607,12 +608,12 @@ void runSlacStateMachine()
     }
     else if (pevSequenceState == STATE_SLAC_PARAM_CNF_RECEIVED) // slac_param confirmation was received.
     {
-        countCyclesSinceStartAttenChar = false; // reset
-        cyclesSinceStartAttenChar = 0; // reset
-
-        slacDelayCycles = 3; // [V2G3-A09-25] wait TP_match_sequence:100ms from SLAC_PARAM.CNF to START_ATTEN_CHAR. delay 3 + one state change. 
-        nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
-        slac_enterState(STATE_START_ATTEN_CHAR);
+        // [V2G3-A09-25] wait TP_match_sequence:100ms from SLAC_PARAM.CNF to START_ATTEN_CHAR.
+        if (pevSequenceCyclesInState > 3) // wait for 90ms + 1 state change
+        {
+            nRemainingStartAttenChar = 3; // There shall be 3 START_ATTEN_CHAR messages.
+            slac_enterState(STATE_START_ATTEN_CHAR);
+        }
     }
     else if (pevSequenceState == STATE_START_ATTEN_CHAR) // received SLAC_PARAM.CNF. Multiple transmissions of START_ATTEN_CHAR.
     {
@@ -622,7 +623,6 @@ void runSlacStateMachine()
             composeStartAttenCharInd();
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting START_ATTEN_CHAR.IND...");
             myEthTransmit();
-            countCyclesSinceStartAttenChar = true;
         }
         else
         {
