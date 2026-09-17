@@ -85,9 +85,9 @@ Hold stop button down while power on to activate special mode. Led will be const
 If nothing is done within 10 seconds, it will continue with normal startup.
 Now press stop button as many times as the mode you want to select:
 - 1: V2X mode
-- 2: (UNASSIGNED)
+- 2: Set max amps to 100A
 - 3: Contactor unwelding attempt
-- 4: More logging
+- 4: Log EXI data
 
 When 2 seconds has elapsed since last button press, you will see as many flashes as button presses (in case you want to check they matches the number of presses you aimed for) and adapter will continue startup.
 If you select a mode that does not exist, it will continue with normal startup.
@@ -96,7 +96,8 @@ After you have selected a mode, it is possible to combine it with another mode, 
 ### Special mode 1: V2X mode
 It will try to detect V2X and support it. Portable dischargers should work without this mode, but eg. Sigenstor will need it to not timeout and to be able to discharge more amps.
 
-### Special mode 2: (UNASSIGNED)
+### Special mode 2: Set max amps to 100A
+Set max amps to 100A
 
 ### Special mode 3: Contactor unwelding attempt
 The contactor is rapidly closed/opened, until you press the stop button. If the contactor is welded/stuck, this may help, but you should test with a multimeter to make sure it is stuck and also use a multimeter during the process, to see if the contactor becomes unstuck again.
@@ -106,7 +107,7 @@ My relay got stuck for some reason (be warned) and this is why I made this funct
 
 ![adapter top 250](https://github.com/user-attachments/assets/5c2cbf2e-dc35-4e17-b48d-6e870a8cd8b1)
 
-### Special mode 4: More logging
+### Special mode 4: Log EXI data
 Will log binary Exi-data sent and recieved.
 
 ## Logging

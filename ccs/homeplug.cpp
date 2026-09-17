@@ -180,9 +180,12 @@ static void evaluateSlacParamCnf(void)
     {
         if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF) //  we were waiting for the SlacParamCnf
         {
-            //pevSequenceDelayCycles = 4; // original Ioniq is waiting 200ms.
-            // [V2G3-A09-07] wait TT_match_response:200ms until all chargers answer with SLAC_PARAM_CNF.
-            // In theory, neighbour chargers could listen and send as well (crosstalk). In reality, I only seen one answer (from the charger we are connected to).
+            // check runId (8 bytes), but ignore the 2 last bytes (set to 0).
+            if (memcmp(&myethreceivebuffer[36], myMAC, 6) != 0) {
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SLAC_PARAM.CNF runId mismatch. Ignore.");
+                return; // Not our session (crosstalk), ignore
+            }
+
             slac_enterState(STATE_SLAC_PARAM_CNF_RECEIVED);
         }
     }
@@ -240,8 +243,8 @@ static void composeNmbcSoundInd(void)
     myethtransmitbuffer[38] = remainingNumberOfSounds; // countdown. Remaining number of sounds. Starts with 9 and counts down to 0.
     fillSourceMac(myMAC, 39); // 39 to 46: runid, filled with MAC of PEV and two bytes 00 00
     myethtransmitbuffer[47] = 0x00; // 47 to 54: reserved, all 00
-    //55 to 70: random number. All 0xff in the ioniq message.
-    memset(&myethtransmitbuffer[55], 0xFF, 16);   // i in range(55, 71):
+    // 55 to 70: random number. All 0xff in the ioniq message.
+    memset(&myethtransmitbuffer[55], 0xFF, 16);
 }
 
 static void evaluateAttenCharInd(void)
@@ -251,13 +254,19 @@ static void evaluateAttenCharInd(void)
     {
         if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND) // we were waiting for the AttenCharInd
         {
-            uint8_t numberOfSounds = myethreceivebuffer[69];
+            // check runId (8 bytes), but ignore the 2 last bytes (set to 0).
+            if (memcmp(&myethreceivebuffer[27], myMAC, 6) != 0) {
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ATTEN_CHAR.IND runId mismatch. Ignore.");
+                return; // Not our session (crosstalk), ignore
+            }
+
+            uint8_t numberOfSounds = myethreceivebuffer[69]; // how many sounds did the charger hear?
             if (numberOfSounds == 0) {
                 addToTrace(MOD_HOMEPLUG, "[PEVSLAC] numberOfSounds is 0. Ignore."); // [V2G3-A09-36]
                 return;
             }
 
-            uint8_t numGroups = myethreceivebuffer[70];
+            uint8_t numGroups = myethreceivebuffer[70]; // should always be 58
             uint16_t sumAtten = 0;
             uint8_t validGroups = 0;
             for (uint8_t i = 0; i < numGroups; i++)
@@ -274,7 +283,7 @@ static void evaluateAttenCharInd(void)
             bool best = AttenCharIndCount == 0 || avgAtten < LowestAvgAtten;
             uint8_t* sourceMac = &myethreceivebuffer[6]; // source MAC starts at offset 6
 
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d groups:%d avgAtten:%d best:%d",
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] charger MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d groups:%d avgAtten:%d best:%d",
                 sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
                 numberOfSounds, numGroups, avgAtten, best);
 
@@ -368,25 +377,23 @@ static void evaluateSlacMatchCnf(void)
     }
     else
     {
-        /* compare all 6 bytes of the destination MAC with our own MAC */
-        bool blIsDestinationMacForMe = (memcmp(myethreceivebuffer, myMAC, 6) == 0); /* any mismatch -> it is not for me */
-        if (!blIsDestinationMacForMe) {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF but with foreign destination MAC. Ignoring.");
+        // check runId (8 bytes), but ignore the 2 last bytes (set to 0).
+        if (memcmp(&myethreceivebuffer[69], myMAC, 6) != 0) {
+            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SLAC_MATCH.CNF runId mismatch. Ignore.");
+            return; // Not our session (crosstalk), ignore
         }
-        else {
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF");
-            memcpy(NID, &myethreceivebuffer[85], 7);   // NID has 7 bytes
-            memcpy(NMK, &myethreceivebuffer[93], 16);
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SLAC_MATCH.CNF, got network membership key (NMK) and NID.");
 
-            // use the extracted NMK and NID to set the key in the adaptor:
-            composeSetKey();
-            addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint170: transmitting SET_KEY.REQ");
-            setCheckpoint(170);
-            myEthTransmit();
+        memcpy(NID, &myethreceivebuffer[85], 7);   // NID has 7 bytes
+        memcpy(NMK, &myethreceivebuffer[93], 16);
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SLAC_MATCH.CNF, got network membership key (NMK) and NID.");
 
-            slac_enterState(STATE_WAITING_FOR_SET_KEY_CNF);
-        }
+        // use the extracted NMK and NID to set the key in the adaptor:
+        composeSetKey();
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint170: transmitting SET_KEY.REQ");
+        setCheckpoint(170);
+        myEthTransmit();
+
+        slac_enterState(STATE_WAITING_FOR_SET_KEY_CNF);
     }
 }
 
@@ -598,6 +605,7 @@ void runSlacStateMachine()
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF) // Waiting for slac_param confirmation.
     {
+        // [V2G3-A09-07] wait TT_match_response:200ms until any charger answer with SLAC_PARAM_CNF.
         if (pevSequenceCyclesInState > 7) // wait for 200ms
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
@@ -632,7 +640,7 @@ void runSlacStateMachine()
             slac_enterState(STATE_SOUNDING);
         }
     }
-    else if (pevSequenceState == STATE_SOUNDING)   // Multiple transmissions of MNBC_SOUND.IND.
+    else if (pevSequenceState == STATE_SOUNDING) // Multiple transmissions of MNBC_SOUND.IND.
     {
         if (remainingNumberOfSounds > 0)
         {
