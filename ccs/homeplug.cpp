@@ -82,8 +82,7 @@ static void runSlacStateMachine();
 /* Extracting the EtherType from a received message. */
 uint16_t getEtherType(uint8_t* messagebufferbytearray)
 {
-    uint16_t etherType = 0;
-    etherType = messagebufferbytearray[12] * 256 + messagebufferbytearray[13];
+    uint16_t etherType = (messagebufferbytearray[12] << 8) | messagebufferbytearray[13];
     return etherType;
 }
 
@@ -122,7 +121,7 @@ static void setNidAt(uint8_t index)
 static uint16_t getManagementMessageType(void)
 {
     /* calculates the MMTYPE (base value + lower two bits), see Table 11-2 of homeplug spec */
-    return (myethreceivebuffer[16] << 8) + myethreceivebuffer[15];
+    return (myethreceivebuffer[16] << 8) | myethreceivebuffer[15];
 }
 
 void composeGetSwReq(void)
@@ -260,26 +259,26 @@ static void evaluateAttenCharInd(void)
                 return; // Not our session (crosstalk), ignore
             }
 
-            uint8_t numberOfSounds = myethreceivebuffer[69]; // how many sounds did the charger hear?
+            uint8_t numberOfSounds = myethreceivebuffer[69]; // how many sounds did the charger hear? We sent 10, so it can't possibly be more:-)
             if (numberOfSounds == 0) {
                 addToTrace(MOD_HOMEPLUG, "[PEVSLAC] numberOfSounds is 0. Ignore."); // [V2G3-A09-36]
                 return;
             }
 
-            uint8_t numGroups = myethreceivebuffer[70]; // should always be 58
+            uint8_t numGroups = myethreceivebuffer[70]; // should always be 58, and at least not more:-)
             uint16_t sumAtten = 0;
             uint8_t validGroups = 0;
-            for (uint8_t i = 0; i < numGroups; i++)
+            for (uint8_t i = 0; i < min<uint8_t>(numGroups, 58); i++) // limit groups to 58
             {
                 uint8_t val = myethreceivebuffer[71 + i];
-                if (val != 0xFF)  // 0xFF = group not measured, exclude
+                if (val != 0xFF)  // 0xFF is nonsense and likely a charger bug (under- or overflow), so ignore it: https://arxiv.org/pdf/2404.06635
                 {
                     sumAtten += val;
                     validGroups++;
                 }
             }
 
-            uint8_t avgAtten = (validGroups > 0) ? (sumAtten / validGroups) : 0xFF;
+            uint8_t avgAtten = (validGroups > 0) ? (sumAtten / validGroups) : (0xFF - min<uint8_t>(numberOfSounds, 10)); // in case no groups, failover to 0xFF - numberOfSounds (limit to 10)
             bool best = AttenCharIndCount == 0 || avgAtten < LowestAvgAtten;
             uint8_t* sourceMac = &myethreceivebuffer[6]; // source MAC starts at offset 6
 
@@ -543,7 +542,7 @@ void evaluateGetSwCnf(void)
             strVersion[i] = x;
         }
         strVersion[i] = 0;
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] modem MAC %02x:%02x:%02x:%02x:%02x:%02x software version %s",
             sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
             strVersion);
     }
@@ -815,22 +814,22 @@ void evaluateReceivedHomeplugPacket(void)
     }
     switch (getManagementMessageType())
     {
-    case CM_GET_KEY + MMTYPE_CNF:
+    case CM_GET_KEY | MMTYPE_CNF:
         evaluateGetKeyCnf();
         break;
-    case CM_SLAC_MATCH + MMTYPE_CNF:
+    case CM_SLAC_MATCH | MMTYPE_CNF:
         evaluateSlacMatchCnf();
         break;
-    case CM_SLAC_PARAM + MMTYPE_CNF:
+    case CM_SLAC_PARAM | MMTYPE_CNF:
         evaluateSlacParamCnf();
         break;
-    case CM_ATTEN_CHAR + MMTYPE_IND:
+    case CM_ATTEN_CHAR | MMTYPE_IND:
         evaluateAttenCharInd();
         break;
-    case CM_SET_KEY + MMTYPE_CNF:
+    case CM_SET_KEY | MMTYPE_CNF:
         evaluateSetKeyCnf();
         break;
-    case CM_GET_SW + MMTYPE_CNF:
+    case CM_GET_SW | MMTYPE_CNF:
         evaluateGetSwCnf();
         break;
     }

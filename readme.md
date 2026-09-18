@@ -85,7 +85,7 @@ Hold stop button down while power on to activate special mode. Led will be const
 If nothing is done within 10 seconds, it will continue with normal startup.
 Now press stop button as many times as the mode you want to select:
 - 1: V2X mode
-- 2: Set max amps to 100A
+- 2: Set max amps to 100A (next release)
 - 3: Contactor unwelding attempt
 - 4: Log EXI data
 

@@ -69,3 +69,13 @@ struct global_data
 extern global_data _global;
 
 extern volatile uint32_t system_millis;
+
+template<typename T>
+constexpr T min(T a, T b) {
+    return (a < b) ? a : b;
+}
+
+template<typename T>
+constexpr T max(T a, T b) {
+    return (a > b) ? a : b;
+}

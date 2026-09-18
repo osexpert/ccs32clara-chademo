@@ -7,16 +7,6 @@
 #define CHA_CYCLE_MS 100
 #define CHA_CYCLES_PER_SEC (1000 / CHA_CYCLE_MS)
 
-template<typename T>
-constexpr T min(T a, T b) {
-    return (a < b) ? a : b;
-}
-
-template<typename T>
-constexpr T max(T a, T b) {
-    return (a > b) ? a : b;
-}
-
 inline uint8_t clampToUint8(uint16_t value) {
     return static_cast<uint8_t>(value > 0xFF ? 0xFF : value);
 }
