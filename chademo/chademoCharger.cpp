@@ -243,12 +243,17 @@ void ChademoCharger::Run()
     Log();
 }
 
+uint8_t getCcsReportSoc(uint8_t soc)
+{
+    return (uint16_t(soc) * MAX_REPORT_SOC) / 100;
+}
+
 void ChademoCharger::SetCcsParamsFromCarData()
 {
     // target +1 to silence warning in pev_sendCurrentDemandReq
     // TODO: use _carData.MaxVoltage? But what is the point? We always just ask for target voltage anyways...
     _ccs_params.MaxVoltage = _carData.TargetVoltage + 1;
-    _ccs_params.soc = _carData.SocPercent;
+    _ccs_params.soc = getCcsReportSoc(_carData.SocPercent);
     _ccs_params.BatteryVoltage = _carData.BatteryVoltage;
     _ccs_params.TargetVoltage = _carData.TargetVoltage;
 

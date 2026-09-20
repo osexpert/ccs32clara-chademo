@@ -54,3 +54,6 @@ CONFIG_ITEM(CONFIG_CHADEMO_09, "chademo-0.9", bool, false);
 CONFIG_ITEM(CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION, "open-adapter-contactor-before-wd", bool, false);
 
 CONFIG_ITEM(EXI_LOGGING, "exi-logging", bool, false);
+
+// CCS SoC is scaled from chademo 0-€“100% to 0-{max-report-soc}%.
+CONFIG_ITEM(MAX_REPORT_SOC, "max-report-soc", uint8_t, 100);
