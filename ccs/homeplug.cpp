@@ -109,7 +109,8 @@ void composeGetSwReq(void)
     myethtransmitbuffer[14] = 0x00; // version
     myethtransmitbuffer[15] = 0x00; // GET_SW.REQ
     myethtransmitbuffer[16] = 0xA0; //
-    myethtransmitbuffer[17] = 0x00; // Vendor OUI
+
+    myethtransmitbuffer[17] = 0x00; // 17-19 Vendor OUI
     myethtransmitbuffer[18] = 0xB0; //
     myethtransmitbuffer[19] = 0x52; //
 }
@@ -129,12 +130,11 @@ static void composeSlacParamReq(void)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // 2 bytes fragmentation information. 0000 means: unfragmented.
     myethtransmitbuffer[18] = 0x00; //
-    myethtransmitbuffer[19] = 0x00; //
-    myethtransmitbuffer[20] = 0x00; //
-    memcpy(&myethtransmitbuffer[21], myMAC, 6); // 21 to 28: 8 bytes runid. The Ioniq uses the PEV mac plus 00 00.
-    myethtransmitbuffer[27] = 0x00; //
-    myethtransmitbuffer[28] = 0x00; //
-    // rest is 00
+    // MME
+    auto mme = &myethtransmitbuffer[19];
+    mme[0] = 0x00; // apptype
+    mme[1] = 0x00; // sectype
+    memcpy(&mme[2], myMAC, 6); // 2-9: 8 bytes runid. The Ioniq uses the PEV mac plus 00 00.
 }
 
 static void evaluateSlacParamCnf(void)
@@ -147,8 +147,10 @@ static void evaluateSlacParamCnf(void)
     {
         if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF) //  we were waiting for the SlacParamCnf
         {
-            // check runId (8 bytes), but ignore the 2 last bytes (set to 0).
-            if (memcmp(&myethreceivebuffer[36], myMAC, 6) != 0) {
+            auto mme = &myethreceivebuffer[19];
+
+            // check runId 17-24 (8 bytes), but ignore the 2 last bytes (set to 0).
+            if (memcmp(&mme[17], myMAC, 6) != 0) {
                 addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SLAC_PARAM.CNF runId mismatch. Ignore.");
                 return; // Not our session (crosstalk), ignore
             }
@@ -173,14 +175,15 @@ static void composeStartAttenCharInd(void)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // 2 bytes fragmentation information. 0000 means: unfragmented.
     myethtransmitbuffer[18] = 0x00; //
-    myethtransmitbuffer[19] = 0x00; // apptype
-    myethtransmitbuffer[20] = 0x00; // sectype
-    myethtransmitbuffer[21] = 0x0a; // number of sounds: 10
-    myethtransmitbuffer[22] = 6; // timeout N*100ms. Normally 6, means in 600ms all sounds must have been tranmitted.
-    myethtransmitbuffer[23] = 0x01; // response type
-    memcpy(&myethtransmitbuffer[24], myMAC, 6); // 24 to 29: sound_forwarding_sta, MAC of the PEV
-    memcpy(&myethtransmitbuffer[30], myMAC, 6); // 30 to 37: runid, filled with MAC of PEV and two bytes 00 00
-    // rest is 00
+    // MME
+    auto mme = &myethtransmitbuffer[19];
+    mme[0] = 0x00; // apptype
+    mme[1] = 0x00; // sectype
+    mme[2] = 0x0a; // number of sounds: 10
+    mme[3] = 6; // timeout N*100ms. Normally 6, means in 600ms all sounds must have been tranmitted.
+    mme[4] = 0x01; // response type
+    memcpy(&mme[5], myMAC, 6); // 5-10: sound_forwarding_sta, MAC of the PEV
+    memcpy(&mme[11], myMAC, 6); // 11-18: runid, filled with MAC of PEV and two bytes 00 00
 }
 
 static void composeNmbcSoundInd(void)
@@ -198,14 +201,15 @@ static void composeNmbcSoundInd(void)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // 2 bytes fragmentation information. 0000 means: unfragmented.
     myethtransmitbuffer[18] = 0x00; //
-    myethtransmitbuffer[19] = 0x00; // apptype
-    myethtransmitbuffer[20] = 0x00; // sectype
-    myethtransmitbuffer[21] = 0x00; // 21 to 37 sender ID, all 00
-    myethtransmitbuffer[38] = remainingNumberOfSounds; // countdown. Remaining number of sounds. Starts with 9 and counts down to 0.
-    memcpy(&myethtransmitbuffer[39], myMAC, 6); // 39 to 46: runid, filled with MAC of PEV and two bytes 00 00
-    myethtransmitbuffer[47] = 0x00; // 47 to 54: reserved, all 00
-    // 55 to 70: random number. All 0xff in the ioniq message.
-    memset(&myethtransmitbuffer[55], 0xFF, 16);
+    // MME
+    auto mme = &myethtransmitbuffer[19];
+    mme[0] = 0x00; // apptype
+    mme[1] = 0x00; // sectype
+    // 2-18 sender ID, all 00
+    mme[19] = remainingNumberOfSounds; // countdown. Remaining number of sounds. Starts with 9 and counts down to 0.
+    memcpy(&mme[20], myMAC, 6); // 20-27: runid, filled with MAC of PEV and two bytes 00 00
+    // 28-35: reserved, all 00
+    memset(&mme[36], 0xFF, 16); // 36-51: random number. All 0xff in the ioniq message.
 }
 
 static void evaluateAttenCharInd(void)
@@ -215,24 +219,27 @@ static void evaluateAttenCharInd(void)
     {
         if (pevSequenceState == STATE_WAIT_FOR_ATTEN_CHAR_IND) // we were waiting for the AttenCharInd
         {
-            // check runId (8 bytes), but ignore the 2 last bytes (set to 0).
-            if (memcmp(&myethreceivebuffer[27], myMAC, 6) != 0) {
+            uint8_t* sourceMac = &myethreceivebuffer[6]; // source MAC starts at offset 6
+            auto mme = &myethreceivebuffer[19];
+
+            // check runId 8-15 (8 bytes), but ignore the 2 last bytes (set to 0).
+            if (memcmp(&mme[8], myMAC, 6) != 0) {
                 addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ATTEN_CHAR.IND runId mismatch. Ignore.");
                 return; // Not our session (crosstalk), ignore
             }
 
-            uint8_t numberOfSounds = myethreceivebuffer[69]; // how many sounds did the charger hear? We sent 10, so it can't possibly be more:-)
+            uint8_t numberOfSounds = mme[50]; // how many sounds did the charger hear? We sent 10, so it can't possibly be more:-)
             if (numberOfSounds == 0) {
                 addToTrace(MOD_HOMEPLUG, "[PEVSLAC] numberOfSounds is 0. Ignore."); // [V2G3-A09-36]
                 return;
             }
 
-            uint8_t numGroups = myethreceivebuffer[70]; // should always be 58, and at least not more:-)
+            uint8_t numGroups = mme[51]; // should always be 58, and at least not more:-)
             uint16_t sumAtten = 0;
             uint8_t validGroups = 0;
             for (uint8_t i = 0; i < min<uint8_t>(numGroups, 58); i++) // limit groups to 58
             {
-                uint8_t val = myethreceivebuffer[71 + i];
+                uint8_t val = mme[52 + i];
                 if (val != 0xFF)  // 0xFF is nonsense and likely a charger bug (under- or overflow), so ignore it: https://arxiv.org/pdf/2404.06635
                 {
                     sumAtten += val;
@@ -242,7 +249,6 @@ static void evaluateAttenCharInd(void)
 
             uint8_t avgAtten = (validGroups > 0) ? (sumAtten / validGroups) : (0xFF - min<uint8_t>(numberOfSounds, 10)); // in case no groups, failover to 0xFF - numberOfSounds (limit to 10)
             bool best = AttenCharIndCount == 0 || avgAtten < LowestAvgAtten;
-            uint8_t* sourceMac = &myethreceivebuffer[6]; // source MAC starts at offset 6
 
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] charger MAC %02x:%02x:%02x:%02x:%02x:%02x sounds:%d groups:%d avgAtten:%d best:%d",
                 sourceMac[0], sourceMac[1], sourceMac[2], sourceMac[3], sourceMac[4], sourceMac[5],
@@ -279,13 +285,15 @@ static void composeAttenCharRsp(const uint8_t* destMac)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // 2 bytes fragmentation information. 0000 means: unfragmented.
     myethtransmitbuffer[18] = 0x00; //
-    myethtransmitbuffer[19] = 0x00; // apptype
-    myethtransmitbuffer[20] = 0x00; // sectype
-    memcpy(&myethtransmitbuffer[21], myMAC, 6); // 21 to 26: source MAC
-    memcpy(&myethtransmitbuffer[27], myMAC, 6); // 27 to 34: runid. The PEV mac, plus 00 00.
-    // 35 to 51: source_id, all 00
-    // 52 to 68: resp_id, all 00
-    // 69: result. 0 is ok
+    // MME
+    auto mme = &myethtransmitbuffer[19];
+    mme[0] = 0x00; // apptype
+    mme[1] = 0x00; // sectype
+    memcpy(&mme[2], myMAC, 6); // 2-7: source MAC
+    memcpy(&mme[8], myMAC, 6); // 8-15: runid. The PEV mac, plus 00 00.
+    // 16-32: source_id, all 00
+    // 33-49: resp_id, all 00
+    // 50: result. 0 is ok
 }
 
 static void composeSlacMatchReq(void)
@@ -303,16 +311,19 @@ static void composeSlacMatchReq(void)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // 2 bytes fragmentation information. 0000 means: unfragmented.
     myethtransmitbuffer[18] = 0x00; //
-    myethtransmitbuffer[19] = 0x00; // apptype
-    myethtransmitbuffer[20] = 0x00; // sectype
-    myethtransmitbuffer[21] = 0x3E; // 21 to 22: length
-    myethtransmitbuffer[22] = 0x00; //
-    // 23 to 39: pev_id, all 00
-    memcpy(&myethtransmitbuffer[40], myMAC, 6); // 40 to 45: PEV MAC
-    // 46 to 62: evse_id, all 00
-    memcpy(&myethtransmitbuffer[63], evseMac, 6); // 63 to 68: EVSE MAC
-    memcpy(&myethtransmitbuffer[69], myMAC, 6); // 69 to 76: runid. The PEV mac, plus 00 00.
-    // 77 to 84: reserved, all 00
+    // MME 
+    // NOTE: in my copy of ISO 15118-3:2015 the indexes of fields PEV ID, EVSE ID, EVSE MAC are incorrect. You had one job...
+    auto mme = &myethtransmitbuffer[19];
+    mme[0] = 0x00; // apptype
+    mme[1] = 0x00; // sectype
+    mme[2] = 0x3E; // 2-3: length
+    mme[3] = 0x00;
+    // 4-20: pev_id, all 00
+    memcpy(&mme[21], myMAC, 6); // 21-26: PEV MAC
+    // 27-43: evse_id, all 00
+    memcpy(&mme[44], evseMac, 6); // 44-49: EVSE MAC
+    memcpy(&mme[50], myMAC, 6); // 50-57: runid. The PEV mac, plus 00 00.
+    // 58-65: reserved, all 00
 }
 
 static void evaluateSlacMatchCnf(void)
@@ -334,14 +345,16 @@ static void evaluateSlacMatchCnf(void)
     }
     else
     {
+        auto mme = &myethreceivebuffer[19];
+
         // check runId (8 bytes), but ignore the 2 last bytes (set to 0).
-        if (memcmp(&myethreceivebuffer[69], myMAC, 6) != 0) {
+        if (memcmp(&mme[50], myMAC, 6) != 0) {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SLAC_MATCH.CNF runId mismatch. Ignore.");
             return; // Not our session (crosstalk), ignore
         }
 
-        memcpy(NID, &myethreceivebuffer[85], 7);   // NID has 7 bytes
-        memcpy(NMK, &myethreceivebuffer[93], 16);
+        memcpy(NID, &mme[66], 7);   // NID has 7 bytes
+        memcpy(NMK, &mme[74], 16);
         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] From SLAC_MATCH.CNF, got network membership key (NMK) and NID.");
 
         // use the extracted NMK and NID to set the key in the adaptor:
@@ -371,34 +384,35 @@ static void composeSetKey(void)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // frag_index
     myethtransmitbuffer[18] = 0x00; // frag_seqnum
-    myethtransmitbuffer[19] = 0x01; // 0 key type
+    // MME
+    auto mme = &myethtransmitbuffer[19];
+    mme[0] = 0x01; // 0 key type. 0x01 is NMK.
 
-    myethtransmitbuffer[20] = 0xaa; // 1 my nonce
-    myethtransmitbuffer[21] = 0xaa; // 2
-    myethtransmitbuffer[22] = 0xaa; // 3
-    myethtransmitbuffer[23] = 0xaa; // 4
+    mme[1] = 0xaa; // 1-4 my nonce
+    mme[2] = 0xaa;
+    mme[3] = 0xaa;
+    mme[4] = 0xaa;
 
-    myethtransmitbuffer[24] = 0x00; // 5 your nonce
-    myethtransmitbuffer[25] = 0x00; // 6
-    myethtransmitbuffer[26] = 0x00; // 7
-    myethtransmitbuffer[27] = 0x00; // 8
+    mme[5] = 0x00; // 5-8 your nonce
+    mme[6] = 0x00;
+    mme[7] = 0x00;
+    mme[8] = 0x00;
 
-    myethtransmitbuffer[28] = 0x04; // 9 nw pid
+    mme[9] = 0x04; // 9 nw pid. 0x04 is HLE protocol.
 
-    myethtransmitbuffer[29] = 0x00; // 10 prn
-    myethtransmitbuffer[30] = 0x00; // 11
-    myethtransmitbuffer[31] = 0x00; // 12 pmn
-    myethtransmitbuffer[32] = 0x00; // 13 cco cap
-    memcpy(&myethtransmitbuffer[33], NID, 7); // 14-20 nid  7 bytes from 33 to 39
+    mme[10] = 0x00; // 10-11 prn
+    mme[11] = 0x00;
+    mme[12] = 0x00; // 12 pmn
+    mme[13] = 0x00; // 13 cco cap
+    memcpy(&mme[14], NID, 7); // 14-20 nid
     // Network ID to be associated with the key distributed herein.
     // The 54 LSBs of this field contain the NID (refer to Section 3.4.3.1). The two MSBs shall be set to 0b00.
-    myethtransmitbuffer[40] = 0x01; // 21 peks (payload encryption key select) Table 11-83. 01 is NMK.
+    mme[21] = 0x01; // 21 peks (payload encryption key select) Table 11-83. 0x01 is NMK.
     // with 0x0F we could choose "no key, payload is sent in the clear"
-    memcpy(&myethtransmitbuffer[41], NMK, 16); // NMK
+    memcpy(&mme[22], NMK, 16); // 22 to 37: NMK
 
 #define variation 0
-    myethtransmitbuffer[41] += variation; // to try different NMKs
-    // and three remaining zeros
+    mme[22] += variation; // to try different NMKs
 }
 
 static void evaluateSetKeyCnf(void)
