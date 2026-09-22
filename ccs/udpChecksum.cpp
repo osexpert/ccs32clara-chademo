@@ -44,7 +44,7 @@ uint16_t calculateUdpAndTcpChecksumForIPv6(uint8_t *UdpOrTcpframe, uint16_t UdpO
     // Run the checksum over the concatenation of the pseudoheader and the buffer.
     totalSum = 0;
 	for (i=0; i<PSEUDO_HEADER_LEN/2; i++) { // running through the pseudo header, in 2-byte-steps
-        value16 = pseudoHeader[2*i] * 256 + pseudoHeader[2*i+1]; // take the current 16-bit-word
+        value16 = pseudoHeader[2*i] << 8 | pseudoHeader[2*i+1]; // take the current 16-bit-word
         totalSum += value16; // we start with a normal addition of the value to the totalSum
         // But we do not want normal addition, we want a 16 bit one's complement sum,
         // see https://en.wikipedia.org/wiki/User_Datagram_Protocol
@@ -54,7 +54,7 @@ uint16_t calculateUdpAndTcpChecksumForIPv6(uint8_t *UdpOrTcpframe, uint16_t UdpO
 		}
 	}
 	for (i=0; i<evenFrameLen/2; i++) { // running through the udp buffer, in 2-byte-steps
-        value16 = UdpOrTcpframe[2*i] * 256 + UdpOrTcpframe[2*i+1]; // take the current 16-bit-word
+        value16 = UdpOrTcpframe[2*i] << 8 | UdpOrTcpframe[2*i+1]; // take the current 16-bit-word
         totalSum += value16; // we start with a normal addition of the value to the totalSum
         // But we do not want normal addition, we want a 16 bit one's complement sum,
         // see https://en.wikipedia.org/wiki/User_Datagram_Protocol

@@ -45,16 +45,16 @@ void evaluateUdpPayload(void) {
       if ((udpPayload[0]==0x01) && (udpPayload[1]==0xFE)) { //# protocol version 1 and inverted
          //# it is a V2GTP message
          //showAsHex(udpPayload, "V2GTP ")
-         v2gptPayloadType = udpPayload[2] * 256 + udpPayload[3];
+         v2gptPayloadType = udpPayload[2] << 8 | udpPayload[3];
          //# 0x8001 EXI encoded V2G message (Will NOT come with UDP. Will come with TCP.)
          //# 0x9000 SDP request message (SECC Discovery)
          //# 0x9001 SDP response message (SECC response to the EVCC)
          if (v2gptPayloadType == 0x9001) {
             //# it is a SDP response from the charger to the car
             //addToTrace("it is a SDP response from the charger to the car");
-            v2gptPayloadLen = (((uint32_t)udpPayload[4])<<24)  +
-                              (((uint32_t)udpPayload[5])<<16) +
-                              (((uint32_t)udpPayload[6])<<8) +
+            v2gptPayloadLen = (((uint32_t)udpPayload[4])<<24) |
+                              (((uint32_t)udpPayload[5])<<16) |
+                              (((uint32_t)udpPayload[6])<<8) |
                               udpPayload[7];
             if (v2gptPayloadLen == 20) {
                //# 20 is the only valid length for a SDP response.
@@ -70,7 +70,7 @@ void evaluateUdpPayload(void) {
                //# at byte 8 of the UDP payload starts the IPv6 address of the charger.
                memcpy(SeccIp, &udpPayload[8], 16); // 16 bytes IP address of the charger
                //# Extract the TCP port, on which the charger will listen:
-               seccTcpPort = (((uint16_t)(udpPayload[8+16]))<<8) + udpPayload[8+16+1];
+               seccTcpPort = (((uint16_t)(udpPayload[8+16]))<<8) | udpPayload[8+16+1];
 
                /* Generally trust the SDP source MAC, this is the MAC actually sending IPv6 traffic on the link. */
                if (memcmp(evseMac, &myethreceivebuffer[6], 6) != 0) {
@@ -101,10 +101,10 @@ void ipv6_evaluateReceivedPacket(void) {
       nextheader = myethreceivebuffer[20];
       if (nextheader == 0x11) { //  it is an UDP frame
          addToTrace(MOD_IPV6, "Its a UDP.");
-         sourceport = myethreceivebuffer[54] * 256 + myethreceivebuffer[55];
-         destinationport = myethreceivebuffer[56] * 256 + myethreceivebuffer[57];
-         udplen = myethreceivebuffer[58] * 256 + myethreceivebuffer[59];
-         udpsum = myethreceivebuffer[60] * 256 + myethreceivebuffer[61];
+         sourceport = myethreceivebuffer[54] << 8 | myethreceivebuffer[55];
+         destinationport = myethreceivebuffer[56] << 8 | myethreceivebuffer[57];
+         udplen = myethreceivebuffer[58] << 8 | myethreceivebuffer[59];
+         udpsum = myethreceivebuffer[60] << 8 | myethreceivebuffer[61];
          //# udplen is including 8 bytes header at the begin
          if (udplen>UDP_PAYLOAD_LEN) {
             /* ignore long UDP */
@@ -169,7 +169,7 @@ void ipv6_packRequestIntoUdp(void) {
    //           #   2 bytes length (incl checksum)
    //           #   2 bytes checksum
    UdpRequest[0] = evccPort >> 8;
-   UdpRequest[1] = evccPort  & 0xFF;
+   UdpRequest[1] = evccPort & 0xFF;
    UdpRequest[2] = 15118 >> 8;
    UdpRequest[3] = 15118 & 0xFF;
 

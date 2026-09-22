@@ -68,7 +68,7 @@ void evaluateTcpPacket(void)
    uint16_t sourcePort, destinationPort, pLen, hdrLen, tmpPayloadLen;
 
    /* todo: check the IP addresses, checksum etc */
-   pLen = (((uint16_t)myethreceivebuffer[18]) << 8) + myethreceivebuffer[19]; /* length of the IP payload */
+   pLen = (((uint16_t)myethreceivebuffer[18]) << 8) | myethreceivebuffer[19]; /* length of the IP payload */
    hdrLen = (myethreceivebuffer[66] >> 4) * 4; /* header length in byte */
    //log_v("pLen=%d, hdrLen=%d", pLen, hdrLen);
    if (pLen >= hdrLen)
@@ -79,8 +79,8 @@ void evaluateTcpPacket(void)
    {
       tmpPayloadLen = 0; /* no TCP payload data */
    }
-   sourcePort =      (((uint16_t)myethreceivebuffer[54])<<8) +  myethreceivebuffer[55];
-   destinationPort = (((uint16_t)myethreceivebuffer[56])<<8) +  myethreceivebuffer[57];
+   sourcePort =      (((uint16_t)myethreceivebuffer[54])<<8) | myethreceivebuffer[55];
+   destinationPort = (((uint16_t)myethreceivebuffer[56])<<8) | myethreceivebuffer[57];
    if ((sourcePort != seccTcpPort) || (destinationPort != evccPort))
    {
       addToTrace(MOD_TCP, "[TCP] wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
@@ -88,14 +88,14 @@ void evaluateTcpPacket(void)
    }
 
    remoteSeqNr =
-      (((uint32_t)myethreceivebuffer[58])<<24) +
-      (((uint32_t)myethreceivebuffer[59])<<16) +
-      (((uint32_t)myethreceivebuffer[60])<<8) +
+      (((uint32_t)myethreceivebuffer[58])<<24) |
+      (((uint32_t)myethreceivebuffer[59])<<16) |
+      (((uint32_t)myethreceivebuffer[60])<<8) |
       (((uint32_t)myethreceivebuffer[61]));
    remoteAckNr =
-      (((uint32_t)myethreceivebuffer[62])<<24) +
-      (((uint32_t)myethreceivebuffer[63])<<16) +
-      (((uint32_t)myethreceivebuffer[64])<<8) +
+      (((uint32_t)myethreceivebuffer[62])<<24) |
+      (((uint32_t)myethreceivebuffer[63])<<16) |
+      (((uint32_t)myethreceivebuffer[64])<<8) |
       (((uint32_t)myethreceivebuffer[65]));
    flags = myethreceivebuffer[67];
 
