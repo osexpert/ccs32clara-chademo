@@ -308,8 +308,8 @@ static void tcp_packRequestIntoEthernet(void)
    // #  6 bytes source MAC
    // #  2 bytes EtherType
    //# fill the destination MAC with the MAC of the charger
-   fillDestinationMac(evseMac, 0);
-   fillSourceMac(getOurMac(), 6); // bytes 6 to 11 are the source MAC
+   memcpy(&myethtransmitbuffer[0], evseMac, 6);
+   memcpy(&myethtransmitbuffer[6], getOurMac(), 6); // bytes 6 to 11 are the source MAC
    myethtransmitbuffer[12] = 0x86; // # 86dd is IPv6
    myethtransmitbuffer[13] = 0xdd;
    myEthTransmit();

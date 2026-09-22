@@ -54,9 +54,7 @@
 static const uint8_t MAC_BROADCAST[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 uint8_t myMAC[6] = {0xFE, 0xED, 0xBE, 0xEF, 0xAF, 0xFE}; // FEED BEEF *
 uint8_t evseMac[6];
-uint8_t numberOfSoftwareVersionResponses;
 
-static uint8_t verLen;
 static uint8_t NID[7];
 static uint8_t NMK[16];
 static uint8_t pevSequenceState;
@@ -86,36 +84,10 @@ uint16_t getEtherType(uint8_t* messagebufferbytearray)
     return etherType;
 }
 
-void fillSourceMac(const uint8_t* mac, uint8_t offset)
-{
-    /* at offset 6 in the ethernet frame, we have the source MAC.
-       we can give a different offset, to re-use the MAC also in the data area */
-    memcpy(&myethtransmitbuffer[offset], mac, 6);
-}
-
-void fillDestinationMac(const uint8_t* mac, uint8_t offset)
-{
-    /* at offset 0 in the ethernet frame, we have the destination MAC.
-       we can give a different offset, to re-use the MAC also in the data area */
-    memcpy(&myethtransmitbuffer[offset], mac, 6);
-}
-
 static void cleanTransmitBuffer(void)
 {
     /* fill the complete ethernet transmit buffer with 0x00 */
     memset(myethtransmitbuffer, 0, MY_ETH_TRANSMIT_BUFFER_LEN);
-}
-
-static void setNmkAt(uint8_t index)
-{
-    /* sets the Network Membership Key (NMK) at a certain position in the transmit buffer */
-    memcpy(&myethtransmitbuffer[index], NMK, 16); // NMK
-}
-
-static void setNidAt(uint8_t index)
-{
-    /* copies the network ID (NID, 7 bytes) into the wished position in the transmit buffer */
-    memcpy(&myethtransmitbuffer[index], NID, 7);
 }
 
 static uint16_t getManagementMessageType(void)
@@ -129,10 +101,8 @@ void composeGetSwReq(void)
     /* GET_SW.REQ request, as used by the win10 laptop */
     myethtransmitbufferLen = 60;
     cleanTransmitBuffer();
-    /* Destination MAC */
-    fillDestinationMac(MAC_BROADCAST, 0);
-    /* Source MAC */
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], MAC_BROADCAST, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     /* Protocol */
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -149,10 +119,8 @@ static void composeSlacParamReq(void)
     /* SLAC_PARAM request, as it was recorded 2021-12-17 WP charger 2 */
     myethtransmitbufferLen = 60;
     cleanTransmitBuffer();
-    // Destination MAC
-    fillDestinationMac(MAC_BROADCAST, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], MAC_BROADCAST, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     // Protocol
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -163,7 +131,7 @@ static void composeSlacParamReq(void)
     myethtransmitbuffer[18] = 0x00; //
     myethtransmitbuffer[19] = 0x00; //
     myethtransmitbuffer[20] = 0x00; //
-    fillSourceMac(myMAC, 21); // 21 to 28: 8 bytes runid. The Ioniq uses the PEV mac plus 00 00.
+    memcpy(&myethtransmitbuffer[21], myMAC, 6); // 21 to 28: 8 bytes runid. The Ioniq uses the PEV mac plus 00 00.
     myethtransmitbuffer[27] = 0x00; //
     myethtransmitbuffer[28] = 0x00; //
     // rest is 00
@@ -195,10 +163,8 @@ static void composeStartAttenCharInd(void)
     /* reference: see wireshark interpreted frame from ioniq */
     myethtransmitbufferLen = 60;
     cleanTransmitBuffer();
-    // Destination MAC
-    fillDestinationMac(MAC_BROADCAST, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], MAC_BROADCAST, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     // Protocol
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -211,11 +177,9 @@ static void composeStartAttenCharInd(void)
     myethtransmitbuffer[20] = 0x00; // sectype
     myethtransmitbuffer[21] = 0x0a; // number of sounds: 10
     myethtransmitbuffer[22] = 6; // timeout N*100ms. Normally 6, means in 600ms all sounds must have been tranmitted.
-    // Todo: As long we are a little bit slow, lets give 1000ms instead of 600, so that the
-    // charger is able to catch it all.
     myethtransmitbuffer[23] = 0x01; // response type
-    fillSourceMac(myMAC, 24); // 24 to 29: sound_forwarding_sta, MAC of the PEV
-    fillSourceMac(myMAC, 30); // 30 to 37: runid, filled with MAC of PEV and two bytes 00 00
+    memcpy(&myethtransmitbuffer[24], myMAC, 6); // 24 to 29: sound_forwarding_sta, MAC of the PEV
+    memcpy(&myethtransmitbuffer[30], myMAC, 6); // 30 to 37: runid, filled with MAC of PEV and two bytes 00 00
     // rest is 00
 }
 
@@ -224,10 +188,8 @@ static void composeNmbcSoundInd(void)
     /* reference: see wireshark interpreted frame from Ioniq */
     myethtransmitbufferLen = 71;
     cleanTransmitBuffer();
-    //Destination MAC
-    fillDestinationMac(MAC_BROADCAST, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], MAC_BROADCAST, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     // Protocol
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -240,7 +202,7 @@ static void composeNmbcSoundInd(void)
     myethtransmitbuffer[20] = 0x00; // sectype
     myethtransmitbuffer[21] = 0x00; // 21 to 37 sender ID, all 00
     myethtransmitbuffer[38] = remainingNumberOfSounds; // countdown. Remaining number of sounds. Starts with 9 and counts down to 0.
-    fillSourceMac(myMAC, 39); // 39 to 46: runid, filled with MAC of PEV and two bytes 00 00
+    memcpy(&myethtransmitbuffer[39], myMAC, 6); // 39 to 46: runid, filled with MAC of PEV and two bytes 00 00
     myethtransmitbuffer[47] = 0x00; // 47 to 54: reserved, all 00
     // 55 to 70: random number. All 0xff in the ioniq message.
     memset(&myethtransmitbuffer[55], 0xFF, 16);
@@ -307,10 +269,8 @@ static void composeAttenCharRsp(const uint8_t* destMac)
     /* reference: see wireshark interpreted frame from Ioniq */
     myethtransmitbufferLen = 70;
     cleanTransmitBuffer();
-    // Destination MAC
-    fillDestinationMac(destMac, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], destMac, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     // Protocol
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -321,8 +281,8 @@ static void composeAttenCharRsp(const uint8_t* destMac)
     myethtransmitbuffer[18] = 0x00; //
     myethtransmitbuffer[19] = 0x00; // apptype
     myethtransmitbuffer[20] = 0x00; // sectype
-    fillSourceMac(myMAC, 21); // 21 to 26: source MAC
-    fillDestinationMac(myMAC, 27); // 27 to 34: runid. The PEV mac, plus 00 00.
+    memcpy(&myethtransmitbuffer[21], myMAC, 6); // 21 to 26: source MAC
+    memcpy(&myethtransmitbuffer[27], myMAC, 6); // 27 to 34: runid. The PEV mac, plus 00 00.
     // 35 to 51: source_id, all 00
     // 52 to 68: resp_id, all 00
     // 69: result. 0 is ok
@@ -333,10 +293,8 @@ static void composeSlacMatchReq(void)
     /* reference: see wireshark interpreted frame from Ioniq */
     myethtransmitbufferLen = 85;
     cleanTransmitBuffer();
-    // Destination MAC
-    fillDestinationMac(evseMac, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], evseMac, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     // Protocol
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -350,10 +308,10 @@ static void composeSlacMatchReq(void)
     myethtransmitbuffer[21] = 0x3E; // 21 to 22: length
     myethtransmitbuffer[22] = 0x00; //
     // 23 to 39: pev_id, all 00
-    fillSourceMac(myMAC, 40); // 40 to 45: PEV MAC
+    memcpy(&myethtransmitbuffer[40], myMAC, 6); // 40 to 45: PEV MAC
     // 46 to 62: evse_id, all 00
-    fillDestinationMac(evseMac, 63); // 63 to 68: EVSE MAC
-    fillSourceMac(myMAC, 69); // 69 to 76: runid. The PEV mac, plus 00 00.
+    memcpy(&myethtransmitbuffer[63], evseMac, 6); // 63 to 68: EVSE MAC
+    memcpy(&myethtransmitbuffer[69], myMAC, 6); // 69 to 76: runid. The PEV mac, plus 00 00.
     // 77 to 84: reserved, all 00
 }
 
@@ -403,10 +361,8 @@ static void composeSetKey(void)
        Table 11-88 in the homeplug_av21_specification_final_public.pdf */
     myethtransmitbufferLen = 60;
     cleanTransmitBuffer();
-    // Destination MAC
-    fillDestinationMac(MAC_BROADCAST, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
+    memcpy(&myethtransmitbuffer[0], MAC_BROADCAST, 6); // Destination MAC
+    memcpy(&myethtransmitbuffer[6], myMAC, 6); // Source MAC
     // Protocol
     myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
     myethtransmitbuffer[13] = 0xE1; //
@@ -415,7 +371,7 @@ static void composeSetKey(void)
     myethtransmitbuffer[16] = 0x60; //
     myethtransmitbuffer[17] = 0x00; // frag_index
     myethtransmitbuffer[18] = 0x00; // frag_seqnum
-    myethtransmitbuffer[19] = 0x01; // 0 key info type
+    myethtransmitbuffer[19] = 0x01; // 0 key type
 
     myethtransmitbuffer[20] = 0xaa; // 1 my nonce
     myethtransmitbuffer[21] = 0xaa; // 2
@@ -427,19 +383,19 @@ static void composeSetKey(void)
     myethtransmitbuffer[26] = 0x00; // 7
     myethtransmitbuffer[27] = 0x00; // 8
 
-    myethtransmitbuffer[28] = 0x04; // 9 nw info pid
+    myethtransmitbuffer[28] = 0x04; // 9 nw pid
 
-    myethtransmitbuffer[29] = 0x00; // 10 info prn
+    myethtransmitbuffer[29] = 0x00; // 10 prn
     myethtransmitbuffer[30] = 0x00; // 11
     myethtransmitbuffer[31] = 0x00; // 12 pmn
     myethtransmitbuffer[32] = 0x00; // 13 cco cap
-    setNidAt(33); // 14-20 nid  7 bytes from 33 to 39
-    //          Network ID to be associated with the key distributed herein.
-    //          The 54 LSBs of this field contain the NID (refer to Section 3.4.3.1). The
-    //          two MSBs shall be set to 0b00.
-    myethtransmitbuffer[40] = 0x01; // 21 peks (payload encryption key select) Table 11-83. 01 is NMK. We had 02 here, why???
+    memcpy(&myethtransmitbuffer[33], NID, 7); // 14-20 nid  7 bytes from 33 to 39
+    // Network ID to be associated with the key distributed herein.
+    // The 54 LSBs of this field contain the NID (refer to Section 3.4.3.1). The two MSBs shall be set to 0b00.
+    myethtransmitbuffer[40] = 0x01; // 21 peks (payload encryption key select) Table 11-83. 01 is NMK.
     // with 0x0F we could choose "no key, payload is sent in the clear"
-    setNmkAt(41);
+    memcpy(&myethtransmitbuffer[41], NMK, 16); // NMK
+
 #define variation 0
     myethtransmitbuffer[41] += variation; // to try different NMKs
     // and three remaining zeros
@@ -476,42 +432,6 @@ static void evaluateSetKeyCnf(void)
     }
 }
 
-#if false
-static void composeGetKey(void)
-{
-    /* CM_GET_KEY.REQ request
-       from https://github.com/uhi22/plctool2/blob/master/listen_to_eth.c
-       and homeplug_av21_specification_final_public.pdf */
-    myethtransmitbufferLen = 60;
-    cleanTransmitBuffer();
-    // Destination MAC
-    fillDestinationMac(MAC_BROADCAST, 0);
-    // Source MAC
-    fillSourceMac(myMAC, 6);
-    // Protocol
-    myethtransmitbuffer[12] = 0x88; // Protocol HomeplugAV
-    myethtransmitbuffer[13] = 0xE1;
-    myethtransmitbuffer[14] = 0x01; // version
-    myethtransmitbuffer[15] = 0x0C; // CM_GET_KEY.REQ https://github.com/uhi22/plctool2/blob/master/plc_homeplug.h
-    myethtransmitbuffer[16] = 0x60; //
-    myethtransmitbuffer[17] = 0x00; // 2 bytes fragmentation information. 0000 means: unfragmented.
-    myethtransmitbuffer[18] = 0x00; //
-    myethtransmitbuffer[19] = 0x00; // 0 Request Type 0=direct
-    myethtransmitbuffer[20] = 0x01; // 1 RequestedKeyType only "NMK" is permitted over the H1 interface.
-    //           value see HomeplugAV2.1 spec table 11-89. 1 means AES-128.
-
-    setNidAt(21); // NID starts here (table 11-91 Homeplug spec is wrong. Verified by accepted command.)
-    myethtransmitbuffer[28] = 0xaa; // 10-13 mynonce. The position at 28 is verified by the response of the devolo.
-    myethtransmitbuffer[29] = 0xaa; //
-    myethtransmitbuffer[30] = 0xaa; //
-    myethtransmitbuffer[31] = 0xaa; //
-    myethtransmitbuffer[32] = 0x04; // 14 PID. According to  ISO15118-3 fix value 4, "HLE protocol"
-    myethtransmitbuffer[33] = 0x00; // 15-16 PRN Protocol run number
-    myethtransmitbuffer[34] = 0x00; //
-    myethtransmitbuffer[35] = 0x00; // 17 PMN Protocol message number
-}
-#endif
-
 void readModemVersions(void)
 {
     composeGetSwReq();
@@ -524,10 +444,9 @@ void evaluateGetSwCnf(void)
        Reference: see wireshark interpreted frame from TPlink, Ioniq and Alpitronic charger */
     uint8_t i, x;
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received GET_SW.CNF");
-    numberOfSoftwareVersionResponses += 1;
     uint8_t* sourceMac = &myethreceivebuffer[6];
 
-    verLen = myethreceivebuffer[22];
+    uint8_t verLen = myethreceivebuffer[22];
     if ((verLen > 0) && (verLen < 0x30))
     {
         char strVersion[200];
@@ -773,7 +692,7 @@ void runSdpStateMachine(void)
         SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.
         sdp_state = 1;
     }
-    else if (sdp_state == 1)   // SDP request transmission and waiting for SDP response.
+    else if (sdp_state == 1) // SDP request transmission and waiting for SDP response.
     {
         /* The normal state transition in case of received SDP response is done in
            the IPv6 receive handler. This will inform the ConnectionManager, and we will stop here
@@ -801,8 +720,6 @@ void runSdpStateMachine(void)
     }
 }
 
-static void evaluateGetKeyCnf(void) {}
-
 void evaluateReceivedHomeplugPacket(void)
 {
     if (connMgr_getLevel() >= CONNLEVEL_80_TCP_CONNECTED) {
@@ -814,9 +731,6 @@ void evaluateReceivedHomeplugPacket(void)
     }
     switch (getManagementMessageType())
     {
-    case CM_GET_KEY | MMTYPE_CNF:
-        evaluateGetKeyCnf();
-        break;
     case CM_SLAC_MATCH | MMTYPE_CNF:
         evaluateSlacMatchCnf();
         break;

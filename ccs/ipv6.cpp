@@ -225,7 +225,7 @@ void ipv6_packRequestIntoEthernet(void) {
    myethtransmitbuffer[3] = 0x00;
    myethtransmitbuffer[4] = 0x00;
    myethtransmitbuffer[5] = 0x01;
-   fillSourceMac(getOurMac(), 6); // bytes 6 to 11 are the source MAC
+   memcpy(&myethtransmitbuffer[6], getOurMac(), 6); // bytes 6 to 11 are the source MAC
    myethtransmitbuffer[12] = 0x86; // # 86dd is IPv6
    myethtransmitbuffer[13] = 0xdd;
    myEthTransmit();
@@ -270,9 +270,9 @@ void evaluateNeighborSolicitation(void) {
 
    /* send a NeighborAdvertisement as response. */
    // destination MAC = neighbors MAC
-   fillDestinationMac(NeighborsMac, 0); // bytes 0 to 5 are the destination MAC
+   memcpy(&myethtransmitbuffer[0], NeighborsMac, 6); // bytes 0 to 5 are the destination MAC
    // source MAC = my MAC
-   fillSourceMac(getOurMac(), 6); // bytes 6 to 11 are the source MAC
+   memcpy(&myethtransmitbuffer[6], getOurMac(), 6); // bytes 6 to 11 are the source MAC
    // Ethertype 86DD
    myethtransmitbuffer[12] = 0x86; // # 86dd is IPv6
    myethtransmitbuffer[13] = 0xdd;
