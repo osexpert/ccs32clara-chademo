@@ -84,19 +84,19 @@ uint16_t getEtherType(uint8_t* messagebufferbytearray)
     return etherType;
 }
 
-static void cleanTransmitBuffer(void)
+static void cleanTransmitBuffer()
 {
     /* fill the complete ethernet transmit buffer with 0x00 */
     memset(myethtransmitbuffer, 0, MY_ETH_TRANSMIT_BUFFER_LEN);
 }
 
-static uint16_t getManagementMessageType(void)
+static uint16_t getManagementMessageType()
 {
     /* calculates the MMTYPE (base value + lower two bits), see Table 11-2 of homeplug spec */
     return (myethreceivebuffer[16] << 8) | myethreceivebuffer[15];
 }
 
-void composeGetSwReq(void)
+void composeGetSwReq()
 {
     /* GET_SW.REQ request, as used by the win10 laptop */
     myethtransmitbufferLen = 60;
@@ -115,7 +115,7 @@ void composeGetSwReq(void)
     myethtransmitbuffer[19] = 0x52; //
 }
 
-static void composeSlacParamReq(void)
+static void composeSlacParamReq()
 {
     /* SLAC_PARAM request, as it was recorded 2021-12-17 WP charger 2 */
     myethtransmitbufferLen = 60;
@@ -137,11 +137,11 @@ static void composeSlacParamReq(void)
     memcpy(&mme[2], myMAC, 6); // 2-9: 8 bytes runid. The Ioniq uses the PEV mac plus 00 00.
 }
 
-static void evaluateSlacParamCnf(void)
+static void evaluateSlacParamCnf()
 {
     /* As PEV, we receive the first response from the charger. */
     _global.ccsLifesign = true;
-    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint102: received SLAC_PARAM.CNF");
+    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_PARAM.CNF");
     setCheckpoint(102);
     if (iAmPev)
     {
@@ -160,7 +160,7 @@ static void evaluateSlacParamCnf(void)
     }
 }
 
-static void composeStartAttenCharInd(void)
+static void composeStartAttenCharInd()
 {
     /* reference: see wireshark interpreted frame from ioniq */
     myethtransmitbufferLen = 60;
@@ -186,7 +186,7 @@ static void composeStartAttenCharInd(void)
     memcpy(&mme[11], myMAC, 6); // 11-18: runid, filled with MAC of PEV and two bytes 00 00
 }
 
-static void composeNmbcSoundInd(void)
+static void composeNmbcSoundInd()
 {
     /* reference: see wireshark interpreted frame from Ioniq */
     myethtransmitbufferLen = 71;
@@ -212,7 +212,7 @@ static void composeNmbcSoundInd(void)
     memset(&mme[36], 0xFF, 16); // 36-51: random number. All 0xff in the ioniq message.
 }
 
-static void evaluateAttenCharInd(void)
+static void evaluateAttenCharInd()
 {
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received ATTEN_CHAR.IND");
     if (iAmPev == 1)
@@ -296,7 +296,7 @@ static void composeAttenCharRsp(const uint8_t* destMac)
     // 50: result. 0 is ok
 }
 
-static void composeSlacMatchReq(void)
+static void composeSlacMatchReq()
 {
     /* reference: see wireshark interpreted frame from Ioniq */
     myethtransmitbufferLen = 85;
@@ -326,7 +326,7 @@ static void composeSlacMatchReq(void)
     // 58-65: reserved, all 00
 }
 
-static void evaluateSlacMatchCnf(void)
+static void evaluateSlacMatchCnf()
 {
     if (pevSequenceState != STATE_WAITING_FOR_SLAC_MATCH_CNF)
     {
@@ -334,6 +334,7 @@ static void evaluateSlacMatchCnf(void)
         return;
     }
 
+    addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SLAC_MATCH.CNF");
     // The SLAC_MATCH.CNF contains the NMK and the NID.
     // We extract this information, so that we can use it for the CM_SET_KEY afterwards.
     // References: https://github.com/qca/open-plc-utils/blob/master/slac/evse_cm_slac_match.c
@@ -359,7 +360,7 @@ static void evaluateSlacMatchCnf(void)
 
         // use the extracted NMK and NID to set the key in the adaptor:
         composeSetKey();
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint170: transmitting SET_KEY.REQ");
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting SET_KEY.REQ");
         setCheckpoint(170);
         myEthTransmit();
 
@@ -367,7 +368,7 @@ static void evaluateSlacMatchCnf(void)
     }
 }
 
-static void composeSetKey(void)
+static void composeSetKey()
 {
     /* CM_SET_KEY.REQ request */
     /* From example trace from catphish https://openinverter.org/forum/viewtopic.php?p=40558&sid=9c23d8c3842e95c4cf42173996803241#p40558
@@ -387,19 +388,15 @@ static void composeSetKey(void)
     // MME
     auto mme = &myethtransmitbuffer[19];
     mme[0] = 0x01; // 0 key type. 0x01 is NMK.
-
     mme[1] = 0xaa; // 1-4 my nonce
     mme[2] = 0xaa;
     mme[3] = 0xaa;
     mme[4] = 0xaa;
-
     mme[5] = 0x00; // 5-8 your nonce
     mme[6] = 0x00;
     mme[7] = 0x00;
     mme[8] = 0x00;
-
     mme[9] = 0x04; // 9 nw pid. 0x04 is HLE protocol.
-
     mme[10] = 0x00; // 10-11 prn
     mme[11] = 0x00;
     mme[12] = 0x00; // 12 pmn
@@ -415,7 +412,7 @@ static void composeSetKey(void)
     mme[22] += variation; // to try different NMKs
 }
 
-static void evaluateSetKeyCnf(void)
+static void evaluateSetKeyCnf() // The Setkey confirmation
 {
     if (pevSequenceState != STATE_WAITING_FOR_SET_KEY_CNF)
     {
@@ -423,19 +420,18 @@ static void evaluateSetKeyCnf(void)
         return;
     }
 
-    // The Setkey confirmation
-    uint8_t result;
-    // In spec, the result 0 means "success". But in reality, the 0 means: did not work. When it works,
-    // then the LEDs are blinking (device is restarting), and the response is 1.
-    // open-plc-utils do the same: https://github.com/qca/open-plc-utils/blob/358dfcf78bdaf7b0b13dcdf91cb1aae1789f2770/slac/evse_cm_set_key.c
-    // if (! confirm->RESULT) return (slac_debug(session, session->exit, __func__, "Device refused request"));
-	// So for some reason, they did not follow the spec:-)
-
     addToTrace(MOD_HOMEPLUG, "[PEVSLAC] received SET_KEY.CNF");
-    result = myethreceivebuffer[19];
+    auto mme = &myethreceivebuffer[19];
+
+    // The Result field interpretation used by Qualcommis based on HomePlug AV 1.0 specification, where 0x00 is a failure.
+    // The later versions of the HomePlug specification(HomePlug AV 1.1 and HomePlug Green PHY) considers the result field as being set to 0x00 for success.
+    // BUT! The spec does not define the CM_SET_KEY.CNF mme and write it is up to the implementation how to handle CM_SET_KEY.CNF, if at all! [V2G3-A09-101]
+    // open-plc-utils: https://github.com/qca/open-plc-utils/blob/358dfcf78bdaf7b0b13dcdf91cb1aae1789f2770/slac/evse_cm_set_key.c
+    // if (! confirm->RESULT) return (slac_debug(session, session->exit, __func__, "Device refused request"));
+    uint8_t result = mme[0];
     if (result == 0)
     {
-        //this would be a bad sign for local modem, but normal for remote
+        // this would be a bad sign for local modem, but normal for remote
         addToTrace(MOD_HOMEPLUG, "[PEVSLAC] SET_KEY.CNF says 0: Device refused request.");
     }
     else
@@ -446,13 +442,13 @@ static void evaluateSetKeyCnf(void)
     }
 }
 
-void readModemVersions(void)
+void readModemVersions()
 {
     composeGetSwReq();
     myEthTransmit();
 }
 
-void evaluateGetSwCnf(void)
+void evaluateGetSwCnf()
 {
     /* The GET_SW confirmation. This contains the software version of the homeplug modem.
        Reference: see wireshark interpreted frame from TPlink, Ioniq and Alpitronic charger */
@@ -529,7 +525,7 @@ void runSlacStateMachine()
     }
     else if (pevSequenceState == STATE_SEND_SLAC_PARAM_REQ)
     {
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint100: Sending SLAC_PARAM.REQ...");
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Sending SLAC_PARAM.REQ...");
         setCheckpoint(100);
         composeSlacParamReq();
         myEthTransmit();
@@ -616,7 +612,7 @@ void runSlacStateMachine()
     else if (pevSequenceState == STATE_SEND_SLAC_MATCH_REQ)
     {
         composeSlacMatchReq();
-        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Checkpoint150: transmitting SLAC_MATCH.REQ...");
+        addToTrace(MOD_HOMEPLUG, "[PEVSLAC] transmitting SLAC_MATCH.REQ...");
         setCheckpoint(150);
         myEthTransmit();
         slac_enterState(STATE_WAITING_FOR_SLAC_MATCH_CNF);
@@ -652,7 +648,7 @@ void runSlacStateMachine()
 static int sdpRecoveryState = 0;
 static int sdpRecoveryDelay = 0;
 
-void runSdpRecoveryStateMachine(void)
+void runSdpRecoveryStateMachine()
 {
     if (connMgr_getLevel() != CONNLEVEL_5_SDP_RECOVERY)
     {
@@ -691,7 +687,7 @@ void runSdpRecoveryStateMachine(void)
     }
 }
 
-void runSdpStateMachine(void)
+void runSdpStateMachine()
 {
     if (connMgr_getLevel() != CONNLEVEL_15_SLAC_DONE_SDP_NEXT)
     {
@@ -702,7 +698,7 @@ void runSdpStateMachine(void)
     if (sdp_state == 0)
     {
         // Next step is to discover the chargers communication controller (SECC) using discovery protocol (SDP).
-        addToTrace(MOD_HOMEPLUG, "[SDP] Checkpoint200: Starting SDP.");
+        addToTrace(MOD_HOMEPLUG, "[SDP] Starting SDP.");
         setCheckpoint(200);
         sdpDelayCycles = 0;
         SdpRepetitionCounter = 50; // prepare the number of retries for the SDP. The more the better.
@@ -736,7 +732,7 @@ void runSdpStateMachine(void)
     }
 }
 
-void evaluateReceivedHomeplugPacket(void)
+void evaluateReceivedHomeplugPacket()
 {
     if (connMgr_getLevel() >= CONNLEVEL_80_TCP_CONNECTED) {
         /* we have TCP traffic running, so we ignore all homeplug management packets. This
