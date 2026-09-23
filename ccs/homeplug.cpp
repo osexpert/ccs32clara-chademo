@@ -538,7 +538,7 @@ void runSlacStateMachine()
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_PARAM_CNF) // Waiting for slac_param confirmation.
     {
         // [V2G3-A09-07] wait TT_match_response:200ms until any charger answer with SLAC_PARAM_CNF.
-        if (pevSequenceCyclesInState > 7) // wait for 200ms
+        if (pevSequenceCyclesInState > 7) // TT_match_response:200ms
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout while waiting for SLAC_PARAM.CNF");
             slacDelayCycles = 33 - 7; // delay before retry, no need to flood
@@ -623,7 +623,7 @@ void runSlacStateMachine()
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SLAC_MATCH_CNF)
     {
-        if (pevSequenceCyclesInState > 7) // 200ms
+        if (pevSequenceCyclesInState > 7) // TT_match_response:200ms
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SLAC_MATCH.CNF");
             slac_enterState(STATE_INITIAL);
@@ -632,7 +632,9 @@ void runSlacStateMachine()
     }
     else if (pevSequenceState == STATE_WAITING_FOR_SET_KEY_CNF)
     {
-        if (pevSequenceCyclesInState > 7) // 200ms
+        // This response time does not seem to be covered by the spec. Spec has TT_match_join:12s but this cover a much larger "area".
+        // Worst case in my logs: 664ms
+        if (pevSequenceCyclesInState > 33) // 1s
         {
             addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Timeout waiting for SET_KEY.CNF");
             slac_enterState(STATE_INITIAL);
