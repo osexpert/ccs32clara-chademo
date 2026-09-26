@@ -599,7 +599,7 @@ void runSlacStateMachine()
         {
             if (AttenCharIndCount > 0)
             {
-                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] Received %d ATTEN_CHAR.IND", AttenCharIndCount);
+                addToTrace(MOD_HOMEPLUG, "[PEVSLAC] ATTEN_CHAR.IND count:%d", AttenCharIndCount);
                 slac_enterState(STATE_SEND_SLAC_MATCH_REQ);
             }
             else

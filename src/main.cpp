@@ -621,16 +621,16 @@ int adapter_charging()
     rcc_periph_clock_disable(RCC_CAN1);
     rcc_periph_clock_disable(RCC_RNG);
 
-    systick_setup(0xFFFFFF); //max 99.88 ms
+    systick_setup(0xFFFFFF); // max 99.88 ms
 
     bool ledState = true;
-    uint32_t last_system_millis = 0;
+    uint32_t last_system_millis = 0; // not millis in this case, it is 100millis:-)
 
     while (1)
     {
         __WFI();
 
-        if ((system_millis - last_system_millis) >= 20)
+        if ((system_millis - last_system_millis) >= 20) // 20 * 100ms = 2seconds
         {
             last_system_millis += 20;
 

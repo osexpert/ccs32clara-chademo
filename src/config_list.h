@@ -55,5 +55,5 @@ CONFIG_ITEM(CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION, "open-adapte
 
 CONFIG_ITEM(EXI_LOGGING, "exi-logging", bool, false);
 
-// CCS SoC is scaled from chademo 0-€“100% to 0-{max-report-soc}%.
+// ccs soc is scaled from chademo 0-100% to 0-{max-report-soc}%.
 CONFIG_ITEM(MAX_REPORT_SOC, "max-report-soc", uint8_t, 100);

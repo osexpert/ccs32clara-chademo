@@ -176,7 +176,7 @@ void evaluateTcpPacket(void)
 
 void tcp_connect(void)
 {
-   addToTrace(MOD_TCP, "[TCP] Checkpoint301: connecting from %d", evccPort);
+   addToTrace(MOD_TCP, "[TCP] Connecting from %d", evccPort);
    setCheckpoint(301);
 
    tcpHeaderLen = 20; /* 20 bytes normal header, no options */

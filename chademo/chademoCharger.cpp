@@ -360,7 +360,7 @@ int ChademoCharger::GetCyclicOffset(uint8_t offset)
  * Optimized to 0.83f to satisfy both safety criteria:
  * - Drops below 25% (100V) after 1.0 second (~62V)
  * - Drops below 10V after 2.0 seconds (~9V due to int truncation)
- * Formula: factor = 10th root of 0.155 (0.155000^0.1) = 0.8300000f
+ * Formula: factor = 10th root of 0.155 (0.155^0.1) = 0.83f
  * This reduces the voltage by exactly 17% every 100ms.
  */
 const float VOLTAGE_BLEED_RETAIN_FACTOR = 0.83f;
@@ -492,7 +492,7 @@ void ChademoCharger::RunStateMachine()
     {
         if (min(_carData.ProtocolNumber, _chargerData.ProtocolNumber) >= ProtocolNumber::Chademo_1_0 ?
             not has_flag(_carData.Status, CarStatus::CONTACTOR_OPEN) : // Typ: 1-2 seconds after D2, Spec: max 4 sec.
-            // jedemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
+            // jdemo will wait only 400ms after it start to request current, for ChargerStatus::CHARGING to be set / ChargerStatus::STOPPED to be cleared. So need to use RequestCurrent as trigger, the 2second wait is too long.
             ((_carData.MaxRequestCurrentBeforeD2 == 0 && _carData.RequestCurrent > 0) || HasElapsedMs(CHADEMO_09_AssumeCarContactorsClosed_MS)) // chademo 0.9 (and earlier) did not have the flag, so wait 2 seconds and hope for the best (spec: compliance time 2 seconds). A real chademo charger would measure the inlet voltage and know when (> 50V), but this adapter doesn't have a voltmeter.
             )
         {
