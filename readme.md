@@ -250,10 +250,10 @@ The releases and the actions has updated info.
 ## Building
 If you want to compile the software from scratch, you can follow these instructions
 
-### Linux
+### Linux: Debian/Ubuntu
 
 - git clone https://github.com/osexpert/ccs32clara-chademo.git
-- cd into directory ccs32clara-chademo
+- cd ccs32clara-chademo
 - git submodule init
 - git submodule update
 - sudo apt install gcc-arm-none-eabi
@@ -261,11 +261,33 @@ If you want to compile the software from scratch, you can follow these instructi
 - make get-deps
 - make
 
+### Linux: Fedora
+
+- git clone https://github.com/osexpert/ccs32clara-chademo.git
+- cd ccs32clara-chademo
+- git submodule init
+- git submodule update
+- sudo dnf install arm-none-eabi-gcc arm-none-eabi-newlib
+- bash
+- make get-deps
+- make
+
+### MacOS on a macbook pro M1
+
+- brew uninstall arm-none-eabi-gcc arm-none-eabi-binutils
+- brew install --cask gcc-arm-embedded
+- git clone https://github.com/osexpert/ccs32clara-chademo.git
+- cd ccs32clara-chademo
+- git submodule init
+- git submodule update
+- make get-deps
+- make
+
 This will output a My407ccs2chademo.bin file that you can flash onto the adapter
 
 ### Windows
 
-- Instructions in build.txt
+- Instructions in build-windows.txt
 
 # ccs32clara
 
