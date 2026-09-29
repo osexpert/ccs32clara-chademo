@@ -714,6 +714,7 @@ extern "C" int main(void)
     println("battery level:%d (1:low, 2:ok, 3:good)", batteryLevel);
 
     bool stopPressed = not DigIo::stop_button_in_inverted.Get();
+    if (stopPressed) println("Stop pressed -> start special modes selection");
     special_modes_init(stopPressed);
 
     can_setup();

@@ -89,21 +89,20 @@ uint8_t read_write_byte(uint8_t param)
 
 static void mySpiTransmitReceive()
 {
-    cm_disable_interrupts();
-
-    //while (SPI_SR(SPI1) & SPI_SR_BSY);
-    DigIo::spi_cs_out.Clear();
-
-    small_delay();
-
-    for (uint32_t i = 0; i < mySpiDataSize; i++) 
+    CM_ATOMIC_BLOCK()
     {
-        mySpiRxBuffer[i] = read_write_byte(mySpiTxBuffer[i]);
+        //while (SPI_SR(SPI1) & SPI_SR_BSY);
+        DigIo::spi_cs_out.Clear();
+
+        small_delay();
+
+        for (uint32_t i = 0; i < mySpiDataSize; i++)
+        {
+            mySpiRxBuffer[i] = read_write_byte(mySpiTxBuffer[i]);
+        }
+
+        DigIo::spi_cs_out.Set();
     }
-
-    DigIo::spi_cs_out.Set();
-
-    cm_enable_interrupts();
 }
 
 static void spiQCA7000DemoReadSignature(void) {
