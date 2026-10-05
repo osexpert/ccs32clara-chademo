@@ -587,7 +587,7 @@ void ChademoCharger::RunStateMachine()
             // We do not have any timeout here currently. But possibly it is not needed since we have all the stop reasons?
             if (CONFIG_SX && _sxState != SX_DONE)
             {
-                _chargerData.OutputCurrent = 1; // fake towards the car
+                _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // fake towards the car
 
                 if (_sxState == SX_INITIAL)
                 {
@@ -676,7 +676,7 @@ void ChademoCharger::RunStateMachine()
                 // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
                 if (not _isDischarging && _chargerData.OutputCurrent == 0)
                 {
-                    _chargerData.OutputCurrent = 1; // fake towards the car
+                    _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // fake towards the car
                 }
             }
         }

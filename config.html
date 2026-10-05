@@ -149,6 +149,20 @@
     box-shadow: 0 0 0 2px rgba(224, 164, 88, 0.3);
   }
 
+  /* --- SETTING DESCRIPTIONS (info button + expandable row) --- */
+  button.info{
+    width:1.6rem; height:1.6rem; padding:0; margin-left:.4rem;
+    border-radius:50%; background:transparent; color:var(--dim);
+    border:1px solid var(--line); font-size:.65rem; font-style:italic;
+    line-height:1; vertical-align:middle;
+  }
+  button.info:hover, button.info[aria-expanded="true"]{color:var(--accent); border-color:var(--accent);}
+  tr.desc td{
+    color:var(--dim); font-size:.7rem; line-height:1.5; white-space:pre-wrap;
+    padding:.3rem .5rem .6rem; background:rgba(94,230,160,.05);
+    border-left:2px solid var(--accent-dim);
+  }
+
   /* --- OTHER ELEMENTS --- */
   .row{display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;}
   button{
@@ -238,6 +252,8 @@ let fileBytes = null;     // Uint8Array, mutated in place on write — only copy
 let fileName = "firmware.bin";
 let blocks = [];           // parsed block descriptors, incl. loadedValue snapshot
 let configs = [];          // flat list of {name, description, values(resolved)}
+let settingDescriptions = {}; // setting name -> description, from "settings" in configs.json
+const openInfo = new Set();   // setting names whose description is expanded; survives render()
 
 const dropEl = document.getElementById('drop');
 const fwVersionEl = document.getElementById('fwVersion');
@@ -336,12 +352,44 @@ function parseAndRender(){
   actionsEl.style.display = 'flex';
 }
 
+// Builds the "i" button and the expandable description row for a setting.
+// Returns null when configs.json has no description for it (no button is shown then).
+function buildInfo(settingName){
+  const description = settingDescriptions[settingName];
+  if (!description) return null;
+
+  const descTd = document.createElement('td');
+  descTd.colSpan = 4;
+  descTd.textContent = description;
+
+  const descTr = document.createElement('tr');
+  descTr.className = 'desc';
+  descTr.hidden = !openInfo.has(settingName);
+  descTr.appendChild(descTd);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'info';
+  button.textContent = 'i';
+  button.setAttribute('aria-label', `About ${settingName}`);
+  button.setAttribute('aria-expanded', String(!descTr.hidden));
+  button.addEventListener('click', () => {
+    descTr.hidden = !descTr.hidden;
+    if (descTr.hidden) openInfo.delete(settingName); else openInfo.add(settingName);
+    button.setAttribute('aria-expanded', String(!descTr.hidden));
+  });
+
+  return { button, row: descTr };
+}
+
 function render(){
   rowsEl.innerHTML = '';
   blocks.forEach(b => {
     const tr = document.createElement('tr');
     const nameTd = document.createElement('td');
     nameTd.innerHTML = `<span class="name">${b.name}</span>`;
+    const info = buildInfo(b.name);
+    if (info) nameTd.appendChild(info.button);
     const typeTd = document.createElement('td');
     typeTd.innerHTML = `<span class="type">${b.type}</span><span class="badge">${b.valueLen}B</span>`;
     const origTd = document.createElement('td');
@@ -392,6 +440,7 @@ function render(){
     }
     tr.appendChild(nameTd); tr.appendChild(typeTd); tr.appendChild(origTd); tr.appendChild(valTd);
     rowsEl.appendChild(tr);
+    if (info) rowsEl.appendChild(info.row);
   });
 }
 
@@ -439,9 +488,11 @@ function setStatus(msg, isErr, isOk){
 // ---- configs ----
 
 function setConfigs(json){
+  settingDescriptions = (json && json.settings) || {};
   configs = loadConfigList(json);
   configSelect.innerHTML = '<option value="">— Custom / no config —</option>' +
     configs.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  if (blocks.length) render(); // firmware may have been loaded before configs.json arrived
 }
 
 function loadConfigsFile(file){

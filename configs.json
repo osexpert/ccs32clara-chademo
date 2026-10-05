@@ -37,5 +37,26 @@
       "description": "Emulate chademo 0.9 without welding detection (default: chademo 1.0 with welding detection). Probably better for sensitive cars like Mitsubishi Outlander PHEV that produce DTC's (P101B, P101C) after charging is done.",
       "values": { "chademo-0.9": true, "chademo-wd": false }
     }
-  ]
+  ],
+  "settings": {
+    "max-amps": "Maximum charging current (A) reported to the car. This indirectly limits the charging current by making the car ask for less. In addition, the request from the car is clamped.",
+    "stop-charging-soc": "Adapter will stop charging when SOC (reported by car) reaches N%.",
+    "max-volts": "Maximum charging voltage (V) reported to the car. Porsche Taycan requires 750V, but 750 may break compatibility with many chargers. 500V is a good default.",
+    "max-discharge-amps-fallback": "If the car reports a maximum discharge current, the car takes precedence. Else the fallback value is used as maximum discharge current.",
+    "dynamic-current-fallback": "Controls if available current is allowed to change while charging. If the car declares that it allows it, the car takes precedence. Else the fallback value is used.",
+    "sx": "Start a fake chademo charging, then wait for ccs to join. Should work better with Xpeng and Lexus.",
+    "v2x": "V2X mode enabled. It will then send and handle the special 20*-series of chademo messages. Should work equally well for charging, but some cars may not like it (speculation).",
+    "always-on": "After inactivity or charging ended, do a soft restart instead of shutting down. Below 3.3V battery it powers off. Errors and stop buttons power off, as usual.",
+    "voltage-estimation-mode": "0 = default. 1 = for target voltage 410V use nominal voltage 380V instead of 355V (better match for Leaf/e-NV200 with 20-30kWh battery).",
+    "assume-car-contactors-closed-after-ms": "Time (ms) after which the adapter assumes the car's contactors are closed. Worst case seen in logs is 1600ms before the car asks for amps, but currently 2000ms is default.",
+    "fake-idle-amps": "Fake output current (A) reported to the car, when no charging is happening. In theory, this may prevent the car from thinking charging is over and stopping the charging.",
+    "voltage-modulation": "Modulates the voltage reported to the car, by +-N Volt every 100ms. 0 = off (default). Rarely needed: added to prevent voltage deviation errors, which now seem solved.",
+    "precharge-start-delay-ms": "Delay (ms) before CCS precharge starts. 2000ms should be a safe default. In very special edge cases, some chargers could benefit from a higher value (eg 3000ms), but you would need to be an expert to know.",
+    "max-undersupply-amps": "Maximum allowed difference (undersupply) of output current compared to request current. If the difference is larger, available output current is reduced to output current + N.",
+    "chademo-wd": "Enable welding detection. Required by chademo 1.x, optional in 0.9.",
+    "chademo-0.9": "Simulate chademo 0.9 instead of 1.0. Welding detection is optional in chademo 0.9.",
+    "open-adapter-contactor-before-wd": "Open the adapter contactor before welding detection. Pro: voltage drops consistently and does not depend on the charger's bleed-down speed. Con: the inlet may not bleed down at all (spec demands <1uF, but charge could be trapped).",
+    "exi-logging": "Log the EXI messages exchanged with the charger (debugging).",
+    "max-report-soc": "SOC reported to the charger is scaled from chademo's 0-100% to 0-N%."
+  }
 }
