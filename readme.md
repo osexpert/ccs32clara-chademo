@@ -122,6 +122,8 @@ Test: power on the adapter and you should see logging in the terminal. Now you a
 
 How to get the log out of the app? Two ways: use top right button [...]->Data->Share and. eg. send as email to yourself. I use [...]->Data->Save, but I needed to adjust the save output location first, to be able to access/find the files in the Files app.
 
+Alternative app "EV-BOY CHAdeMO-CCS Debugger": https://play.google.com/store/apps/details?id=com.ev_boy.ev_boyadaptordebugginglogger
+
 ## Other
 There is a 5sec. watchdog that will reset (effectively power off) adapter if there is a hung.
 
