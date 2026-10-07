@@ -185,6 +185,7 @@ void ChademoCharger::HandlePendingCarMessages()
                     _carData.MaxVoltOverride,
                     _carData.AdjustBelowSoc, 
                     _carData.AdjustBelowFactor);
+                _carData.BatteryVoltageIsSet = true;
             }
         }
 
@@ -197,6 +198,7 @@ void ChademoCharger::HandlePendingCarMessages()
         COMPARE_SET(_msg103.m.BatteryVoltage, _msg103_isr.m.BatteryVoltage, "103.BatteryVoltage %d -> %d");
 
         _carData.BatteryVoltage = _msg103.m.BatteryVoltage;
+        _carData.BatteryVoltageIsSet = true;
         _carData.BatteryVoltageIsMeasured = true;
     }
     if (_msg110_pending)
@@ -478,7 +480,7 @@ void ChademoCharger::RunStateMachine()
         {
             // d2 = true is telling the car, you can close contactors now, so precharge voltage must be (close to) battery voltage at this point. 
             SetSwitchD2(true);
-            println("[cha] Car progressing to ChargingLoop in its own time");
+            println("[cha] Car progressing to ChargingLoop in its own time. Tip: if the car fails shortly after, the adapter contactor may be welded.");
 
             SetState(ChargerState::WaitForCarContactorsClosed);
         }

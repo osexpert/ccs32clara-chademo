@@ -552,6 +552,7 @@ struct CarData
     
     // false: estimated (default)
     bool BatteryVoltageIsMeasured = false;
+    bool BatteryVoltageIsSet = false;
 
     uint16_t CyclesSinceCarLastRequestCurrent;
 
