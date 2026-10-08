@@ -44,9 +44,9 @@ CONFIG_ITEM(CHADEMO_MAX_UNDERSUPPLY_AMPS, "max-undersupply-amps", uint8_t, 10);
 // chademo 1.* require welding detection, while in 0.9 it is optional, but maybe some cars still allow it?
 // Tested with false on Leaf 2018, it does not complain, but I don't see any difference. Maybe it is just ignore and has no effect?
 // Hard to say how other cars will behave.
-CONFIG_ITEM(CONFIG_WELDING_DETECTION, "chademo-wd", bool, true);
+//CONFIG_ITEM(CONFIG_WELDING_DETECTION, "chademo-wd", bool, true);
 
-// Simulate chademo 0.9 instead of 1.0. In Chademo 0.9, setting welding detection was optional.
+// Simulate chademo 0.9 without welding detection, instead of 1.0 with welding detection. Welding detection became mandatory in chademo 1.0.
 CONFIG_ITEM(CONFIG_CHADEMO_09, "chademo-0.9", bool, false);
 
 // Pro: voltage will drop consistently and hopefully faster? Won't rely on every chargers bleed-down speed?

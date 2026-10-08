@@ -146,6 +146,10 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.Status = (CarStatus)_msg102.m.Status;
         _carData.ProtocolNumber = _msg102.m.ProtocolNumber;
 
+        // Chademo 1.0 and later: welding detection is mandatory:-( For older versions, keep it disabled.
+        // We do not send CAN until 0x102 is recieved, so should be safe to set based on the car's chademo version
+        _chargerData.SupportWeldingDetection = min(_carData.ProtocolNumber, _chargerData.ProtocolNumber) >= Chademo_1_0;
+
         // XPeng update TargetVoltage after closing its contactors, (it seems) from real target (battery max at 4.2v) to the same as MaxVolt.
         // Why? I guess...they think it will give them faster charging? In any case, ignore changes to TargetVoltage after d2 is set
 		// TargetVoltage should normally never change, so alternative could be to snapshot it as soon as switch(k) is set. But this seemed easier.

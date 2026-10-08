@@ -657,7 +657,7 @@ struct ChargerData
     /// Chademo 1.X: welding detection is required, must be true:-/
     /// Chademo < 1.X: optional
     /// </summary>
-    bool SupportWeldingDetection = CONFIG_WELDING_DETECTION;
+    bool SupportWeldingDetection;
 
     uint8_t MaxAvailableOutputCurrent;
     uint8_t DynAvailableOutputCurrent;
