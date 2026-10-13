@@ -746,7 +746,21 @@ static void stateFunctionWaitForPreChargeStart()
     // Its "impossible" that chademo uses less than 2 seconds until reaching _preChargeDoneButStalled, so it should be safe to wait 2 sec here
     // without worry about chademo needing to wait unnecesary for _preChargeDoneButStalled.
     // How long can we wait before sending the first PreChargeReq? It seems undefined in spec.
-    if (CONFIG_SX ? true : pev_cyclesInState > (DX_CCS_PreChargeStartDelay_MS / 30))
+
+    //bool preChargeCanStart = false;
+    //if (CONFIG_SX)
+    //{
+    //    preChargeCanStart = true;
+    //}
+    //else if (pev_cyclesInState > (DX_CCS_PreChargeStartDelay_MS / 30))
+    //{
+    //    preChargeCanStart = chademoInterface_preChargeCanStart();
+    //}
+
+    if (CONFIG_SX ?
+        true :
+        pev_cyclesInState > (DX_CCS_PreChargeStartDelay_MS / 30) && chademoInterface_preChargeCanStart()
+        )
     {
         uint16_t batVtg = hardwareInterface_getBatteryVoltage();
 

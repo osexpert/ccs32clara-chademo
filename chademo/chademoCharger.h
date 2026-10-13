@@ -733,7 +733,7 @@ public:
     }
     void AlwaysOnRestore(ChademoAlwaysOnBackup bk)
     {
-        if (CONFIG_SX)
+        if (CONFIG_SX || CONFIG_SS)
         {
             // nothing, clean slate
         }
@@ -787,7 +787,7 @@ public:
         bool _d2 = false;
         bool _adapterContactorClosed = false;
 
-        bool _discovery = CONFIG_SX ? false : true;
+        bool _discovery = (CONFIG_SX || CONFIG_SS) ? false : true;
         bool _discoveryIsDone = false;
 
         bool _preChargeDoneButStalled = false;
@@ -819,6 +819,15 @@ public:
         msg209 _msg209 = {};
 
         StopReason _stopReason = StopReason::NONE;
+
+        /*
+        * #ifdef CHADEMO_SINGLE_SESSION
+        ChargerState _state = ChargerState::PreStart_DiscoveryCompleted_WaitForCableCheckDone;
+#else
+        ChargerState _state = ChargerState::Start;
+#endif
+
+*/
 
         ChargerState _state = CONFIG_SX ?
             ChargerState::WaitForChademoKickoff :

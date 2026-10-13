@@ -164,7 +164,10 @@ void ChademoCharger::HandlePendingCarMessages()
         _carData.RequestCurrent = _msg102.m.RequestCurrent;
 
         // soc and the constant both unstable before switch(k)
-        if (_carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE))
+        if (CONFIG_SS ? 
+            _carData.Switch_k : // SS: cut corners to save time, so we can start ccs preCharge a bit faster
+            _carData.Switch_k && has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)
+            )
         {
             if (_msg100.m.SocPercentConstant > 0 && _msg100.m.SocPercentConstant != 100)
                 _carData.SocPercent = ((float)_msg102.m.SocPercent / _msg100.m.SocPercentConstant) * 100;
@@ -814,6 +817,32 @@ bool chademoInterface_carContactorsClosed()
 {
     return chademoCharger->CarContactorsClosed();
 }
+
+bool ChademoCharger::PreChargeCanStart()
+{
+    return CONFIG_SS ?
+        _carData.BatteryVoltageIsSet :
+        true;
+
+    //if (CONFIG_SS)
+    //{
+    //    // SOC is stable after CarReadyToCharge, need it for Estimated battery voltage used in precharge
+    //    //bool carReadyToCharge = _state == ChargerState::WaitForPreChargeDone;
+    //    //return carReadyToCharge;
+
+    //    // To avoid waiting too long before sending first PreChargeReq, do it after switch(k), to save a second. ccs may not like waiting too long between CableCheck and first PreChargeReq.
+    //    // SOC won't change much between switch(k) and ReadyToCharge anyways, max 2%.
+    //    return _carData.BatteryVoltageIsSet;
+    //}
+
+    //return true;
+}
+
+bool chademoInterface_preChargeCanStart()
+{
+    return chademoCharger->PreChargeCanStart();
+}
+
 
 void ChademoCharger::SetState(ChargerState newState, StopReason stopReason)
 {
