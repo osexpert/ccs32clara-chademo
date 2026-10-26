@@ -128,9 +128,9 @@ Alternative app "EV-BOY CHAdeMO-CCS Debugger": https://play.google.com/store/app
 Firmware update logic is inside the bootloader, so this is not affected by the firmware:
 With adapter off, plug in usb stick with the firmware.
 Hold power button down and don't let go.
-The usb stick led flashes a few times and turns off.
-Firmware update is done and you can let go of the power button.
-Finally, adapter turns on and adapter led is flashing.
+The usb stick led flashes a few times and then turns off.
+Finally, adapter turns on, you hear the familiar relay click and adapter led is on.
+Firmware update is now done and you can let go of the power button.
 Press the stop button to turn adapter off.
 
 ## Charging the adapter
