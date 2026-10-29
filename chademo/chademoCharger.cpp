@@ -903,7 +903,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     else
     {
         auto dynMaxA = _ccs_params.EvseDynMaxCurrent();
-        COMPARE_SET(_ccs_params_EvseDynMaxCurrent, dynMaxA, "%d => %d");
+        COMPARE_SET(_ccs_params_EvseDynMaxCurrent, dynMaxA, "ccs.DynMaxCurrent %d => %d");
 
         // mirror these values
         SetChargerData(
