@@ -488,7 +488,7 @@ void special_mode_selected(enum SpecialMode mode)
 
     if (mode == SpecialMode::Discharge)
     {
-        CONFIG_V2X = true;
+        CONFIG_V2X_MODE = V2X_MODE_STD;
     }
     else if (mode == SpecialMode::ExiLogging)
     {
@@ -728,7 +728,7 @@ extern "C" int main(void)
     ChademoCharger cc;
     chademoCharger = &cc;
 
-    if (CONFIG_V2X)
+    if (CONFIG_V2X_MODE == V2X_MODE_STD)
     {
         chademoCharger->EnableDischarge();
     }

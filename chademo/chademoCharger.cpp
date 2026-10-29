@@ -16,6 +16,13 @@ extern ChademoCharger* chademoCharger;
 
 #define SWAP16(x) (uint16_t)((((x) & 0x00FF) << 8) | (((x) & 0xFF00) >> 8))
 
+template<typename T>
+bool increment_reached(T& var, T target) {
+    if (var < target)
+        ++var;
+    return var >= target;
+}
+
 #define COMPARE_SET(oldval, newval, fmt) \
     do { \
         if ((oldval) != (newval)) { \
@@ -364,6 +371,13 @@ int ChademoCharger::GetCyclicOffset(uint8_t offset)
     return result;
 }
 
+int ChademoCharger::GetMaxDischargeAmps() const
+{
+    return _carData.MaxDischargeCurrentSet
+        ? _carData.MaxDischargeCurrent
+        : MAX_DISCHARGE_AMPS_FALLBACK;  // no discharge message from car, use fallback
+}
+
 /*
  * RETAIN_FACTOR calculation:
  * Optimized to 0.83f to satisfy both safety criteria:
@@ -560,15 +574,15 @@ void ChademoCharger::RunStateMachine()
 
             // If discharge enabled, make sure there is 5 sec. left, so we can go on forever.
             // This time can be seen inside the car? So count it down as long as it does not interfere with our plans (the plan is to stop countdown at 5 seconds).
-            if (_dischargeEnabled && _chargerData.RemainingChargeTimeCycles < (CHA_CYCLES_PER_SEC * 5))
-                _chargerData.RemainingChargeTimeCycles = (CHA_CYCLES_PER_SEC * 5);
+            if (_dischargeEnabled || CONFIG_V2X_MODE == V2X_MODE_LIGHT)
+                _chargerData.RemainingChargeTimeCycles = max(_chargerData.RemainingChargeTimeCycles, uint32_t(CHA_CYCLES_PER_SEC * 5));
         }
 
         StopReason stopReason = StopReason::NONE;
         // global reason
         if (_global.powerOffPending) set_flag(&stopReason, StopReason::POWER_OFF_PENDING);
         // car reasons
-        if (_carData.CyclesSinceCarLastRequestCurrent++ > LAST_REQUEST_CURRENT_TIMEOUT_CYCLES) set_flag(&stopReason, StopReason::CAR_REQUEST_CURRENT_TIMEOUT);
+        if (increment_reached(_carData.CyclesSinceCarLastRequestCurrent, uint16_t(LAST_REQUEST_CURRENT_TIMEOUT_CYCLES))) set_flag(&stopReason, StopReason::CAR_REQUEST_CURRENT_TIMEOUT);
         if (not _carData.Switch_k) set_flag(&stopReason, StopReason::CAR_SWITCH_K_OFF);
         if (not has_flag(_carData.Status, CarStatus::READY_TO_CHARGE)) set_flag(&stopReason, StopReason::CAR_NOT_READY_TO_CHARGE);
         if (has_flag(_carData.Status, CarStatus::NOT_IN_PARK)) set_flag(&stopReason, StopReason::CAR_NOT_IN_PARK);
@@ -627,25 +641,19 @@ void ChademoCharger::RunStateMachine()
             }
             else // not SX or SX_DONE
             {
+                bool isDischarging = false;
                 if (_dischargeEnabled)
                 {
-                    bool isDischarging = false;
                     if (_chargerData.OutputCurrent == 0)
                     {
-                        // zero amps for more than 3seconds -> assume discharging (the waiting may be pointless)
-                        if (_zeroOutputAmpsCycles < (CHA_CYCLES_PER_SEC * 3)) {
-                            _zeroOutputAmpsCycles++;
-                        }
-                        if (_zeroOutputAmpsCycles >= (CHA_CYCLES_PER_SEC * 3)) {
-                            isDischarging = true;
-                        }
+                        // zero amps for more than X seconds -> assume discharging (the waiting may be pointless)
+                        isDischarging = increment_reached(_v2xModeStdZeroOutputAmpsCycles, CHA_CYCLES_PER_SEC * CONFIG_V2X_ZERO_OUTPUT_SEC);
                     }
                     else
                     {
-                        _zeroOutputAmpsCycles = 0;
+                        _v2xModeStdZeroOutputAmpsCycles = 0;
                     }
 
-                    COMPARE_SET(_isDischarging, isDischarging, "[cha] IsDischarging %d -> %d");
 
                     if (isDischarging)
                     {
@@ -657,20 +665,16 @@ void ChademoCharger::RunStateMachine()
                         // V2X unit use our request amps as a "sign" of how much we (the car) can discharge.
                         // Since we are using Chademo dynamic current control, we will limit asked amps to 10 or so, so fake a RequestCurrent to max allowed.
                         // NOTE: it may be scary to ask for too much, if the charger suddenly decide to give us what we ask for?
-                        int maxDischargeAmps = _carData.MaxDischargeCurrentSet ?
-                            _carData.MaxDischargeCurrent :
-                            MAX_DISCHARGE_AMPS_FALLBACK; // no discharge message from car, use fallback
-
-                        _carData.RequestCurrent = maxDischargeAmps;
+                        _carData.RequestCurrent = GetMaxDischargeAmps();
 
                         // My car time out after 6 minutes, if OutputCurrent = 0, so tickle OutputCurrent every minute to keep it alive.
 	                    // I wonder what purpose the Chademo discharge messages has, because RemainingDischargeTime does not help nor do DischargeCurrent. It times out regardless, if OutputCurrent = 0 .
-                        if (_fakeOutputCurrentCycles++ >= FAKE_OUTPUT_CURRENT_INTERVAL)
+                        if (increment_reached(_fakeOutputCurrentCycles, FAKE_OUTPUT_CURRENT_INTERVAL))
                         {
                             _chargerData.DischargeCurrent = 0;
                             _chargerData.OutputCurrent = 1; // tickle 1A
 
-                            _fakeOutputCurrentCycles = 0;
+                            _fakeOutputCurrentCycles = 0; // reset immeditately = tickle for one cycle
                         }
                     }
                     else
@@ -685,9 +689,20 @@ void ChademoCharger::RunStateMachine()
                 // It seems it is mainly OutputCurrent > 0 is what keeps the car alive.
                 // For DEV_VOLTS, the car does measure voltage itself and too big difference triggers it.
                 // But how does DEV_AMPS fit into this? Is this simply a check for RequestCurrent vs OutputCurrent? Or is real current measurement in the car involved?
-                if (not _isDischarging && _chargerData.OutputCurrent == 0)
+                if (not isDischarging && _chargerData.OutputCurrent == 0)
                 {
                     _chargerData.OutputCurrent = CHADEMO_FAKE_IDLE_AMPS; // fake towards the car
+
+                    if (CONFIG_V2X_MODE == V2X_MODE_LIGHT && increment_reached(_v2xModeLightZeroOutputAmpsCycles, CHA_CYCLES_PER_SEC * CONFIG_V2X_ZERO_OUTPUT_SEC))
+                    {
+                        // per default, sigenstor can only discharge 10A, as it takes the cars request current as the max discharge current. And we limit car request current to OutputCurrent + 10.
+                        // V2X unit use our request amps as a "sign" of how much we (the car) can discharge, so FAKE a higher request current from the car to the charger
+                        _carData.RequestCurrent = GetMaxDischargeAmps();
+                    }
+                }
+                else
+                {
+                    _v2xModeLightZeroOutputAmpsCycles = 0; // reset
                 }
             }
         }
@@ -904,7 +919,7 @@ void ChademoCharger::SetChargerDataFromCcsParams()
 
 void ChademoCharger::Log()
 {
-    if (_logCycleCounter++ > (CHA_CYCLES_PER_SEC * 1))
+    if (increment_reached(_logCycleCounter, CHA_CYCLES_PER_SEC * 1))
     {
         // every second
         println("[cha] state:%s cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",

@@ -8,7 +8,7 @@
     {
       "name": "V2X",
       "description": "V2X mode permanently enabled. Should work equally well for charging, but some cars may not like it (speculation).",
-      "values": { "v2x": true }
+      "values": { "v2x-mode": 1 }
     },
     {
       "name": "V2X-AO",
@@ -45,7 +45,8 @@
     "max-discharge-amps-fallback": "If the car reports a maximum discharge current, the car takes precedence. Else the fallback value is used as maximum discharge current.",
     "dynamic-current-fallback": "Controls whether available current is allowed to change while charging. If the car declares that it allows it, the car takes precedence. Else the fallback value is used.",
     "sx": "Start a fake chademo charging, then wait for CCS to join. Should work better with Xpeng and Lexus.",
-    "v2x": "Sends and handles the 0x20*-series of chademo bidirectional charging messages. Charging should work equally well, but some cars may not like it (speculation).",
+    "v2x-mode": "0: default off. 1: Sends and handles the 0x20*-series of chademo bidirectional charging messages. Charging should work equally well, but some cars may not like it (speculation). 2: Light-version that do not rely on the 0x20*-series of chademo bidirectional charging messages.",
+    "v2x-zero-output-sec": "Seconds the charger OutputCurrent must stay zero, before discharge is assumed.",
     "always-on": "After inactivity or charging ended, do a soft restart instead of shutting down. Below 3.3V battery it powers off. Errors and stop buttons power off, as usual.",
     "voltage-estimation-mode": "0 = default. 1 = for target voltage 410V use nominal voltage 380V instead of 355V (better match for Leaf/e-NV200 with 20-30kWh battery).",
     "assume-car-contactors-closed-after-ms": "Time (ms) after which the adapter assumes the car's contactors are closed. Worst case seen in logs is 1600ms before the car asks for amps, but the default is 2000ms.",

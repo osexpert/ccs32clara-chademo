@@ -22,8 +22,6 @@ CONFIG_ITEM(DYNAMIC_CONTROL_FALLBACK, "dynamic-current-fallback", bool, true);
 
 CONFIG_ITEM(CONFIG_SX, "sx", bool, false);
 
-CONFIG_ITEM(CONFIG_V2X, "v2x", bool, false);
-
 CONFIG_ITEM(CONFIG_ALWAYS_ON, "always-on", bool, false);
 
 CONFIG_ITEM(CONFIG_ALT_ESTIMATED_VOLTAGE, "voltage-estimation-mode", uint8_t, 0);
@@ -57,3 +55,13 @@ CONFIG_ITEM(EXI_LOGGING, "exi-logging", bool, false);
 
 // ccs soc is scaled from chademo 0-100% to 0-{max-report-soc}%.
 CONFIG_ITEM(MAX_REPORT_SOC, "max-report-soc", uint8_t, 100);
+
+// 0: disabled (do not read or send chademo discharge messages), 1: standard (read and send chademo discharge messages) 2: light (read chademo discharge messages, if any)
+CONFIG_ITEM(CONFIG_V2X_MODE, "v2x-mode", uint8_t, 0);
+
+// Delay in seconds to wait for charger OutputCurrent == 0 before kicking in
+CONFIG_ITEM(CONFIG_V2X_ZERO_OUTPUT_SEC, "v2x-zero-output-sec", uint8_t, 4);
+
+#define V2X_MODE_OFF 0
+#define V2X_MODE_STD 1
+#define V2X_MODE_LIGHT 2
