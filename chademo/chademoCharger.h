@@ -831,5 +831,7 @@ public:
         int _fakeOutputCurrentCycles = FAKE_OUTPUT_CURRENT_INTERVAL; // fake once during start
         int _zeroOutputAmpsCycles = 0;
         int _offset_index = 0;
+
+        int _ccs_params_EvseDynMaxCurrent = 0;
 };
 

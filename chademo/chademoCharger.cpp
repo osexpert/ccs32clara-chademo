@@ -267,18 +267,25 @@ void ChademoCharger::SetCcsParamsFromCarData()
     if (requestCurrent > maxCurrent)
         requestCurrent = maxCurrent;
 
-    // 2. Ramp
-    int diff = requestCurrent - _ccs_params.TargetCurrent;
-    if (diff > 4)
-        _ccs_params.TargetCurrent += 4; // 4A/100ms = 40A/sec ramp up
-    else if (diff < -10)
-        _ccs_params.TargetCurrent -= 10; // 10A/100ms = 100A/sec ramp down
-    else
-        _ccs_params.TargetCurrent = requestCurrent;
+    // 2. Snap
+    int targetCurrent = _ccs_params.TargetCurrent;
 
-    // 3. Limit target current to max allowed by charger
-    if (_ccs_params.TargetCurrent > maxCurrent)
-        _ccs_params.TargetCurrent = maxCurrent;
+    // 3. Ramp
+    int diff = requestCurrent - targetCurrent;
+    if (diff > 4)
+        targetCurrent += 4; // 4A/100ms = 40A/sec ramp up
+    else if (diff < -10)
+        targetCurrent -= 10; // 10A/100ms = 100A/sec ramp down
+    else
+        targetCurrent = requestCurrent;
+
+    // 4. Limit target current to max allowed by charger
+    if (targetCurrent > maxCurrent)
+        targetCurrent = maxCurrent;
+
+    // 5. Update
+    // TODO: change to direct set later
+    COMPARE_SET(_ccs_params.TargetCurrent, targetCurrent, "ccs.TargetCurrent %d -> %d");
 }
 
 bool ChademoCharger::IsTimeoutSec(uint16_t sec)
@@ -880,11 +887,14 @@ void ChademoCharger::SetChargerDataFromCcsParams()
     }
     else
     {
+        auto dynMaxA = _ccs_params.EvseDynMaxCurrent();
+        COMPARE_SET(_ccs_params_EvseDynMaxCurrent, dynMaxA, "%d => %d");
+
         // mirror these values
         SetChargerData(
             _ccs_params.EvseMaxVoltage,
             _ccs_params.EvseMaxCurrent,
-            _ccs_params.EvseDynMaxCurrent(),
+            _ccs_params_EvseDynMaxCurrent,
             _ccs_params.EvseVoltage,
             true, // measured until proven otherwise
             _ccs_params.EvseCurrent

@@ -940,10 +940,10 @@ static void stateFunctionWaitForCurrentDemandResponse()
 
             if (dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed) {
                 int evseMaxCurrent = combineValueAndMultiplier(dinDocDec.V2G_Message.Body.CurrentDemandRes.EVSEMaximumCurrentLimit);
-                _ccs_params.EvseMaxCurrentInCurrentDemandRes = evseMaxCurrent;
+                _ccs_params.EvseMaxCurrentInCurrentDemandRes = max(evseMaxCurrent, 0); // if negative value, set to 0
             }
             else {
-                _ccs_params.EvseMaxCurrentInCurrentDemandRes = 0;
+                _ccs_params.EvseMaxCurrentInCurrentDemandRes = -1; // not set
             }
 
             _ccs_params.EvseVoltage = evsePresentVoltage;
