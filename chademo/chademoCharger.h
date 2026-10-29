@@ -833,5 +833,7 @@ public:
         int _offset_index = 0;
         int _v2xModeStdZeroOutputAmpsCycles = 0;
         int _v2xModeLightZeroOutputAmpsCycles = 0;
+
+        int _ccs_params_EvseDynMaxCurrent = 0;
 };
 

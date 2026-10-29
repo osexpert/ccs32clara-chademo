@@ -58,14 +58,12 @@ struct ccs_params
 
     int EvseVoltage = 0;
     int EvseCurrent = 0;
-    int EvseMaxCurrentInCurrentDemandRes = 0;
+    int EvseMaxCurrentInCurrentDemandRes = -1; // initially not set
     int CurrentDemandStopReason = STOP_REASON_NONE;
 
     int EvseDynMaxCurrent() const
     {
-        return EvseMaxCurrentInCurrentDemandRes == 0 ?
-            EvseMaxCurrent :
-            EvseMaxCurrentInCurrentDemandRes;
+        return EvseMaxCurrentInCurrentDemandRes == -1 ? EvseMaxCurrent : EvseMaxCurrentInCurrentDemandRes;
     }
 
     bool PowerRelayOn = false;
