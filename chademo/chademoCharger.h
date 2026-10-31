@@ -593,8 +593,6 @@ struct CarData
 
     int NomVoltOverride = 0;
     int MaxVoltOverride = 0;
-    int AdjustBelowSoc = 0;
-    float AdjustBelowFactor = 0.0f;
     bool OverridesJudged = false;
 
     bool Switch_k = false;

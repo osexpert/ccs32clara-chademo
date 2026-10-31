@@ -41,6 +41,50 @@ bool increment_reached(T& var, T target) {
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
+static float GetEstimatedBatteryVoltageZE0(float target, float soc, float nomVolt = 0, float maxVolt = 0)
+{
+    if (maxVolt == 0)
+        maxVolt = target - 10;
+
+    if (nomVolt == 0)
+        nomVolt = 0.875f * target + 21.25f; // 380 for target 410 (ZE0)
+
+    // Scale for all anchors. Top half (nom -> max) is the best known part of the curve,
+    // while min is rarely known, so the lower anchors are scaled from it.
+    float topHalf = maxVolt - nomVolt;
+
+    float volt0 = nomVolt - 2.56f * topHalf;   /* 328 */
+    float volt12 = nomVolt - 1.00f * topHalf;   /* 360, knee: steep rise ends */
+    float volt37 = nomVolt - 0.1517f * topHalf; /* 377, knee: steep rise ends, plateau starts */
+    float volt80 = nomVolt + 0.55f * topHalf;   /* delta 50-80 */
+
+    if (soc < 12.0f)
+    {
+        float fraction = soc / 12.0f;
+        return volt0 + fraction * (volt12 - volt0);
+    }
+    else if (soc < 37.0f)
+    {
+        float fraction = (soc - 12.0f) / 25.0f;
+        return volt12 + fraction * (volt37 - volt12);
+    }
+    else if (soc < 50.0f)
+    {
+        float fraction = (soc - 37.0f) / 13.0f;
+        return volt37 + fraction * (nomVolt - volt37);
+    }
+    else if (soc < 80.0f)
+    {
+        float fraction = (soc - 50.0f) / 30.0f;
+        return nomVolt + fraction * (volt80 - nomVolt);
+    }
+    else
+    {
+        float fraction = (soc - 80.0f) / 20.0f;
+        return volt80 + fraction * (maxVolt - volt80);
+    }
+}
+
 /// <summary>
 /// get estimated battery volt from target and soc.
 /// make a lot of assumtions:-)
@@ -48,12 +92,13 @@ bool increment_reached(T& var, T target) {
 /// Based on Leaf data (soc from dash, volts from leafSpy).
 /// Previous logic used soc and volts from leafSpy, but soc's in dash are completely different from those in leafSpy, and obviosly dash soc are sent in chademo.
 /// </summary>
-static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float maxVolt = 0, float adjustBelowSoc = 0, float adjustBelowFactor = 0.0f)
+static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float maxVolt = 0)
 {
+    if (CONFIG_ALT_ESTIMATED_VOLTAGE == 1)
+        return GetEstimatedBatteryVoltageZE0(target, soc, nomVolt, maxVolt);
+
     if (maxVolt == 0)
-    {
         maxVolt = target - 10;
-    }
 
     if (nomVolt == 0)
     {
@@ -63,30 +108,27 @@ static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt =
         nomVolt = 0.875f * target + 6.25f;
     }
 
-    float minVolt = nomVolt - (maxVolt - nomVolt); // symetric
+    // Scale for all anchors. Top half (nom -> max) is the best known part of the curve,
+    // while min is rarely known, so the lower anchors are scaled from it.
+    float topHalf = maxVolt - nomVolt;
 
-    float deltaLow = 0.35f * (nomVolt - minVolt); // delta 20-50
-    float volt20 = nomVolt - deltaLow;
+    float volt20 = nomVolt - 0.35f * topHalf; /* delta 20-50 */
+    float volt80 = nomVolt + 0.55f * topHalf; /* delta 50-80 */
 
-    float deltaHigh = 0.55f * (maxVolt - nomVolt); // delta 50-80
-    float volt80 = nomVolt + deltaHigh;
-
-    if (adjustBelowSoc != 0 && soc < adjustBelowSoc)
+    if (soc < 50.0f)
     {
-        float volt0 = minVolt - adjustBelowFactor * (volt20 - minVolt);
-        return volt0 + (soc / adjustBelowSoc) * (volt20 - volt0);
-    }
-    else if (soc < 50.0f)
-    {
-        return volt20 + ((soc - 20.0f) / 30.0f) * (nomVolt - volt20);
+        float fraction = (soc - 20.0f) / 30.0f;
+        return volt20 + fraction * (nomVolt - volt20);
     }
     else if (soc < 80.0f)
     {
-        return nomVolt + ((soc - 50.0f) / 30.0f) * (volt80 - nomVolt);
+        float fraction = (soc - 50.0f) / 30.0f;
+        return nomVolt + fraction * (volt80 - nomVolt);
     }
     else
     {
-        return volt80 + ((soc - 80.0f) / 20.0f) * (maxVolt - volt80);
+        float fraction = (soc - 80.0f) / 20.0f;
+        return volt80 + fraction * (maxVolt - volt80);
     }
 }
 
@@ -189,9 +231,8 @@ void ChademoCharger::HandlePendingCarMessages()
                 _carData.BatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
                     _carData.SocPercent, 
                     _carData.NomVoltOverride, 
-                    _carData.MaxVoltOverride,
-                    _carData.AdjustBelowSoc, 
-                    _carData.AdjustBelowFactor);
+                    _carData.MaxVoltOverride
+                );
                 _carData.BatteryVoltageIsSet = true;
             }
         }
@@ -321,37 +362,34 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
     if (_carData.OverridesJudged)
         return;
 
-    bool override = false;
+    bool overrided = false; // to control if we should println
 
     if (_carData.TargetVoltage == 410)
     {
         if (CONFIG_ALT_ESTIMATED_VOLTAGE == 1) // Leaf 20-30
         {
             _carData.NomVoltOverride = 380;
-            _carData.AdjustBelowSoc = 29;
-            _carData.AdjustBelowFactor = 0.7f;
-            override = true;
+            overrided = true;
         }
         else // Leaf 40+ (default)
         {
             _carData.NomVoltOverride = 355; 
-            override = true;
+            overrided = true;
         }
     }
     else if (_carData.TargetVoltage == 336) // Peugeot iOn
     {
         _carData.NomVoltOverride = 310;
         _carData.MaxVoltOverride = 336;
+        overrided = true;
     }
 
-    if (override)
-        println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv adjustBelowSoc:%d adjustBelowFactor:%f (0=default)", 
+    if (overrided)
+        println("[cha] AV%d: override target %dv => nomVolt:%dv maxVolt:%dv (0=default)", 
             CONFIG_ALT_ESTIMATED_VOLTAGE, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
             _carData.MaxVoltOverride,
-            _carData.AdjustBelowSoc,
-            &_carData.AdjustBelowFactor // bypass float to double promotion by passing as reference
         );
 
     _carData.OverridesJudged = true;
