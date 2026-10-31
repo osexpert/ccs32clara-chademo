@@ -429,13 +429,13 @@ static void pev_sendCurrentDemandReq()
     // EVTargetVoltage
     uint16_t targetVoltage = hardwareInterface_getChargingTargetVoltage(); /* The charging target. Scaling is 1V. */
     uint16_t targetCurrent = hardwareInterface_getChargingTargetCurrent(); /* The charging target current. Scaling is 1A. */
-    uint16_t EVMaximumVoltageLimit = _ccs_params.MaxVoltage;
-    if (EVMaximumVoltageLimit > 1 && targetVoltage > EVMaximumVoltageLimit) {
-        /* Some chargers run into emergency shutdown, if the requested or actual voltage is above the announced EVMaximumVoltageLimit. */
-        targetVoltage = EVMaximumVoltageLimit;
-        addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is above EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
-            targetVoltage, EVMaximumVoltageLimit);
-    }
+    //uint16_t EVMaximumVoltageLimit = _ccs_params.MaxVoltage;
+    //if (EVMaximumVoltageLimit > 1 && targetVoltage > EVMaximumVoltageLimit) {
+    //    /* Some chargers run into emergency shutdown, if the requested or actual voltage is above the announced EVMaximumVoltageLimit. */
+    //    targetVoltage = EVMaximumVoltageLimit;
+    //    addToTrace(MOD_PEV, "Warning: TargetVoltage %dV is above EVMaximumVoltageLimit %dV, which may cause charger shutdown.",
+    //        targetVoltage, EVMaximumVoltageLimit);
+    //}
 #define req dinDocEnc.V2G_Message.Body.CurrentDemandReq
     req.EVTargetVoltage.Multiplier = 0;  /* -3 to 3. The exponent for base of 10. */
     req.EVTargetVoltage.Unit = dinunitSymbolType_V;
