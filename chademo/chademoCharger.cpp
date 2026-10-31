@@ -228,9 +228,9 @@ void ChademoCharger::HandlePendingCarMessages()
 
             // estimate if not measured
             if (not _carData.BatteryVoltageIsMeasured) {
-                _carData.BatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage, 
-                    _carData.SocPercent, 
-                    _carData.NomVoltOverride, 
+                _carData.BatteryVoltage = GetEstimatedBatteryVoltage(_carData.TargetVoltage,
+                    _carData.SocPercent,
+                    _carData.NomVoltOverride,
                     _carData.MaxVoltOverride
                 );
                 _carData.BatteryVoltageIsSet = true;
@@ -389,7 +389,7 @@ void ChademoCharger::SetBatteryVoltOverridesOnce()
             CONFIG_ALT_ESTIMATED_VOLTAGE, 
             _carData.TargetVoltage, 
             _carData.NomVoltOverride,
-            _carData.MaxVoltOverride,
+            _carData.MaxVoltOverride
         );
 
     _carData.OverridesJudged = true;
