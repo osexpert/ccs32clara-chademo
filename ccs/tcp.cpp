@@ -21,6 +21,12 @@
 #define CLIENT_MIN_PORT 49152
 #define CLIENT_MAX_PORT 65535
 
+/* offsets in myethreceivebuffer: 14 bytes Ethernet, 40 bytes IPv6 (without extension headers), then TCP */
+#define TCP_RX_IP_SOURCE 22
+#define TCP_RX_IP_DEST 38
+#define TCP_RX_SEGMENT 54
+#define TCP_RX_MIN_HEADER 20
+
 static uint32_t nextRetryTime = 0;
 static uint32_t retryDelay = TCP_ACK_INITIAL_TIMEOUT_MS;
 static uint32_t retryTotalElapsed = 0;
@@ -60,6 +66,37 @@ uint32_t tcp_getTotalNumberOfRetries(void) {
   return tcp_debug_totalRetryCounter;
 }
 
+#define TCP_SEGMENT_OK        0
+#define TCP_SEGMENT_TOO_LONG  1 /* the segment isn't complete in the receive buffer */
+#define TCP_SEGMENT_BAD_SUM   2 /* its checksum is wrong */
+
+/* Checks the received TCP segment (segLen bytes, from the IPv6 payload length): is it complete in the receive buffer,
+   and is its checksum over the IPv6 pseudo header and the segment right (RFC 9293 section 3.1, RFC 8200 section 8.1)?
+   Summed with the checksum field included, a correct segment gives 0. qca7000.cpp keeps at most
+   MY_ETH_RECEIVE_BUFFER_LEN bytes of a frame, so a longer segment can't be checked (or used). The checksum function
+   writes a padding byte after an odd-length segment, so an odd one needs that byte free in the buffer too. */
+static uint8_t tcp_checkSegment(uint16_t segLen)
+{
+    uint16_t needed = TCP_RX_SEGMENT + segLen + (segLen & 1);
+    if (segLen < TCP_RX_MIN_HEADER || TCP_RX_SEGMENT + segLen > myethreceivebufferLen
+        || needed > MY_ETH_RECEIVE_BUFFER_LEN)
+    {
+        /* The frame was longer than the receive buffer and was cut (or the IPv6 length is wrong). Its end is missing,
+          so it can't be checked or used. Before, a payload of 177 to 199 bytes was copied from beyond the end of
+          myethreceivebuffer. */
+        return TCP_SEGMENT_TOO_LONG;
+    }
+    if (calculateUdpAndTcpChecksumForIPv6(&myethreceivebuffer[TCP_RX_SEGMENT], segLen,
+        &myethreceivebuffer[TCP_RX_IP_SOURCE], &myethreceivebuffer[TCP_RX_IP_DEST],
+        NEXT_TCP) != 0)
+    {
+        /* A corrupted segment changes nothing; the charger sends it again, as it does a lost one. Without this check, a
+        corrupted segment was taken as it came: its flags, its sequence and ACK numbers and its data. */
+        return TCP_SEGMENT_BAD_SUM;
+    }
+    return TCP_SEGMENT_OK;
+}
+
 void evaluateTcpPacket(void)
 {
    uint8_t flags;
@@ -85,6 +122,13 @@ void evaluateTcpPacket(void)
    {
       addToTrace(MOD_TCP, "[TCP] wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
       return; /* wrong port */
+   }
+
+   auto segCheck = tcp_checkSegment(pLen);
+   if (segCheck != TCP_SEGMENT_OK)
+   {
+       addToTrace(MOD_TCP, "[TCP] bad segment: %d", segCheck);
+       return;
    }
 
    remoteSeqNr =
