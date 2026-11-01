@@ -68,9 +68,11 @@ uint32_t tcp_getTotalNumberOfRetries(void) {
     return tcp_debug_totalRetryCounter;
 }
 
-#define TCP_SEGMENT_OK        0
-#define TCP_SEGMENT_TOO_LONG  1 /* the segment isn't complete in the receive buffer */
-#define TCP_SEGMENT_BAD_SUM   2 /* its checksum is wrong */
+#define TCP_SEGMENT_OK          0
+#define TCP_SEGMENT_TOO_SHORT   1 /* TCP segment shorter than minimum header */
+#define TCP_SEGMENT_TOO_LONG    2 /* the segment isn't complete in the receive buffer */
+#define TCP_SEGMENT_BAD_HEADER  3 /* TCP header length < 20 bytes or greater than segment length */
+#define TCP_SEGMENT_BAD_SUM     4 /* its checksum is wrong */
 
 /* Checks the received TCP segment (segLen bytes, from the IPv6 payload length): is it complete in the receive buffer,
    and is its checksum over the IPv6 pseudo header and the segment right (RFC 9293 section 3.1, RFC 8200 section 8.1)?
@@ -79,21 +81,21 @@ uint32_t tcp_getTotalNumberOfRetries(void) {
    writes a padding byte after an odd-length segment, so an odd one needs that byte free in the buffer too. */
 static uint8_t tcp_checkSegment(uint16_t segLen)
 {
-    uint16_t needed = TCP_RX_SEGMENT + segLen + (segLen & 1);
-    if (segLen < TCP_RX_MIN_HEADER || TCP_RX_SEGMENT + segLen > myethreceivebufferLen
-        || needed > MY_ETH_RECEIVE_BUFFER_LEN)
-    {
-        /* The frame was longer than the receive buffer and was cut (or the IPv6 length is wrong). Its end is missing,
-          so it can't be checked or used. Before, a payload of 177 to 199 bytes was copied from beyond the end of
-          myethreceivebuffer. */
+    if (segLen < TCP_RX_MIN_HEADER)
+        return TCP_SEGMENT_TOO_SHORT;
+
+    uint32_t needed = TCP_RX_SEGMENT + segLen + (segLen & 1);
+    if (TCP_RX_SEGMENT + segLen > myethreceivebufferLen || needed > MY_ETH_RECEIVE_BUFFER_LEN)
         return TCP_SEGMENT_TOO_LONG;
-    }
+
+    uint16_t hdrLen = (myethreceivebuffer[TCP_RX_SEGMENT + 12] >> 4) * 4;
+    if (hdrLen < TCP_RX_MIN_HEADER || hdrLen > segLen)
+        return TCP_SEGMENT_BAD_HEADER;
+
     if (calculateUdpAndTcpChecksumForIPv6(&myethreceivebuffer[TCP_RX_SEGMENT], segLen,
         &myethreceivebuffer[TCP_RX_IP_SOURCE], &myethreceivebuffer[TCP_RX_IP_DEST],
         NEXT_TCP) != 0)
     {
-        /* A corrupted segment changes nothing; the charger sends it again, as it does a lost one. Without this check, a
-        corrupted segment was taken as it came: its flags, its sequence and ACK numbers and its data. */
         return TCP_SEGMENT_BAD_SUM;
     }
     return TCP_SEGMENT_OK;
@@ -101,49 +103,33 @@ static uint8_t tcp_checkSegment(uint16_t segLen)
 
 void evaluateTcpPacket(void)
 {
-    uint8_t flags;
-    uint32_t remoteSeqNr;
-    uint32_t remoteAckNr;
-    uint16_t sourcePort, destinationPort, pLen, hdrLen, tmpPayloadLen;
-
-    pLen = (((uint16_t)myethreceivebuffer[18]) << 8) | myethreceivebuffer[19]; /* length of the IP payload */
-
-    auto segCheck = tcp_checkSegment(pLen);
+    uint16_t pLen = (((uint16_t)myethreceivebuffer[18]) << 8) | myethreceivebuffer[19]; /* length of the IP payload */
+    uint8_t segCheck = tcp_checkSegment(pLen);
     if (segCheck != TCP_SEGMENT_OK)
     {
         addToTrace(MOD_TCP, "[TCP] bad segment: %d", segCheck);
         return;
     }
 
-    hdrLen = (myethreceivebuffer[66] >> 4) * 4; /* header length in byte */
-    //log_v("pLen=%d, hdrLen=%d", pLen, hdrLen);
-    if (pLen >= hdrLen)
-    {
-        tmpPayloadLen = pLen - hdrLen;
-    }
-    else
-    {
-        tmpPayloadLen = 0; /* no TCP payload data */
-    }
-    sourcePort = (((uint16_t)myethreceivebuffer[54]) << 8) | myethreceivebuffer[55];
-    destinationPort = (((uint16_t)myethreceivebuffer[56]) << 8) | myethreceivebuffer[57];
+    uint16_t sourcePort = (((uint16_t)myethreceivebuffer[54]) << 8) | myethreceivebuffer[55];
+    uint16_t destinationPort = (((uint16_t)myethreceivebuffer[56]) << 8) | myethreceivebuffer[57];
     if ((sourcePort != seccTcpPort) || (destinationPort != evccPort))
     {
         addToTrace(MOD_TCP, "[TCP] wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
         return; /* wrong port */
     }
 
-    remoteSeqNr =
+    uint32_t remoteSeqNr =
         (((uint32_t)myethreceivebuffer[58]) << 24) |
         (((uint32_t)myethreceivebuffer[59]) << 16) |
         (((uint32_t)myethreceivebuffer[60]) << 8) |
         (((uint32_t)myethreceivebuffer[61]));
-    remoteAckNr =
+    uint32_t remoteAckNr =
         (((uint32_t)myethreceivebuffer[62]) << 24) |
         (((uint32_t)myethreceivebuffer[63]) << 16) |
         (((uint32_t)myethreceivebuffer[64]) << 8) |
         (((uint32_t)myethreceivebuffer[65]));
-    flags = myethreceivebuffer[67];
+    uint8_t flags = myethreceivebuffer[67];
 
     if (flags & TCP_FLAG_RST)
     {
@@ -163,10 +149,9 @@ void evaluateTcpPacket(void)
 
     if (tcpState == TCP_STATE_SYN_SENT)
     {
-        if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK))   /* This is the connection setup response from the server. */
+        if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK) && remoteAckNr == TcpSndNxt)   /* This is the connection setup response from the server. */
         {
             TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
-            TcpSndNxt = TcpSeqNr; /* nothing sent yet on the new connection */
             TcpAckNr = remoteSeqNr + 1; /* The ACK number of our next transmit packet is one more than the received seq number. */
             setCheckpoint(303);
             tcpState = TCP_STATE_ESTABLISHED;
@@ -181,18 +166,6 @@ void evaluateTcpPacket(void)
         return;
     }
 
-    /* Here the state is ESTABLISHED, or CLOSED with our FIN sent and the charger's FIN still expected. */
-
-    /* The ACK first, so that the ACK we send for the data below carries the sequence number the charger expects. We
-       advance TcpSeqNr only when the charger acknowledges a request. A response usually also acknowledges the request;
-       if we acknowledged its data before taking that ACK, our ACK would carry the request's own sequence number, below
-       what the charger has already received. The charger discards such an ACK (RFC 9293 section 3.10.7.4) and, unless
-       our next request comes first, sends its response again after its retransmission timeout.
-       Only an ACK number from TcpSeqNr (SND.UNA) to TcpSndNxt (SND.NXT) is taken (RFC 9293 section 3.10.7.4). A
-       repeated earlier segment from the charger carries an older ACK number: taking it would move TcpSeqNr backwards,
-       so that our next request reuses sequence numbers. The retransmission timer stops only once everything sent is
-       acknowledged; stopping it on such an older ACK would leave a lost request unrepeated.
-       This is outside the ESTABLISHED check on purpose: the ACK of our FIN arrives in the CLOSED state. */
     if (flags & TCP_FLAG_ACK)
     {
         // handles 32-bit sequence number wraparound
@@ -210,49 +183,58 @@ void evaluateTcpPacket(void)
         {
             /* acknowledges something already acknowledged, or something never sent: ignore the ACK (the segment's
                data, if any, is still handled below) */
-            addToTrace(MOD_TCP, "[TCP] ACK outside range: ignore");
+            addToTrace(MOD_TCP, "[TCP] ACK outside range");
         }
     }
 
+    // already verified by tcp_checkSegment
+    uint16_t hdrLen = (myethreceivebuffer[TCP_RX_SEGMENT + 12] >> 4) * 4;
+    uint16_t payloadLen = pLen - hdrLen;
+
     if (tcpState == TCP_STATE_ESTABLISHED)
     {
-        //log_v("L=%d", tmpPayloadLen);
-        if (tmpPayloadLen > TCP_RX_DATA_LEN) println("[TCP] Too much data");
-        bool hasPayload = (tmpPayloadLen > 0) && (tmpPayloadLen <= TCP_RX_DATA_LEN);
+        bool hasPayload = (payloadLen > 0);
         bool isInSequence = (remoteSeqNr == TcpAckNr);
 
-        if (hasPayload && !isInSequence)
+        if (hasPayload)
         {
-            /* The data doesn't start at the next byte we expect. Either we already have it (the charger sent the
-               segment again), or a segment before it was lost. As RFC 9293 section 3.10.7.4 requires, acknowledge what
-               has been received and drop the segment; the charger then sends what is missing. Handing a repeated
-               response to the application as a new one would make it send its next request early. */
-            addToTrace(MOD_TCP, "[TCP] wrong data sequence: drop %d %d %d", tmpPayloadLen, remoteSeqNr, TcpAckNr); // len=1 (1 byte garbage) seqDiff=-1 (1 less than expected) is keepalive
-            tcp_sendAck();
-        }
-        else if (hasPayload)
-        {
-            /* This is a data transfer packet. */
-            tcp_rxdataLen = tmpPayloadLen;
-            /* myethreceivebuffer[74] is the first payload byte. */
-            /* Fix for https://github.com/uhi22/ccs32clara/issues/15. We explicitely need to copy the data here,
-            because the application will look asynchronously on the tcp_rxdata, and if in between some other received
-            data would end up in the myethreceivebuffer (e.g. neighbour solicitation, or TCP traffic with other ports),
-            the overwritten myethreceivebuffer would lead to not seeing the tcp_rxdata anymore, if this would be just
-            a pointer to myethreceivebuffer[74]. */
-            memcpy(tcp_rxdata, &myethreceivebuffer[54 + hdrLen], tcp_rxdataLen);  /* provide the received data to the application */
-            // connMgr_TcpOk();
-            TcpAckNr = remoteSeqNr + tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
-            tcp_sendAck();
+            if (payloadLen > TCP_RX_DATA_LEN)
+            {
+                addToTrace(MOD_TCP, "[TCP] Too much data: %d", payloadLen);
+            }
+            else if (!isInSequence)
+            {
+                /* The data doesn't start at the next byte we expect. Either we already have it (the charger sent the
+                   segment again), or a segment before it was lost. As RFC 9293 section 3.10.7.4 requires, acknowledge what
+                   has been received and drop the segment; the charger then sends what is missing. Handing a repeated
+                   response to the application as a new one would make it send its next request early. */
+                addToTrace(MOD_TCP, "[TCP] wrong data sequence: drop %d %d %d", payloadLen, remoteSeqNr, TcpAckNr); // len=1 (1 byte garbage) seqDiff=-1 (1 less than expected) is keepalive
+            }
+            else
+            {
+                /* This is a data transfer packet. */
+                tcp_rxdataLen = payloadLen;
+                /* myethreceivebuffer[74] is the first payload byte. */
+                /* Fix for https://github.com/uhi22/ccs32clara/issues/15. We explicitely need to copy the data here,
+                because the application will look asynchronously on the tcp_rxdata, and if in between some other received
+                data would end up in the myethreceivebuffer (e.g. neighbour solicitation, or TCP traffic with other ports),
+                the overwritten myethreceivebuffer would lead to not seeing the tcp_rxdata anymore, if this would be just
+                a pointer to myethreceivebuffer[74]. */
+                memcpy(tcp_rxdata, &myethreceivebuffer[54 + hdrLen], tcp_rxdataLen);  /* provide the received data to the application */
+                // connMgr_TcpOk();
+                TcpAckNr = remoteSeqNr + tcp_rxdataLen; /* The ACK number of our next transmit packet is tcp_rxdataLen more than the received seq number. */
 
-            addToTrace_bytes(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
+                addToTrace_bytes(MOD_TCPTRAFFIC, "Data received: ", tcp_rxdata, tcp_rxdataLen);
+            }
+
+            tcp_sendAck();
         }
     }
 
     if (flags & TCP_FLAG_FIN)
     {
         addToTrace(MOD_TCP, "[TCP] FIN received, sending ACK");
-        TcpAckNr = remoteSeqNr + tmpPayloadLen + 1; // + tmpPayloadLen in case there is data + FIN
+        TcpAckNr = remoteSeqNr + payloadLen + 1; // + payloadLen in case there is data + FIN
         tcp_sendAck();
         tcpState = TCP_STATE_CLOSED; // even if some chargers keep sending data, AI is very clear about FIN and RST both terminate the session. I agree.
         peerFinPending = false;
@@ -268,6 +250,7 @@ void tcp_connect(void)
     tcpPayloadLen = 0;   /* only the TCP header, no data is in the connect message. */
     tcp_prepareTcpHeader(TCP_FLAG_SYN);
     tcp_packRequestIntoIp();
+    TcpSndNxt = TcpSeqNr + 1;
     tcpState = TCP_STATE_SYN_SENT;
     finPending = peerFinPending = false;
     tcp_setRetry();
@@ -449,7 +432,7 @@ void tcp_checkRetry(void)
     if (lastTransmitAckPending && (tcpState == TCP_STATE_ESTABLISHED || tcpState == TCP_STATE_SYN_SENT))
     {
         uint32_t now = rtc_get_ms();
-        if (now >= nextRetryTime)
+        if ((int32_t)(now - nextRetryTime) >= 0)
         {
             bool syn = (tcpState == TCP_STATE_SYN_SENT);
             if (retryTotalElapsed >= TCP_MAX_TOTAL_RETRY_TIME_MS)
