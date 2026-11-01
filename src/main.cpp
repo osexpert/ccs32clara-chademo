@@ -459,7 +459,7 @@ static void print_ccs_trace()
         int state = _ccs_params.opmode;
         const char* label = pevSttLabels[state];
 
-        println("[ccs] In state %s. TcpRetries %u. out:%uV/%uA max:%uV/%uA/%uA  mirror:%uV/%uA car: ask:%uA target:%uV batt:%uV max:%uV/%uA soc:%d",
+        println("[ccs] In state %s. TcpRetries %d. out:%dV/%dA max:%dV/%dA/%dA  mirror:%dV/%dA car: ask:%dA target:%dV batt:%dV max:%dV/%dA soc:%d",
             label,
             tcp_getTotalNumberOfRetries(),
             _ccs_params.EvseVoltage,
@@ -584,7 +584,7 @@ static void SetRandomStartPort()
     rng_disable(); // Disable RNG when finished to save power
 
     uint16_t start_port = setStartPort(rand_num);
-    println("Random start port:%u", start_port);
+    println("Random start port:%d", start_port);
 }
 
 /* Called when systick fires */
