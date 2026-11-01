@@ -15,5 +15,6 @@ jobs:
         with:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
+          delete_workflow_pattern: "pages-build-deployment|Delete old workflow runs"
           retain_days: 0
           keep_minimum_runs: 1
