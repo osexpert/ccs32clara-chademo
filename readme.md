@@ -262,6 +262,12 @@ This will output a My407ccs2chademo.bin file that you can flash onto the adapter
 
 - Instructions in build-windows.txt
 
+### Too heavy, power off
+The adapter works like a lever on the chademo port and can produce too much force on the metal lock hinge. This can trigger the chademo end stop button switch being pressed, since the hinge and stop button switch is connected. You can not see the button being pressed, it is the internal switch being pressed. Over time, this can also cause too much stress on the chademo port notch in the car, and weaken or break the notch.
+It took a couple of years of use before I experienced the problem, so I am guessing the notch in my car has now weakened... I made a piece of wood (5cm in height) that I put between the adapter and the car:
+<img width="1105" height="1473" alt="image" src="https://github.com/user-attachments/assets/b9b5b881-40a7-43cd-81fb-254ac072efc1" />
+This is on Leaf ZE1, other cars need other hacks. I have seen home made supports to put between the charging cable and the ground. Use whatever that will take the load of the adapter metal lock hinge against the chademo port notch.
+
 # ccs32clara
 
 ![image](doc/clara_logo_colored.jpg) 
