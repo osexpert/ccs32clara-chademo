@@ -228,7 +228,7 @@ void evaluateTcpPacket(void)
                segment again), or a segment before it was lost. As RFC 9293 section 3.10.7.4 requires, acknowledge what
                has been received and drop the segment; the charger then sends what is missing. Handing a repeated
                response to the application as a new one would make it send its next request early. */
-            addToTrace(MOD_TCP, "[TCP] wrong data sequence: drop");
+            addToTrace(MOD_TCP, "[TCP] wrong data sequence: drop %d %d %d", tmpPayloadLen, remoteSeqNr, TcpAckNr); // len=1 (1 byte garbage) seqDiff=-1 (1 less than expected) is keepalive
             tcp_sendAck();
         }
         else if (hasPayload)
