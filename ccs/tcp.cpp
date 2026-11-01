@@ -106,8 +106,15 @@ void evaluateTcpPacket(void)
     uint32_t remoteAckNr;
     uint16_t sourcePort, destinationPort, pLen, hdrLen, tmpPayloadLen;
 
-    /* todo: check the IP addresses, checksum etc */
     pLen = (((uint16_t)myethreceivebuffer[18]) << 8) | myethreceivebuffer[19]; /* length of the IP payload */
+
+    auto segCheck = tcp_checkSegment(pLen);
+    if (segCheck != TCP_SEGMENT_OK)
+    {
+        addToTrace(MOD_TCP, "[TCP] bad segment: %d", segCheck);
+        return;
+    }
+
     hdrLen = (myethreceivebuffer[66] >> 4) * 4; /* header length in byte */
     //log_v("pLen=%d, hdrLen=%d", pLen, hdrLen);
     if (pLen >= hdrLen)
@@ -124,13 +131,6 @@ void evaluateTcpPacket(void)
     {
         addToTrace(MOD_TCP, "[TCP] wrong port: %d!=%d||%d!=%d", sourcePort, seccTcpPort, destinationPort, evccPort);
         return; /* wrong port */
-    }
-
-    auto segCheck = tcp_checkSegment(pLen);
-    if (segCheck != TCP_SEGMENT_OK)
-    {
-        addToTrace(MOD_TCP, "[TCP] bad segment: %d", segCheck);
-        return;
     }
 
     remoteSeqNr =
@@ -195,12 +195,10 @@ void evaluateTcpPacket(void)
        This is outside the ESTABLISHED check on purpose: the ACK of our FIN arrives in the CLOSED state. */
     if (flags & TCP_FLAG_ACK)
     {
+        // handles 32-bit sequence number wraparound
         int32_t ackMinusUna = (int32_t)(remoteAckNr - TcpSeqNr);
         int32_t ackMinusNxt = (int32_t)(remoteAckNr - TcpSndNxt);
-        bool ackIsBehindUna = ackMinusUna < 0;
-        bool ackIsBeyondNxt = ackMinusNxt > 0;
-
-        if (!ackIsBehindUna && !ackIsBeyondNxt)
+        if (ackMinusUna >= 0 && ackMinusNxt <= 0)
         {
             TcpSeqNr = remoteAckNr; /* The sequence number of our next transmit packet is given by the received ACK number. */
             if (TcpSeqNr == TcpSndNxt)
@@ -212,14 +210,15 @@ void evaluateTcpPacket(void)
         {
             /* acknowledges something already acknowledged, or something never sent: ignore the ACK (the segment's
                data, if any, is still handled below) */
-            addToTrace(MOD_TCP, "[TCP] ACK for data not sent: ignore");
+            addToTrace(MOD_TCP, "[TCP] ACK outside range: ignore");
         }
     }
 
     if (tcpState == TCP_STATE_ESTABLISHED)
     {
         //log_v("L=%d", tmpPayloadLen);
-        bool hasPayload = (tmpPayloadLen > 0) && (tmpPayloadLen < TCP_RX_DATA_LEN);
+        if (tmpPayloadLen > TCP_RX_DATA_LEN) println("[TCP] Too much data");
+        bool hasPayload = (tmpPayloadLen > 0) && (tmpPayloadLen <= TCP_RX_DATA_LEN);
         bool isInSequence = (remoteSeqNr == TcpAckNr);
 
         if (hasPayload && !isInSequence)
