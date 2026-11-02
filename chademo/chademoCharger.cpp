@@ -959,7 +959,7 @@ void ChademoCharger::Log()
 {
     if (increment_reached(_logCycleCounter, CHA_CYCLES_PER_SEC * 2))
     {
-        // every second
+        // every 2 seconds
         println("[cha] state:%s cycles:%d out:%dV/%dA max:%dV/%dA/%dA rem_t:%ds st=0x%02x car: req:%dA est_t:%dm max_t:%ds st:0x%02x err:0x%02x target:%dV max:%dV soc:%d%% batt:%dV cap=%fkWh",
             GetStateName(),
             _cyclesInState,
