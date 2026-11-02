@@ -198,7 +198,7 @@ Chademo spec says D2 (pin 10) should drive the car contactors directly and be ab
 The adapter uses a transistor and can supply (at best) 1/3 of this. AFAIK, Electway have the same problem.
 Most cars do not follow the spec and use D2 to drive a small relay, that again drive the car contactors from the 12V car battery.
 So in this case, two wrongs make a right:-) The problem is, some cars _do_ follow the spec:
-- The triplets (Mitsubishi i-Miev, Peugeot iOn, Citroen C-Zero) is most known.
+- The triplets (Mitsubishi i-Miev, Peugeot iOn, Citroen C-Zero) is most known. It is possible that only cars before 2013 need the mod. Google claim "something" changed around 2013, that made the chademo software and/or hardware more "modern".
 
 - Orion BMS. The standard wiring follow the spec and does not work: https://www.orionbms.com/manuals/pdf/chademo_integration.pdf
 One alternative wiring is spotted: instead of pulling current from D2, it switches its own current from GND to D2. This wiring will burn the D2 transistor after a few minutes: https://github.com/osexpert/ccs32clara-chademo/discussions/50
