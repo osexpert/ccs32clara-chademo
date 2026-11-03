@@ -779,8 +779,8 @@ public:
         bool _msg102_recieved = false;
         bool _send_can = false;
 
-        // Initially ovveride to 0v. Set to -1 to not override
-        int _overrideOutputVoltage = 0;
+        // Initially ovveride to 0v
+        Nullable<int> _overrideOutputVoltage{ 0 };
 
         bool _d1 = false;
         bool _d2 = false;

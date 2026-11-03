@@ -565,7 +565,7 @@ void ChademoCharger::RunStateMachine()
 
             println("[cha] Car contactors closed");
             _carData.CarContactorsClosed = true;
-            _overrideOutputVoltage = -1; // stop override and let car "see" the charger voltage.
+            _overrideOutputVoltage.unset(); // stop override and let car "see" the charger voltage.
 
             if (CONFIG_SX)
             {
@@ -778,7 +778,7 @@ void ChademoCharger::RunStateMachine()
             // But if the car uses the 11 steps on page 83, and only rely on CAN voltage, this won't help.
             // Some ccs chargers voltage during WD can not be trusted, adapter does not have a voltmeter, some cars rely on CAN voltage alone to avoid adding own voltmeter.
             // Could use chademo 0.9, that allows not doing WD...
-            _overrideOutputVoltage = _overrideOutputVoltage * VOLTAGE_BLEED_RETAIN_FACTOR;
+            _overrideOutputVoltage = _overrideOutputVoltage.value() * VOLTAGE_BLEED_RETAIN_FACTOR;
             // Some also suggest to call OpenAdapterContactor here, but not sure. At least now its configurable.
             if (CONFIG_OPEN_ADAPTER_CONTACTOR_BEFORE_WELDING_DETECTION && _adapterContactorClosed)
                 OpenAdapterContactor();
@@ -1139,7 +1139,7 @@ void ChademoCharger::UpdateChargerMessages()
     // ZE0 seems to hangs the second time, if discharge is enabled during discovery
     COMPARE_SET(_msg109.m.DischargeCompatible, _dischargeEnabled && not _discovery, "109.DischargeCompatible %d -> %d");
 
-    uint16_t outputVolt = _overrideOutputVoltage >= 0 ? _overrideOutputVoltage : _chargerData.OutputVoltage;
+    uint16_t outputVolt = _overrideOutputVoltage.value_or(_chargerData.OutputVoltage);
     COMPARE_SET(_msg109.m.PresentVoltage, outputVolt, "109.OutputVoltage %d -> %d");
 
     uint8_t remainingChargingTime10s = 0;

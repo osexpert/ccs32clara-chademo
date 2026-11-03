@@ -79,3 +79,44 @@ template<typename T>
 constexpr T max(T a, T b) {
     return (a > b) ? a : b;
 }
+
+template<typename T>
+struct Nullable
+{
+private:
+    bool _is_set;
+    T _value;
+
+public:
+    Nullable() : _is_set(false), _value() {}
+
+    Nullable(const T& value)
+        : _is_set(true), _value(value) {}
+
+    void unset()
+    {
+        _is_set = false;
+    }
+
+    bool is_set() const
+    {
+        return _is_set;
+    }
+
+    void set(const T& value)
+    {
+        _value = value;
+        _is_set = true;
+    }
+
+    T value_or(const T& arg) const
+    {
+        return _is_set ? _value : arg;
+    }
+
+    // only use if you are sure is_set()
+    const T& value() const
+    {
+        return _value;
+    }
+};
