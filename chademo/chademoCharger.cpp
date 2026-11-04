@@ -41,48 +41,54 @@ bool increment_reached(T& var, T target) {
 
 #define LAST_REQUEST_CURRENT_TIMEOUT_CYCLES (CHA_CYCLES_PER_SEC * 1) // 1 second
 
-static float GetEstimatedBatteryVoltageZE0(float target, float soc, float nomVolt = 0, float maxVolt = 0)
+struct VoltPoint
 {
-    if (maxVolt == 0)
-        maxVolt = target - 10;
+    uint8_t soc;
+    float factor;
+};
 
-    if (nomVolt == 0)
-        nomVolt = 0.875f * target + 21.25f; // 380 for target 410 (ZE0)
 
-    // Scale for all anchors. Top half (nom -> max) is the best known part of the curve,
-    // while min is rarely known, so the lower anchors are scaled from it.
-    float topHalf = maxVolt - nomVolt;
+static constexpr VoltPoint Ze0Curve[] =
+{
+    { 0, -2.56f },
+    { 12, -1.00f },
+    { 37, -0.1517f },
+    { 50,  0.0f },
+    { 80,  0.55f },
+};
 
-    float volt0 = nomVolt - 2.56f * topHalf;   /* 328 */
-    float volt12 = nomVolt - 1.00f * topHalf;   /* 360, knee: steep rise ends */
-    float volt37 = nomVolt - 0.1517f * topHalf; /* 377, knee: steep rise ends, plateau starts */
-    float volt80 = nomVolt + 0.55f * topHalf;   /* delta 50-80 */
+static constexpr VoltPoint Ze1Curve[] =
+{
+    { 20, -0.35f },
+    { 50,  0.0f },
+    { 80,  0.55f },
+};
 
-    if (soc < 12.0f)
-    {
-        float fraction = soc / 12.0f;
-        return volt0 + fraction * (volt12 - volt0);
-    }
-    else if (soc < 37.0f)
-    {
-        float fraction = (soc - 12.0f) / 25.0f;
-        return volt12 + fraction * (volt37 - volt12);
-    }
-    else if (soc < 50.0f)
-    {
-        float fraction = (soc - 37.0f) / 13.0f;
-        return volt37 + fraction * (nomVolt - volt37);
-    }
-    else if (soc < 80.0f)
-    {
-        float fraction = (soc - 50.0f) / 30.0f;
-        return nomVolt + fraction * (volt80 - nomVolt);
-    }
-    else
-    {
-        float fraction = (soc - 80.0f) / 20.0f;
-        return volt80 + fraction * (maxVolt - volt80);
-    }
+static float EstimateVoltageImpl(const VoltPoint* curve, size_t count, float soc, float nomVolt, float maxVolt)
+{
+    const float topHalf = maxVolt - nomVolt;
+
+    const size_t lastSegment = count - 1;
+    size_t segment = 0;
+    while (segment < lastSegment && soc >= curve[segment + 1].soc)
+        segment++;
+
+    const bool isLast = (segment == lastSegment);
+
+    const float socLower = curve[segment].soc;
+    const float socUpper = isLast ? 100.0f : curve[segment + 1].soc;
+
+    const float voltLower = nomVolt + curve[segment].factor * topHalf;
+    const float voltUpper = isLast ? maxVolt : nomVolt + curve[segment + 1].factor * topHalf;
+
+    const float fraction = (soc - socLower) / (socUpper - socLower);
+    return voltLower + fraction * (voltUpper - voltLower);
+}
+
+template <size_t N>
+static inline float EstimateVoltage(const VoltPoint(&curve)[N], float soc, float nomVolt, float maxVolt)
+{
+    return EstimateVoltageImpl(curve, N, soc, nomVolt, maxVolt);
 }
 
 /// <summary>
@@ -94,41 +100,27 @@ static float GetEstimatedBatteryVoltageZE0(float target, float soc, float nomVol
 /// </summary>
 static float GetEstimatedBatteryVoltage(float target, float soc, float nomVolt = 0, float maxVolt = 0)
 {
-    if (CONFIG_ALT_ESTIMATED_VOLTAGE == 1)
-        return GetEstimatedBatteryVoltageZE0(target, soc, nomVolt, maxVolt);
-
     if (maxVolt == 0)
         maxVolt = target - 10;
 
-    if (nomVolt == 0)
+    if (CONFIG_ALT_ESTIMATED_VOLTAGE == 1)
     {
-        // Based on 2 extreme data points: iMiev 370 -> 330 and BMW i5 M60: 450 -> 400
-        // For 410 -> 365 (leaf 20-30kwh is 380, leaf 40+ is 355, so 365 is not a bad estimate)
-        // PS: For known targets, we set nomVoltOverride, so this will only be used for unknown targets
-        nomVolt = 0.875f * target + 6.25f;
-    }
+        if (nomVolt == 0)
+            nomVolt = 0.875f * target + 21.25f; // 380 for target 410 (ZE0)
 
-    // Scale for all anchors. Top half (nom -> max) is the best known part of the curve,
-    // while min is rarely known, so the lower anchors are scaled from it.
-    float topHalf = maxVolt - nomVolt;
-
-    float volt20 = nomVolt - 0.35f * topHalf; /* delta 20-50 */
-    float volt80 = nomVolt + 0.55f * topHalf; /* delta 50-80 */
-
-    if (soc < 50.0f)
-    {
-        float fraction = (soc - 20.0f) / 30.0f;
-        return volt20 + fraction * (nomVolt - volt20);
-    }
-    else if (soc < 80.0f)
-    {
-        float fraction = (soc - 50.0f) / 30.0f;
-        return nomVolt + fraction * (volt80 - nomVolt);
+        return EstimateVoltage(Ze0Curve, soc, nomVolt, maxVolt);
     }
     else
     {
-        float fraction = (soc - 80.0f) / 20.0f;
-        return volt80 + fraction * (maxVolt - volt80);
+        if (nomVolt == 0)
+        {
+            // Based on 2 extreme data points: iMiev 370 -> 330 and BMW i5 M60: 450 -> 400
+            // For 410 -> 365 (leaf 20-30kwh is 380, leaf 40+ is 355, so 365 is not a bad estimate)
+            // PS: For known targets, we set nomVoltOverride, so this will only be used for unknown targets
+            nomVolt = 0.875f * target + 6.25f;
+        }
+
+        return EstimateVoltage(Ze1Curve, soc, nomVolt, maxVolt);
     }
 }
 
